@@ -8,10 +8,19 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showTransactionForm, setShowTransactionForm] = useState(false)
+  
+  // Form state
+  const [selectedWorkspace, setSelectedWorkspace] = useState('')
+  const [transactionType, setTransactionType] = useState('PAYMENT_RECEIVED')
+  const [amount, setAmount] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('')
+  const [creating, setCreating] = useState(false)
+  
   const router = useRouter()
 
   useEffect(() => {
-    // Verificar sesión
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
@@ -37,23 +46,20 @@ export default function Dashboard() {
       setLoading(true)
       setError(null)
 
-      // Cargar workspaces
       const { data: wsData, error: wsError } = await supabase
         .from('workspaces')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(10)
 
       if (wsError) throw wsError
       setWorkspaces(wsData || [])
 
-      // Cargar transacciones
       const { data: txData, error: txError } = await supabase
         .from('transactions')
         .select('*')
         .eq('created_by', userId)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(20)
 
       if (txError) throw txError
       setTransactions(txData || [])
@@ -82,17 +88,29 @@ export default function Dashboard() {
     }
   }
 
-  const createTestTransaction = async () => {
-    if (workspaces.length === 0) {
-      alert('Primero creá un workspace!')
+  const handleCreateTransaction = async (e) => {
+    e.preventDefault()
+    
+    if (!selectedWorkspace) {
+      alert('Seleccioná un workspace primero!')
+      return
+    }
+    
+    if (!amount || amount <= 0) {
+      alert('Ingresá un monto válido!')
+      return
+    }
+
+    if (!description.trim()) {
+      alert('Ingresá una descripción!')
       return
     }
 
     try {
-      const workspace = workspaces[0]
+      setCreating(true)
+      const workspace = workspaces.find(ws => ws.id === selectedWorkspace)
       
-      // Crear toda la jerarquía necesaria
-      // 1. Crear Business
+      // Crear jerarquía completa
       const { data: business, error: businessError } = await supabase
         .from('businesses')
         .insert([{
@@ -105,7 +123,6 @@ export default function Dashboard() {
 
       if (businessError) throw businessError
 
-      // 2. Crear Branch
       const { data: branch, error: branchError } = await supabase
         .from('branches')
         .insert([{
@@ -118,7 +135,6 @@ export default function Dashboard() {
 
       if (branchError) throw branchError
 
-      // 3. Crear Cash Point
       const { data: cashPoint, error: cashPointError } = await supabase
         .from('cash_points')
         .insert([{
@@ -130,7 +146,6 @@ export default function Dashboard() {
 
       if (cashPointError) throw cashPointError
 
-      // 4. Crear Shift
       const { data: shift, error: shiftError } = await supabase
         .from('shifts')
         .insert([{
@@ -143,7 +158,6 @@ export default function Dashboard() {
 
       if (shiftError) throw shiftError
 
-      // 5. Crear Payment Method (si no existe)
       let { data: paymentMethods } = await supabase
         .from('payment_methods')
         .select('id')
@@ -165,7 +179,6 @@ export default function Dashboard() {
         paymentMethods = newPaymentMethod
       }
 
-      // 6. Finalmente, crear la Transacción
       const { data: transaction, error: txError } = await supabase
         .from('transactions')
         .insert([{
@@ -174,13 +187,13 @@ export default function Dashboard() {
           business_id: business[0].id,
           branch_id: branch[0].id,
           cash_point_id: cashPoint[0].id,
-          type: 'PAYMENT_RECEIVED',
-          amount: 1500.00,
+          type: transactionType,
+          amount: parseFloat(amount),
           commission_amount: 0,
           payment_method_id: paymentMethods[0].id,
           payment_status: 'ACREDITED',
-          description: 'Venta de prueba - Dashboard',
-          category: 'Ventas',
+          description: description,
+          category: category || 'General',
           created_by: user.id
         }])
         .select()
@@ -188,14 +201,18 @@ export default function Dashboard() {
       if (txError) throw txError
       
       setTransactions([transaction[0], ...transactions])
-      alert('✅ Transacción creada con toda la jerarquía!')
-      
-      // Recargar datos para ver todo actualizado
+      setShowTransactionForm(false)
+      setAmount('')
+      setDescription('')
+      setCategory('')
+      alert('✅ Transacción creada exitosamente!')
       loadData(user.id)
       
     } catch (err) {
       console.error('Error creating transaction:', err)
       alert(`Error: ${err.message}`)
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -204,14 +221,33 @@ export default function Dashboard() {
     router.push('/')
   }
 
+  const getTransactionTypeLabel = (type) => {
+    const labels = {
+      'PAYMENT_RECEIVED': '💰 Cobro Recibido',
+      'EXPENSE_REGISTERED': '💸 Gasto Registrado',
+      'SUPPLIER_PAYMENT_MADE': '🏭 Pago a Proveedor',
+      'CASH_WITHDRAWN': '💵 Retiro de Efectivo',
+      'CASH_OPENED': '🔓 Apertura de Caja',
+      'CASH_CLOSED': '🔒 Cierre de Caja',
+      'MOVEMENT_REVERSED': '↩️ Movimiento Revertido'
+    }
+    return labels[type] || type
+  }
+
+  const getTransactionColor = (type) => {
+    if (type === 'PAYMENT_RECEIVED') return '#d1fae5'
+    if (type === 'EXPENSE_REGISTERED' || type === 'SUPPLIER_PAYMENT_MADE') return '#fee2e2'
+    return '#fef3c7'
+  }
+
   if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
         <div>
-          <h1 style={{ margin: 0 }}> GDT Suite - Dashboard</h1>
+          <h1 style={{ margin: 0 }}>🚀 GDT Suite - Dashboard</h1>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.8 }}>
             Conectado como: {user.email}
           </p>
@@ -222,6 +258,16 @@ export default function Dashboard() {
         >
           Cerrar Sesión
         </button>
+      </div>
+
+      {/* Info Box - Qué son los Workspaces */}
+      <div style={{ padding: '1.5rem', backgroundColor: '#dbeafe', border: '1px solid #93c5fd', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}> ¿Qué son los Workspaces?</h3>
+        <p style={{ margin: 0, color: '#1e3a8a', lineHeight: '1.6' }}>
+          Los <strong>Workspaces</strong> son espacios de trabajo de alto nivel. Cada workspace puede contener múltiples negocios (Businesses), 
+          cada negocio puede tener varias sucursales (Branches), y cada sucursal tiene sus propias cajas (Cash Points) y turnos (Shifts). 
+          Es un sistema multi-tenant que te permite gestionar varios clientes o empresas desde una sola cuenta.
+        </p>
       </div>
 
       {error && (
@@ -272,16 +318,116 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2> Transacciones Recientes ({transactions.length})</h2>
               <button 
-                onClick={createTestTransaction}
+                onClick={() => setShowTransactionForm(!showTransactionForm)}
                 style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
-                + Crear Transacción Completa
+                {showTransactionForm ? '✕ Cancelar' : '+ Nueva Transacción'}
               </button>
             </div>
+
+            {/* Transaction Form */}
+            {showTransactionForm && (
+              <div style={{ padding: '2rem', backgroundColor: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: '8px', marginBottom: '2rem' }}>
+                <h3 style={{ marginTop: 0 }}>Crear Nueva Transacción</h3>
+                <form onSubmit={handleCreateTransaction}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        Workspace *
+                      </label>
+                      <select 
+                        value={selectedWorkspace}
+                        onChange={(e) => setSelectedWorkspace(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                      >
+                        <option value="">Seleccioná un workspace...</option>
+                        {workspaces.map(ws => (
+                          <option key={ws.id} value={ws.id}>{ws.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        Tipo de Transacción *
+                      </label>
+                      <select 
+                        value={transactionType}
+                        onChange={(e) => setTransactionType(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                      >
+                        <option value="PAYMENT_RECEIVED">💰 Cobro Recibido</option>
+                        <option value="EXPENSE_REGISTERED">💸 Gasto Registrado</option>
+                        <option value="SUPPLIER_PAYMENT_MADE">🏭 Pago a Proveedor</option>
+                        <option value="CASH_WITHDRAWN">💵 Retiro de Efectivo</option>
+                        <option value="CASH_OPENED">🔓 Apertura de Caja</option>
+                        <option value="CASH_CLOSED">🔒 Cierre de Caja</option>
+                        <option value="MOVEMENT_REVERSED">↩️ Movimiento Revertido</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        Monto *
+                      </label>
+                      <input 
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        required
+                        style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        Categoría
+                      </label>
+                      <input 
+                        type="text"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        placeholder="Ej: Ventas, Compras, Servicios..."
+                        style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                      Descripción *
+                    </label>
+                    <textarea 
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describí la transacción..."
+                      required
+                      rows="3"
+                      style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={creating}
+                    style={{ padding: '12px 24px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
+                  >
+                    {creating ? 'Creando...' : '✅ Crear Transacción'}
+                  </button>
+                </form>
+              </div>
+            )}
             
             {transactions.length === 0 ? (
               <div style={{ padding: '2rem', backgroundColor: '#f3f4f6', borderRadius: '8px', textAlign: 'center', color: '#6b7280' }}>
-                No tenés transacciones todavía.
+                No tenés transacciones todavía. Creá tu primera transacción!
               </div>
             ) : (
               <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
@@ -290,6 +436,7 @@ export default function Dashboard() {
                     <tr style={{ backgroundColor: '#f9fafb' }}>
                       <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Descripción</th>
                       <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Tipo</th>
+                      <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Categoría</th>
                       <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Monto</th>
                       <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Fecha</th>
                     </tr>
@@ -299,11 +446,14 @@ export default function Dashboard() {
                       <tr key={tx.id}>
                         <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{tx.description}</td>
                         <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>
-                          <span style={{ padding: '4px 8px', backgroundColor: tx.type === 'PAYMENT_RECEIVED' ? '#d1fae5' : '#fee2e2', color: tx.type === 'PAYMENT_RECEIVED' ? '#065f46' : '#991b1b', borderRadius: '4px', fontSize: '12px' }}>
-                            {tx.type}
+                          <span style={{ padding: '4px 8px', backgroundColor: getTransactionColor(tx.type), color: '#1f2937', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                            {getTransactionTypeLabel(tx.type)}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold' }}>
+                        <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px', color: '#6b7280' }}>
+                          {tx.category || '-'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold', fontSize: '16px' }}>
                           ${tx.amount?.toFixed(2)}
                         </td>
                         <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px', color: '#6b7280' }}>
