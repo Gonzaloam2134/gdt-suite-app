@@ -3,24 +3,31 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 
 export default function Home() {
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // Verificar sesión activa
+    // Verificar sesión activa y redirigir al dashboard si está logueado
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        router.push('/dashboard')
+      }
       setUser(session?.user ?? null)
     })
 
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        router.push('/dashboard')
+      }
       setUser(session?.user ?? null)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router])
 
   const handleSignUp = async (e) => {
     e.preventDefault()
@@ -62,6 +69,7 @@ export default function Home() {
         alert(`Error: ${error.message || JSON.stringify(error)}`)
       } else {
         console.log('Login success:', data)
+        // La redirección al dashboard se hace automáticamente por el onAuthStateChange
       }
     } catch (err) {
       console.error('Unexpected error:', err)
@@ -84,6 +92,7 @@ export default function Home() {
           <h2>✅ Sesión iniciada</h2>
           <p><strong>Email:</strong> {user.email}</p>
           <p><strong>ID:</strong> {user.id}</p>
+          <p>Redirigiendo al dashboard...</p>
           <button onClick={handleSignOut} style={{ padding: '10px 20px', cursor: 'pointer', marginTop: '10px' }}>
             Cerrar Sesión
           </button>
