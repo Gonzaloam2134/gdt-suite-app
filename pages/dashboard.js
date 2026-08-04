@@ -70,7 +70,7 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('workspaces')
-        .insert([{ name: 'Mi Primer Workspace', slug: 'mi-primer-workspace' }])
+        .insert([{ name: 'Mi Primer Workspace', slug: `workspace-${Date.now()}` }])
         .select()
 
       if (error) throw error
@@ -91,26 +91,110 @@ export default function Dashboard() {
     try {
       const workspace = workspaces[0]
       
-      const { data, error } = await supabase
-        .from('transactions')
+      // Crear toda la jerarquía necesaria
+      // 1. Crear Business
+      const { data: business, error: businessError } = await supabase
+        .from('businesses')
         .insert([{
           workspace_id: workspace.id,
-          business_id: null,
-          branch_id: null,
-          cash_point_id: null,
-          shift_id: null,
+          name: 'Negocio Demo',
+          legal_name: 'Negocio Demo S.A.',
+          tax_id: '30-12345678-9'
+        }])
+        .select()
+
+      if (businessError) throw businessError
+
+      // 2. Crear Branch
+      const { data: branch, error: branchError } = await supabase
+        .from('branches')
+        .insert([{
+          business_id: business[0].id,
+          name: 'Sucursal Centro',
+          code: 'SUC-001',
+          address: 'Av. Principal 123'
+        }])
+        .select()
+
+      if (branchError) throw branchError
+
+      // 3. Crear Cash Point
+      const { data: cashPoint, error: cashPointError } = await supabase
+        .from('cash_points')
+        .insert([{
+          branch_id: branch[0].id,
+          name: 'Caja Principal',
+          code: 'CAJA-001'
+        }])
+        .select()
+
+      if (cashPointError) throw cashPointError
+
+      // 4. Crear Shift
+      const { data: shift, error: shiftError } = await supabase
+        .from('shifts')
+        .insert([{
+          cash_point_id: cashPoint[0].id,
+          opened_by: user.id,
+          status: 'OPEN',
+          initial_amount: 1000.00
+        }])
+        .select()
+
+      if (shiftError) throw shiftError
+
+      // 5. Crear Payment Method (si no existe)
+      let { data: paymentMethods } = await supabase
+        .from('payment_methods')
+        .select('id')
+        .eq('workspace_id', workspace.id)
+        .eq('name', 'Efectivo')
+        .limit(1)
+
+      if (!paymentMethods || paymentMethods.length === 0) {
+        const { data: newPaymentMethod } = await supabase
+          .from('payment_methods')
+          .insert([{
+            workspace_id: workspace.id,
+            name: 'Efectivo',
+            type: 'EFECTIVO',
+            commission_type: 'NONE'
+          }])
+          .select()
+        
+        paymentMethods = newPaymentMethod
+      }
+
+      // 6. Finalmente, crear la Transacción
+      const { data: transaction, error: txError } = await supabase
+        .from('transactions')
+        .insert([{
+          shift_id: shift[0].id,
+          workspace_id: workspace.id,
+          business_id: business[0].id,
+          branch_id: branch[0].id,
+          cash_point_id: cashPoint[0].id,
           type: 'PAYMENT_RECEIVED',
           amount: 1500.00,
+          commission_amount: 0,
+          payment_method_id: paymentMethods[0].id,
+          payment_status: 'ACREDITED',
           description: 'Venta de prueba - Dashboard',
+          category: 'Ventas',
           created_by: user.id
         }])
         .select()
 
-      if (error) throw error
+      if (txError) throw txError
       
-      setTransactions([data[0], ...transactions])
-      alert('✅ Transacción creada!')
+      setTransactions([transaction[0], ...transactions])
+      alert('✅ Transacción creada con toda la jerarquía!')
+      
+      // Recargar datos para ver todo actualizado
+      loadData(user.id)
+      
     } catch (err) {
+      console.error('Error creating transaction:', err)
       alert(`Error: ${err.message}`)
     }
   }
@@ -120,14 +204,14 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  if (!user) return <div>Cargando...</div>
+  if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
         <div>
-          <h1 style={{ margin: 0 }}>🚀 GDT Suite - Dashboard</h1>
+          <h1 style={{ margin: 0 }}> GDT Suite - Dashboard</h1>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.8 }}>
             Conectado como: {user.email}
           </p>
@@ -158,7 +242,7 @@ export default function Dashboard() {
                 onClick={createTestWorkspace}
                 style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
-                + Crear Workspace de Prueba
+                + Crear Workspace
               </button>
             </div>
             
@@ -191,7 +275,7 @@ export default function Dashboard() {
                 onClick={createTestTransaction}
                 style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
-                + Crear Transacción de Prueba
+                + Crear Transacción Completa
               </button>
             </div>
             
