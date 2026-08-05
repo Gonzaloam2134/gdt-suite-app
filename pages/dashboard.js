@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 
-// Conceptos predefinidos
 const CONCEPTOS_INGRESO = ['Venta del día', 'Venta mostrador', 'Delivery', 'Servicios', 'Otros ingresos']
 const CONCEPTOS_GASTO = ['Proveedor', 'Luz', 'Gas', 'Agua', 'Internet', 'Alquiler', 'Sueldos', 'Impuestos', 'Insumos', 'Otros gastos']
 
@@ -16,8 +15,11 @@ export default function CajaDelDia() {
   const [showForm, setShowForm] = useState(false)
   const [formType, setFormType] = useState('INCOME')
   const [activeShift, setActiveShift] = useState(null)
+  const [closedShifts, setClosedShifts] = useState([])
   const [showOpenShift, setShowOpenShift] = useState(false)
   const [showCloseShift, setShowCloseShift] = useState(false)
+  const [expandedShiftId, setExpandedShiftId] = useState(null)
+  const [shiftMovements, setShiftMovements] = useState({})
   
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
@@ -75,6 +77,16 @@ export default function CajaDelDia() {
       } else {
         setMovements([])
       }
+
+      // Cargar cierres anteriores
+      const { data: closedData } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('workspace_id', activeWorkspaceId)
+        .eq('status', 'CLOSED')
+        .order('closed_at', { ascending: false })
+        .limit(10)
+      setClosedShifts(closedData || [])
       
       const { data: pmData } = await supabase
         .from('payment_methods')
@@ -90,16 +102,51 @@ export default function CajaDelDia() {
     }
   }
 
-  // Cálculo de totales: Bruto, Comisiones, Neto y Salidas
+  const loadShiftMovements = async (shiftId) => {
+    if (shiftMovements[shiftId]) return // Ya cargados
+    
+    const { data } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('shift_id', shiftId)
+      .order('created_at', { ascending: false })
+    
+    if (data) {
+      setShiftMovements(prev => ({ ...prev, [shiftId]: data }))
+    }
+  }
+
+  const toggleShiftExpand = async (shiftId) => {
+    if (expandedShiftId === shiftId) {
+      setExpandedShiftId(null)
+    } else {
+      setExpandedShiftId(shiftId)
+      await loadShiftMovements(shiftId)
+    }
+  }
+
+  const calculateShiftTotals = (movements) => {
+    return movements.reduce((acc, curr) => {
+      const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
+      const commission = curr.commission_amount || 0
+      if (isIncome) {
+        acc.in += curr.amount
+        acc.commissions += commission
+        acc.net += curr.amount - commission
+      } else {
+        acc.out += curr.amount
+      }
+      return acc
+    }, { in: 0, commissions: 0, net: 0, out: 0 })
+  }
+
   const totals = movements.reduce((acc, curr) => {
     const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
     const commission = curr.commission_amount || 0
-    const net = curr.amount - commission
-    
     if (isIncome) {
       acc.in += curr.amount
       acc.commissions += commission
-      acc.net += net
+      acc.net += curr.amount - commission
     } else {
       acc.out += curr.amount
     }
@@ -210,7 +257,7 @@ export default function CajaDelDia() {
       setShowCloseShift(false)
       setActiveShift(null)
       setMovements([])
-      alert(`Caja cerrada. Saldo final real: $${currentBalance.toFixed(2)}`)
+      loadData(user.id)
     } catch (err) {
       alert(`Error: ${err.message}`)
     } finally {
@@ -279,6 +326,7 @@ export default function CajaDelDia() {
               {activeShift ? `Turno activo • ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}
             </p>
           </div>
+          <button onClick={() => router.push('/reportes')} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem', marginRight: '5px' }}>Reportes</button>
           <button onClick={handleSignOut} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Salir</button>
         </div>
       </header>
@@ -298,7 +346,6 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
-            {/* Resumen de Caja: Bruto, Comisiones, Neto */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
               <div style={{ backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Bruto</div>
@@ -314,7 +361,6 @@ export default function CajaDelDia() {
               </div>
             </div>
 
-            {/* Botones de acción */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <button 
                 onClick={() => handleOpenForm('INCOME')}
@@ -341,61 +387,162 @@ export default function CajaDelDia() {
           </>
         )}
 
-        {/* Lista de Movimientos */}
-        <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
-          📖 Movimientos del Turno
-        </h3>
-        
-        {movements.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem' }}>
-            Sin movimientos en este turno
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {movements.map(m => {
-              const isIncome = m.type === 'PAYMENT_RECEIVED' || m.type === 'CASH_OPENED'
-              const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
-              const commission = m.commission_amount || 0
-              const net = m.amount - commission
-              
-              return (
-                <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                        {isIncome ? '📥' : '📤'}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                          {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
+        {/* Turno Activo - Movimientos */}
+        {activeShift && (
+          <>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
+              📖 Movimientos del Turno Actual
+            </h3>
+            
+            {movements.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+                Sin movimientos en este turno
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                {movements.map(m => {
+                  const isIncome = m.type === 'PAYMENT_RECEIVED' || m.type === 'CASH_OPENED'
+                  const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
+                  const commission = m.commission_amount || 0
+                  const net = m.amount - commission
+                  
+                  return (
+                    <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+                            {isIncome ? '📥' : '📤'}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
+                            {isIncome ? '+' : '-'}${m.amount.toFixed(2)}
+                          </div>
                         </div>
                       </div>
+                      
+                      {isIncome && commission > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.75rem' }}>
+                          <div style={{ color: '#64748b' }}>Comisión ({method?.name}):</div>
+                          <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
+                        </div>
+                      )}
+                      
+                      {isIncome && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
+                          <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
+                          <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
-                        {isIncome ? '+' : '-'}${m.amount.toFixed(2)}
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Cierres Anteriores */}
+        {closedShifts.length > 0 && (
+          <>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
+              📋 Cierres Anteriores
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {closedShifts.map(shift => {
+                const shiftMovs = shiftMovements[shift.id] || []
+                const shiftTotals = calculateShiftTotals(shiftMovs)
+                const finalBalance = (shift.initial_amount || 0) + shiftTotals.net - shiftTotals.out
+                const isExpanded = expandedShiftId === shift.id
+                
+                return (
+                  <div key={shift.id} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div 
+                      onClick={() => toggleShiftExpand(shift.id)}
+                      style={{ padding: '0.75rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>
+                          {new Date(shift.closed_at).toLocaleDateString('es-AR')} - {new Date(shift.closed_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          {shiftMovs.length} movimientos • Saldo: ${finalBalance.toFixed(2)}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '1.25rem', color: '#64748b' }}>
+                        {isExpanded ? '▼' : '▶'}
                       </div>
                     </div>
+                    
+                    {isExpanded && (
+                      <div style={{ padding: '0.75rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                        {/* Resumen del cierre */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          <div style={{ backgroundColor: '#dcfce7', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700' }}>BRUTO</div>
+                            <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#15803d' }}>${shiftTotals.in.toFixed(2)}</div>
+                          </div>
+                          <div style={{ backgroundColor: '#fee2e2', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.625rem', color: '#991b1b', fontWeight: '700' }}>COMIS</div>
+                            <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#b91c1c' }}>-${shiftTotals.commissions.toFixed(2)}</div>
+                          </div>
+                          <div style={{ backgroundColor: '#0f172a', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '700' }}>NETO</div>
+                            <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#ffffff' }}>${shiftTotals.net.toFixed(2)}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Lista de movimientos */}
+                        {shiftMovs.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.75rem' }}>
+                            Cargando movimientos...
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {shiftMovs.map(m => {
+                              const isIncome = m.type === 'PAYMENT_RECEIVED' || m.type === 'CASH_OPENED'
+                              const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
+                              const commission = m.commission_amount || 0
+                              const net = m.amount - commission
+                              
+                              return (
+                                <div key={m.id} style={{ backgroundColor: 'white', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                      <div style={{ fontWeight: '600', color: '#0f172a' }}>{m.description}</div>
+                                      <div style={{ fontSize: '0.625rem', color: '#64748b' }}>
+                                        {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
+                                      </div>
+                                    </div>
+                                    <div style={{ fontWeight: '700', color: isIncome ? '#15803d' : '#b91c1c' }}>
+                                      {isIncome ? '+' : '-'}${m.amount.toFixed(2)}
+                                    </div>
+                                  </div>
+                                  {isIncome && commission > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', paddingTop: '0.25rem', borderTop: '1px dashed #e2e8f0' }}>
+                                      <span style={{ color: '#64748b' }}>Comisión: -${commission.toFixed(2)}</span>
+                                      <span style={{ color: '#059669', fontWeight: '600' }}>Neto: +${net.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  
-                  {isIncome && commission > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.75rem' }}>
-                      <div style={{ color: '#64748b' }}>Comisión ({method?.name}):</div>
-                      <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
-                    </div>
-                  )}
-                  
-                  {isIncome && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
-                      <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
-                      <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -437,7 +584,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
               <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -485,13 +632,12 @@ export default function CajaDelDia() {
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
-                {formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}
+                {formType === 'INCOME' ? ' Cobro' : '💸 Gasto'}
               </h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
             <form onSubmit={handleSubmit}>
-              {/* Monto */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>¿Cuánto?</label>
                 <input 
@@ -501,7 +647,6 @@ export default function CajaDelDia() {
                 />
               </div>
 
-              {/* Concepto */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Concepto (opcional)</label>
                 
@@ -556,7 +701,6 @@ export default function CajaDelDia() {
                 )}
               </div>
 
-              {/* Medio de pago */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
                 {paymentMethods.length === 0 ? (
