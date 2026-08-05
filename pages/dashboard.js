@@ -1,25 +1,21 @@
 import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import BottomNav from '../components/BottomNav'
 
-export default function Dashboard() {
+export default function CajaDelDia() {
   const [user, setUser] = useState(null)
-  const [workspaces, setWorkspaces] = useState([])
-  const [transactions, setTransactions] = useState([])
+  const [businessName, setBusinessName] = useState('Mi Negocio')
+  const [movements, setMovements] = useState([])
   const [paymentMethods, setPaymentMethods] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [showTransactionForm, setShowTransactionForm] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [formType, setFormType] = useState('INCOME')
   
-  const [transactionType, setTransactionType] = useState('PAYMENT_RECEIVED')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('')
+  const [selectedMethod, setSelectedMethod] = useState('')
   const [creating, setCreating] = useState(false)
-  
-  const [commissionAmount, setCommissionAmount] = useState(0)
-  const [netAmount, setNetAmount] = useState(0)
   
   const router = useRouter()
   const activeWorkspaceId = typeof window !== 'undefined' ? localStorage.getItem('activeWorkspaceId') : null
@@ -37,159 +33,89 @@ export default function Dashboard() {
         }
       }
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) router.push('/')
-      else setUser(session.user)
-    })
-
-    return () => subscription.unsubscribe()
+    return () => {}
   }, [router, activeWorkspaceId])
 
   const loadData = async (userId) => {
     try {
       setLoading(true)
-      setError(null)
+      const { data: wsData } = await supabase.from('workspaces').select('name').eq('id', activeWorkspaceId).single()
+      if (wsData) setBusinessName(wsData.name)
 
-      if (!activeWorkspaceId) {
-        router.push('/workspaces')
-        return
-      }
-
-      const { data: wsData, error: wsError } = await supabase
-        .from('workspaces')
-        .select('*')
-        .eq('id', activeWorkspaceId)
-        .single()
-
-      if (wsError) throw wsError
-      setWorkspaces(wsData ? [wsData] : [])
-
-      const { data: txData, error: txError } = await supabase
+      const { data: txData } = await supabase
         .from('transactions')
         .select('*')
         .eq('workspace_id', activeWorkspaceId)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(50)
 
-      if (txError) throw txError
-      setTransactions(txData || [])
+      setMovements(txData || [])
+      
+      const { data: pmData } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('workspace_id', activeWorkspaceId)
+        .eq('is_active', true)
 
+      setPaymentMethods(pmData || [])
     } catch (err) {
-      console.error('Error loading data:', err)
-      setError(err.message)
+      console.error(err)
     } finally {
       setLoading(false)
     }
   }
 
-  const loadPaymentMethods = async (workspaceId) => {
-    if (!workspaceId) return
-    const { data, error } = await supabase
-      .from('payment_methods')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .eq('is_active', true)
-      .order('type', { ascending: true })
-      .order('name', { ascending: true })
+  const totals = movements.reduce((acc, curr) => {
+    const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
+    const net = curr.amount - (curr.commission_amount || 0)
+    if (isIncome) acc.in += net
+    else acc.out += net
+    return acc
+  }, { in: 0, out: 0 })
 
-    if (!error) setPaymentMethods(data || [])
+  const handleOpenForm = (type) => {
+    setFormType(type)
+    setAmount('')
+    setDescription('')
+    setSelectedMethod('')
+    setShowForm(true)
   }
 
-  const calculateCommission = (amount, method) => {
-    if (!method || !amount) return { commission: 0, net: amount }
-    let commission = 0
-    const amountNum = parseFloat(amount)
-    if (method.commission_type === 'PERCENTAGE') {
-      commission = (amountNum * method.commission_value) / 100
-    } else if (method.commission_type === 'FIXED') {
-      commission = method.commission_fixed || 0
-    } else if (method.commission_type === 'MIXED') {
-      commission = ((amountNum * method.commission_value) / 100) + (method.commission_fixed || 0)
-    }
-    return { commission, net: amountNum - commission }
-  }
-
-  const handleAmountChange = (value) => {
-    setAmount(value)
-    const method = paymentMethods.find(m => m.id === selectedPaymentMethod)
-    if (method && value) {
-      const { commission, net } = calculateCommission(value, method)
-      setCommissionAmount(commission)
-      setNetAmount(net)
-    } else {
-      setCommissionAmount(0)
-      setNetAmount(parseFloat(value) || 0)
-    }
-  }
-
-  const handlePaymentMethodChange = (methodId) => {
-    setSelectedPaymentMethod(methodId)
-    const method = paymentMethods.find(m => m.id === methodId)
-    if (method && amount) {
-      const { commission, net } = calculateCommission(amount, method)
-      setCommissionAmount(commission)
-      setNetAmount(net)
-    } else {
-      setCommissionAmount(0)
-      setNetAmount(parseFloat(amount) || 0)
-    }
-  }
-
-  const handleCreateTransaction = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!activeWorkspaceId) return alert('No hay workspace activo!')
-    if (!amount || amount <= 0) return alert('Ingresá un monto válido!')
-    if (!description.trim()) return alert('Ingresá una descripción!')
-    if (!selectedPaymentMethod) return alert('Seleccioná un medio de pago!')
+    if (!amount || !description || !selectedMethod) return alert('Completá todos los campos')
 
     try {
       setCreating(true)
-      const workspace = workspaces[0]
-      const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod)
-      
-      const { data: business, error: businessError } = await supabase.from('businesses').insert([{ workspace_id: workspace.id, name: 'Negocio Demo', legal_name: 'Negocio Demo S.A.', tax_id: '30-12345678-9' }]).select()
-      if (businessError) throw businessError
+      const method = paymentMethods.find(m => m.id === selectedMethod)
+      const isIncome = formType === 'INCOME'
+      const type = isIncome ? 'PAYMENT_RECEIVED' : 'EXPENSE_REGISTERED'
+      const commission = isIncome ? ((parseFloat(amount) * (method.commission_value || 0)) / 100) + (method.commission_fixed || 0) : 0
 
-      const { data: branch, error: branchError } = await supabase.from('branches').insert([{ business_id: business[0].id, name: 'Sucursal Centro', code: 'SUC-001', address: 'Av. Principal 123' }]).select()
-      if (branchError) throw branchError
+      const { data: business } = await supabase.from('businesses').select('id').eq('workspace_id', activeWorkspaceId).limit(1)
+      const bizId = business?.[0]?.id || '00000000-0000-0000-0000-000000000000'
 
-      const { data: cashPoint, error: cashPointError } = await supabase.from('cash_points').insert([{ branch_id: branch[0].id, name: 'Caja Principal', code: 'CAJA-001' }]).select()
-      if (cashPointError) throw cashPointError
-
-      const { data: shift, error: shiftError } = await supabase.from('shifts').insert([{ cash_point_id: cashPoint[0].id, opened_by: user.id, status: 'OPEN', initial_amount: 1000.00 }]).select()
-      if (shiftError) throw shiftError
-
-      const { data: transaction, error: txError } = await supabase.from('transactions').insert([{
-        shift_id: shift[0].id,
-        workspace_id: workspace.id,
-        business_id: business[0].id,
-        branch_id: branch[0].id,
-        cash_point_id: cashPoint[0].id,
-        type: transactionType,
+      const { error } = await supabase.from('transactions').insert([{
+        workspace_id: activeWorkspaceId,
+        business_id: bizId,
+        branch_id: bizId,
+        cash_point_id: bizId,
+        shift_id: bizId,
+        type,
         amount: parseFloat(amount),
-        commission_amount: commissionAmount,
-        payment_method_id: paymentMethod.id,
+        commission_amount: commission,
+        payment_method_id: method.id,
         payment_status: 'ACREDITED',
-        description: description,
-        category: category || 'General',
+        description,
+        category: formType === 'INCOME' ? 'Ventas' : 'Gastos',
         created_by: user.id
-      }]).select()
+      }])
 
-      if (txError) throw txError
+      if (error) throw error
       
-      setTransactions([transaction[0], ...transactions])
-      setShowTransactionForm(false)
-      setAmount('')
-      setDescription('')
-      setCategory('')
-      setSelectedPaymentMethod('')
-      setCommissionAmount(0)
-      setNetAmount(0)
-      alert('✅ Transacción creada exitosamente!')
+      setShowForm(false)
       loadData(user.id)
     } catch (err) {
-      console.error('Error creating transaction:', err)
       alert(`Error: ${err.message}`)
     } finally {
       setCreating(false)
@@ -201,191 +127,166 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  const getTransactionTypeLabel = (type) => {
-    const labels = {
-      'PAYMENT_RECEIVED': 'Cobro Recibido',
-      'EXPENSE_REGISTERED': 'Gasto Registrado',
-      'SUPPLIER_PAYMENT_MADE': 'Pago a Proveedor',
-      'CASH_WITHDRAWN': 'Retiro de Efectivo',
-      'CASH_OPENED': 'Apertura de Caja',
-      'CASH_CLOSED': 'Cierre de Caja',
-      'MOVEMENT_REVERSED': 'Movimiento Revertido'
-    }
-    return labels[type] || type
-  }
-
-  const getTransactionColor = (type) => {
-    if (type === 'PAYMENT_RECEIVED') return '#d1fae5'
-    if (type === 'EXPENSE_REGISTERED' || type === 'SUPPLIER_PAYMENT_MADE') return '#fee2e2'
-    return '#fef3c7'
-  }
-
-  const groupPaymentMethodsByType = () => {
-    const groups = {}
-    paymentMethods.forEach(method => {
-      if (!groups[method.type]) groups[method.type] = []
-      groups[method.type].push(method)
-    })
-    return groups
-  }
-
-  if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', fontSize: '18px' }}>Cargando libreta...</div>
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
-        <div>
-          <h1 style={{ margin: 0 }}>GDT Suite - Dashboard</h1>
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.8 }}>
-            Workspace: {workspaces[0]?.name || 'Cargando...'}
-          </p>
+    <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '80px' }}>
+      {/* Header */}
+      <header style={{ backgroundColor: '#ffffff', padding: '1.5rem', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '600px', margin: '0 auto' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a', fontWeight: '800' }}>{businessName}</h1>
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#64748b' }}>Caja del Día • {new Date().toLocaleDateString('es-AR')}</p>
+          </div>
+          <button onClick={handleSignOut} style={{ padding: '8px 12px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '0.875rem' }}>Salir</button>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => router.push('/workspaces')} style={{ padding: '10px 20px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Workspaces</button>
-          <button onClick={() => router.push('/payment-methods')} style={{ padding: '10px 20px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Medios de Pago</button>
-          <button onClick={handleSignOut} style={{ padding: '10px 20px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Salir</button>
+      </header>
+
+      <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1.5rem' }}>
+        {/* Resumen de Caja */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ backgroundColor: '#dcfce7', padding: '1.5rem', borderRadius: '12px', border: '1px solid #86efac' }}>
+            <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: '600', marginBottom: '0.5rem' }}>ENTRADAS</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#15803d' }}>${totals.in.toFixed(2)}</div>
+          </div>
+          <div style={{ backgroundColor: '#fee2e2', padding: '1.5rem', borderRadius: '12px', border: '1px solid #fca5a5' }}>
+            <div style={{ fontSize: '0.875rem', color: '#991b1b', fontWeight: '600', marginBottom: '0.5rem' }}>SALIDAS</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#b91c1c' }}>${totals.out.toFixed(2)}</div>
+          </div>
         </div>
+        
+        <div style={{ backgroundColor: '#0f172a', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.875rem', color: '#94a3b8', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Saldo en Caja</div>
+          <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#ffffff' }}>${(totals.in - totals.out).toFixed(2)}</div>
+        </div>
+
+        {/* Botones de Acción */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+          <button 
+            onClick={() => handleOpenForm('INCOME')}
+            style={{ padding: '1.5rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.125rem', fontWeight: '800', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <span style={{ fontSize: '2rem' }}>💰</span>
+            COBRO
+          </button>
+          <button 
+            onClick={() => handleOpenForm('EXPENSE')}
+            style={{ padding: '1.5rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.125rem', fontWeight: '800', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <span style={{ fontSize: '2rem' }}>💸</span>
+            GASTO
+          </button>
+        </div>
+
+        {/* Lista de Movimientos */}
+        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#334155', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          📖 Últimos Movimientos
+        </h3>
+        
+        {movements.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '12px', border: '2px dashed #cbd5e1' }}>
+            La libreta está vacía.<br/>Registrá tu primer movimiento.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {movements.map(m => {
+              const isIncome = m.type === 'PAYMENT_RECEIVED' || m.type === 'CASH_OPENED'
+              const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
+              const net = m.amount - (m.commission_amount || 0)
+              
+              return (
+                <div key={m.id} style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                      {isIncome ? '' : '📤'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '1rem' }}>{m.description}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                        {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: '800', fontSize: '1.125rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
+                      {isIncome ? '+' : '-'}${net.toFixed(2)}
+                    </div>
+                    {m.commission_amount > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Comisión: ${m.commission_amount.toFixed(2)}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {error && <div style={{ padding: '1rem', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginBottom: '1rem' }}><strong>Error:</strong> {error}</div>}
+      {/* Modal de Formulario */}
+      {showForm && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', zIndex: 50 }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '600px', margin: '0 auto', borderRadius: '20px 20px 0 0', padding: '2rem', boxShadow: '0 -10px 25px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
+                {formType === 'INCOME' ? '💰 Registrar Cobro' : '💸 Registrar Gasto'}
+              </h2>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+            </div>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', fontSize: '18px' }}>Cargando datos...</div>
-      ) : (
-        <section>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2>Transacciones Recientes ({transactions.length})</h2>
-            <button onClick={() => { setShowTransactionForm(!showTransactionForm); if (activeWorkspaceId) loadPaymentMethods(activeWorkspaceId); }} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-              {showTransactionForm ? 'Cancelar' : '+ Nueva Transacción'}
-            </button>
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#334155' }}>¿Cuánto?</label>
+                <input 
+                  type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} 
+                  placeholder="0.00" required autoFocus
+                  style={{ width: '100%', padding: '1rem', fontSize: '2rem', fontWeight: '800', border: '2px solid #e2e8f0', borderRadius: '12px', boxSizing: 'border-box', textAlign: 'right', color: '#0f172a' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#334155' }}>¿Por qué concepto?</label>
+                <input 
+                  type="text" value={description} onChange={e => setDescription(e.target.value)} 
+                  placeholder={formType === 'INCOME' ? 'Ej: Venta del día, Pago de Juan...' : 'Ej: Proveedor, Luz, Gas...'} required
+                  style={{ width: '100%', padding: '1rem', fontSize: '1.125rem', border: '2px solid #e2e8f0', borderRadius: '12px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '2rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: '700', color: '#334155' }}>¿Cómo te pagaron? / ¿Cómo pagaste?</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                  {paymentMethods.map(method => (
+                    <label 
+                      key={method.id}
+                      style={{ 
+                        display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', 
+                        border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '2px solid #e2e8f0',
+                        borderRadius: '12px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white'
+                      }}
+                    >
+                      <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '20px', height: '20px' }} />
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{method.name}</div>
+                        {method.subtype && <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{method.subtype}</div>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button 
+                type="submit" disabled={creating}
+                style={{ width: '100%', padding: '1.25rem', backgroundColor: formType === 'INCOME' ? '#16a34a' : '#dc2626', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.25rem', fontWeight: '800', cursor: 'pointer', opacity: creating ? 0.7 : 1 }}
+              >
+                {creating ? 'Guardando...' : (formType === 'INCOME' ? '✅ CONFIRMAR COBRO' : '✅ CONFIRMAR GASTO')}
+              </button>
+            </form>
           </div>
-
-          {showTransactionForm && (
-            <div style={{ padding: '2rem', backgroundColor: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: '8px', marginBottom: '2rem' }}>
-              <h3 style={{ marginTop: 0 }}>Crear Nueva Transacción</h3>
-              <form onSubmit={handleCreateTransaction}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Tipo de Transacción *</label>
-                  <select value={transactionType} onChange={(e) => setTransactionType(e.target.value)} required style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}>
-                    <option value="PAYMENT_RECEIVED">Cobro Recibido</option>
-                    <option value="EXPENSE_REGISTERED">Gasto Registrado</option>
-                    <option value="SUPPLIER_PAYMENT_MADE">Pago a Proveedor</option>
-                    <option value="CASH_WITHDRAWN">Retiro de Efectivo</option>
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Medio de Pago *</label>
-                  {paymentMethods.length === 0 ? (
-                    <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '4px', color: '#92400e' }}>No hay medios de pago configurados. <a href="/payment-methods" style={{ color: '#3b82f6' }}>Configurar</a></div>
-                  ) : (
-                    <div style={{ display: 'grid', gap: '1rem' }}>
-                      {Object.entries(groupPaymentMethodsByType()).map(([type, methods]) => (
-                        <div key={type}>
-                          <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '14px', color: '#6b7280' }}>{type.replace('_', ' ')}</h4>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem' }}>
-                            {methods.map(method => (
-                              <label key={method.id} style={{ display: 'flex', alignItems: 'center', padding: '10px', backgroundColor: selectedPaymentMethod === method.id ? '#dbeafe' : 'white', border: selectedPaymentMethod === method.id ? '2px solid #3b82f6' : '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}>
-                                <input type="radio" name="paymentMethod" value={method.id} checked={selectedPaymentMethod === method.id} onChange={() => handlePaymentMethodChange(method.id)} style={{ marginRight: '8px' }} />
-                                <div>
-                                  <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{method.name}</div>
-                                  {method.commission_type !== 'NONE' && <div style={{ fontSize: '11px', color: '#ef4444' }}>{method.commission_type === 'PERCENTAGE' ? `${method.commission_value}%` : `$${method.commission_fixed}`}</div>}
-                                </div>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Monto *</label>
-                    <input type="number" step="0.01" min="0" value={amount} onChange={(e) => handleAmountChange(e.target.value)} placeholder="0.00" required style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Categoría</label>
-                    <input type="text" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ej: Ventas" style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                {selectedPaymentMethod && amount && (
-                  <div style={{ padding: '1rem', backgroundColor: '#dbeafe', borderRadius: '4px', marginBottom: '1rem' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0' }}>Resumen</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                      <div><div style={{ fontSize: '12px', color: '#6b7280' }}>Bruto</div><div style={{ fontSize: '18px', fontWeight: 'bold' }}>${parseFloat(amount).toFixed(2)}</div></div>
-                      <div><div style={{ fontSize: '12px', color: '#6b7280' }}>Comisión</div><div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ef4444' }}>-${commissionAmount.toFixed(2)}</div></div>
-                      <div><div style={{ fontSize: '12px', color: '#6b7280' }}>Neto</div><div style={{ fontSize: '18px', fontWeight: 'bold', color: '#10b981' }}>${netAmount.toFixed(2)}</div></div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Descripción *</label>
-                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describí la transacción..." required rows="3" style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px', resize: 'vertical' }} />
-                </div>
-
-                <button type="submit" disabled={creating} style={{ padding: '12px 24px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>
-                  {creating ? 'Creando...' : 'Crear Transacción'}
-                </button>
-              </form>
-            </div>
-          )}
-          
-          {transactions.length === 0 ? (
-            <div style={{ padding: '2rem', backgroundColor: '#f3f4f6', borderRadius: '8px', textAlign: 'center', color: '#6b7280' }}>No tenés transacciones todavía.</div>
-          ) : (
-            <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f9fafb' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Descripción</th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Tipo</th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Medio de Pago</th>
-                    <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Monto</th>
-                    <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Comisión</th>
-                    <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>Neto</th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map(tx => {
-                    const method = paymentMethods.find(pm => pm.id === tx.payment_method_id)
-                    const net = tx.amount - (tx.commission_amount || 0)
-                    return (
-                      <tr key={tx.id}>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{tx.description}</td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>
-                          <span style={{ padding: '4px 8px', backgroundColor: getTransactionColor(tx.type), color: '#1f2937', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
-                            {getTransactionTypeLabel(tx.type)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
-                          {method ? `${method.name} ${method.subtype ? `(${method.subtype})` : ''}` : '-'}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold', fontSize: '16px' }}>
-                          ${tx.amount?.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', color: '#ef4444', fontSize: '14px' }}>
-                          -${(tx.commission_amount || 0).toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold', color: '#10b981', fontSize: '16px' }}>
-                          ${net.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px', color: '#6b7280' }}>
-                          {new Date(tx.created_at).toLocaleString('es-AR')}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        </div>
       )}
+
+      {/* Bottom Navigation */}
+      <BottomNav activeTab="caja" />
     </main>
   )
 }
