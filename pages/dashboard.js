@@ -76,7 +76,6 @@ export default function CajaDelDia() {
         setMovements([])
       }
       
-      // Cargar medios de pago SIEMPRE (no solo si hay shift)
       const { data: pmData } = await supabase
         .from('payment_methods')
         .select('*')
@@ -91,15 +90,23 @@ export default function CajaDelDia() {
     }
   }
 
+  // Cálculo de totales: Bruto, Comisiones, Neto y Salidas
   const totals = movements.reduce((acc, curr) => {
     const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
-    const net = curr.amount - (curr.commission_amount || 0)
-    if (isIncome) acc.in += net
-    else acc.out += net
+    const commission = curr.commission_amount || 0
+    const net = curr.amount - commission
+    
+    if (isIncome) {
+      acc.in += curr.amount
+      acc.commissions += commission
+      acc.net += net
+    } else {
+      acc.out += curr.amount
+    }
     return acc
-  }, { in: 0, out: 0 })
+  }, { in: 0, commissions: 0, net: 0, out: 0 })
 
-  const currentBalance = (activeShift?.initial_amount || 0) + totals.in - totals.out
+  const currentBalance = (activeShift?.initial_amount || 0) + totals.net - totals.out
 
   const handleOpenForm = (type) => {
     setFormType(type)
@@ -203,7 +210,7 @@ export default function CajaDelDia() {
       setShowCloseShift(false)
       setActiveShift(null)
       setMovements([])
-      alert(`Caja cerrada. Saldo final: $${currentBalance.toFixed(2)}`)
+      alert(`Caja cerrada. Saldo final real: $${currentBalance.toFixed(2)}`)
     } catch (err) {
       alert(`Error: ${err.message}`)
     } finally {
@@ -224,7 +231,6 @@ export default function CajaDelDia() {
       const type = isIncome ? 'PAYMENT_RECEIVED' : 'EXPENSE_REGISTERED'
       const commission = isIncome ? ((parseFloat(amount) * (method.commission_value || 0)) / 100) + (method.commission_fixed || 0) : 0
       
-      // Usar concepto personalizado si se escribió uno, sino el seleccionado
       const finalConcept = showCustomConcept ? customConcept : selectedConcept
 
       const { error } = await supabase.from('transactions').insert([{
@@ -280,7 +286,7 @@ export default function CajaDelDia() {
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
         {!activeShift ? (
           <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #cbd5e1', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}></div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔒</div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1rem' }}>Caja Cerrada</h3>
             <p style={{ margin: '0 0 1rem 0', color: '#64748b', fontSize: '0.875rem' }}>Abrí la caja para empezar a operar</p>
             <button 
@@ -292,21 +298,23 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '600', marginBottom: '0.25rem' }}>ENTRADAS</div>
-                <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#15803d' }}>${totals.in.toFixed(2)}</div>
+            {/* Resumen de Caja: Bruto, Comisiones, Neto */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div style={{ backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Bruto</div>
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#15803d' }}>${totals.in.toFixed(2)}</div>
               </div>
-              <div style={{ backgroundColor: '#fee2e2', padding: '0.75rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.625rem', color: '#991b1b', fontWeight: '600', marginBottom: '0.25rem' }}>SALIDAS</div>
-                <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#b91c1c' }}>${totals.out.toFixed(2)}</div>
+              <div style={{ backgroundColor: '#fee2e2', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.625rem', color: '#991b1b', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Comisiones</div>
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#b91c1c' }}>-${totals.commissions.toFixed(2)}</div>
               </div>
-              <div style={{ backgroundColor: '#0f172a', padding: '0.75rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '600', marginBottom: '0.25rem' }}>SALDO</div>
-                <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#ffffff' }}>${currentBalance.toFixed(2)}</div>
+              <div style={{ backgroundColor: '#0f172a', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Neto</div>
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#ffffff' }}>${totals.net.toFixed(2)}</div>
               </div>
             </div>
 
+            {/* Botones de acción */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <button 
                 onClick={() => handleOpenForm('INCOME')}
@@ -333,6 +341,7 @@ export default function CajaDelDia() {
           </>
         )}
 
+        {/* Lista de Movimientos */}
         <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
           📖 Movimientos del Turno
         </h3>
@@ -346,26 +355,43 @@ export default function CajaDelDia() {
             {movements.map(m => {
               const isIncome = m.type === 'PAYMENT_RECEIVED' || m.type === 'CASH_OPENED'
               const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
-              const net = m.amount - (m.commission_amount || 0)
+              const commission = m.commission_amount || 0
+              const net = m.amount - commission
               
               return (
-                <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                      {isIncome ? '📥' : '📤'}
+                <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+                        {isIncome ? '📥' : '📤'}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
+                        {isIncome ? '+' : '-'}${m.amount.toFixed(2)}
                       </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
-                      {isIncome ? '+' : '-'}${net.toFixed(2)}
+                  
+                  {isIncome && commission > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.75rem' }}>
+                      <div style={{ color: '#64748b' }}>Comisión ({method?.name}):</div>
+                      <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {isIncome && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
+                      <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
+                      <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -421,15 +447,23 @@ export default function CajaDelDia() {
                 <span style={{ fontWeight: '600' }}>${activeShift?.initial_amount.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Entradas:</span>
+                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Entradas Brutas:</span>
                 <span style={{ fontWeight: '600', color: '#15803d' }}>+${totals.in.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Salidas:</span>
+                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Comisiones:</span>
+                <span style={{ fontWeight: '600', color: '#dc2626' }}>-${totals.commissions.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Entradas Netas:</span>
+                <span style={{ fontWeight: '600', color: '#059669' }}>+${totals.net.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Salidas (Gastos):</span>
                 <span style={{ fontWeight: '600', color: '#b91c1c' }}>-${totals.out.toFixed(2)}</span>
               </div>
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '700' }}>Saldo final:</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: '700' }}>Saldo final real:</span>
                 <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>${currentBalance.toFixed(2)}</span>
               </div>
             </div>
@@ -467,7 +501,7 @@ export default function CajaDelDia() {
                 />
               </div>
 
-              {/* Concepto - Lista predefinida */}
+              {/* Concepto */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Concepto (opcional)</label>
                 
