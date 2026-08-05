@@ -8,7 +8,6 @@ export default function PaymentMethodsConfig() {
   const [selectedWorkspace, setSelectedWorkspace] = useState('')
   const [paymentMethods, setPaymentMethods] = useState([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -206,7 +205,7 @@ export default function PaymentMethodsConfig() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                    Comisión % 
+                    Comisión %
                   </label>
                   <input 
                     type="number"
