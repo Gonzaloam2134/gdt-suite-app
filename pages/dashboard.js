@@ -27,7 +27,13 @@ export default function CajaDelDia() {
   const [customConcept, setCustomConcept] = useState('')
   const [showCustomConcept, setShowCustomConcept] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState('')
+  
+  // Estados para apertura de caja inteligente
   const [openingAmount, setOpeningAmount] = useState('')
+  const [lastShiftBalance, setLastShiftBalance] = useState(0)
+  const [differenceReason, setDifferenceReason] = useState('')
+  const [isAmountModified, setIsAmountModified] = useState(false)
+  
   const [creating, setCreating] = useState(false)
   
   const router = useRouter()
@@ -87,6 +93,35 @@ export default function CajaDelDia() {
         .order('closed_at', { ascending: false })
         .limit(10)
       setClosedShifts(closedData || [])
+
+      // Calcular el saldo del ÚLTIMO cierre para pre-cargarlo
+      if (closedData && closedData.length > 0) {
+        const lastClosed = closedData[0]
+        const { data: lastTx } = await supabase
+          .from('transactions')
+          .select('amount, commission_amount, type')
+          .eq('shift_id', lastClosed.id)
+        
+        let calculatedBalance = lastClosed.initial_amount || 0
+        if (lastTx) {
+          lastTx.forEach(tx => {
+            const isIncome = tx.type === 'PAYMENT_RECEIVED' || tx.type === 'CASH_OPENED'
+            const commission = tx.commission_amount || 0
+            if (isIncome) {
+              calculatedBalance += (tx.amount - commission)
+            } else {
+              calculatedBalance -= tx.amount
+            }
+          })
+        }
+        setLastShiftBalance(calculatedBalance)
+        setOpeningAmount(calculatedBalance.toFixed(2))
+        setIsAmountModified(false)
+        setDifferenceReason('')
+      } else {
+        setLastShiftBalance(0)
+        setOpeningAmount('')
+      }
       
       const { data: pmData } = await supabase
         .from('payment_methods')
@@ -103,17 +138,9 @@ export default function CajaDelDia() {
   }
 
   const loadShiftMovements = async (shiftId) => {
-    if (shiftMovements[shiftId]) return // Ya cargados
-    
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('shift_id', shiftId)
-      .order('created_at', { ascending: false })
-    
-    if (data) {
-      setShiftMovements(prev => ({ ...prev, [shiftId]: data }))
-    }
+    if (shiftMovements[shiftId]) return
+    const { data } = await supabase.from('transactions').select('*').eq('shift_id', shiftId).order('created_at', { ascending: false })
+    if (data) setShiftMovements(prev => ({ ...prev, [shiftId]: data }))
   }
 
   const toggleShiftExpand = async (shiftId) => {
@@ -125,8 +152,8 @@ export default function CajaDelDia() {
     }
   }
 
-  const calculateShiftTotals = (movements) => {
-    return movements.reduce((acc, curr) => {
+  const calculateShiftTotals = (movs) => {
+    return movs.reduce((acc, curr) => {
       const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
       const commission = curr.commission_amount || 0
       if (isIncome) {
@@ -166,9 +193,27 @@ export default function CajaDelDia() {
     setShowForm(true)
   }
 
+  const handleOpeningAmountChange = (e) => {
+    const newVal = e.target.value
+    setOpeningAmount(newVal)
+    
+    // Detectar si el usuario modificó el monto sugerido
+    if (newVal !== lastShiftBalance.toFixed(2)) {
+      setIsAmountModified(true)
+    } else {
+      setIsAmountModified(false)
+      setDifferenceReason('')
+    }
+  }
+
   const handleOpenShift = async (e) => {
     e.preventDefault()
-    if (!openingAmount || openingAmount <= 0) return alert('Ingresá un monto válido')
+    if (!openingAmount || parseFloat(openingAmount) < 0) return alert('Ingresá un monto válido')
+    
+    // Validación estricta: si cambió el monto, debe explicar por qué
+    if (isAmountModified && !differenceReason.trim()) {
+      return alert('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
+    }
 
     try {
       setCreating(true)
@@ -179,10 +224,7 @@ export default function CajaDelDia() {
         bizId = businesses[0].id
       } else {
         const { data: newBiz, error: bizError } = await supabase.from('businesses').insert([{ 
-          workspace_id: activeWorkspaceId, 
-          name: 'Principal', 
-          legal_name: 'Negocio Principal', 
-          tax_id: '00-00000000-0' 
+          workspace_id: activeWorkspaceId, name: 'Principal', legal_name: 'Negocio Principal', tax_id: '00-00000000-0' 
         }]).select('id').single()
         if (bizError) throw bizError
         bizId = newBiz.id
@@ -194,9 +236,7 @@ export default function CajaDelDia() {
         branchId = branches[0].id
       } else {
         const { data: newBranch, error: branchError } = await supabase.from('branches').insert([{ 
-          business_id: bizId, 
-          name: 'Sucursal Principal', 
-          code: 'SUC-01' 
+          business_id: bizId, name: 'Sucursal Principal', code: 'SUC-01' 
         }]).select('id').single()
         if (branchError) throw branchError
         branchId = newBranch.id
@@ -208,9 +248,7 @@ export default function CajaDelDia() {
         cashPointId = cashPoints[0].id
       } else {
         const { data: newCP, error: cpError } = await supabase.from('cash_points').insert([{ 
-          branch_id: branchId, 
-          name: 'Caja Principal', 
-          code: 'CAJA-01' 
+          branch_id: branchId, name: 'Caja Principal', code: 'CAJA-01' 
         }]).select('id').single()
         if (cpError) throw cpError
         cashPointId = newCP.id
@@ -225,7 +263,8 @@ export default function CajaDelDia() {
           cash_point_id: cashPointId,
           opened_by: user.id,
           status: 'OPEN',
-          initial_amount: parseFloat(openingAmount)
+          initial_amount: parseFloat(openingAmount),
+          opening_difference_reason: isAmountModified ? differenceReason : null // Guardamos el motivo si hay diferencia
         }])
         .select()
         .single()
@@ -234,6 +273,8 @@ export default function CajaDelDia() {
       
       setShowOpenShift(false)
       setOpeningAmount('')
+      setDifferenceReason('')
+      setIsAmountModified(false)
       loadData(user.id)
     } catch (err) {
       alert(`Error: ${err.message}`)
@@ -244,14 +285,9 @@ export default function CajaDelDia() {
 
   const handleCloseShift = async () => {
     if (!activeShift) return
-
     try {
       setCreating(true)
-      const { error } = await supabase
-        .from('shifts')
-        .update({ status: 'CLOSED', closed_at: new Date().toISOString() })
-        .eq('id', activeShift.id)
-
+      const { error } = await supabase.from('shifts').update({ status: 'CLOSED', closed_at: new Date().toISOString() }).eq('id', activeShift.id)
       if (error) throw error
       
       setShowCloseShift(false)
@@ -277,7 +313,6 @@ export default function CajaDelDia() {
       const isIncome = formType === 'INCOME'
       const type = isIncome ? 'PAYMENT_RECEIVED' : 'EXPENSE_REGISTERED'
       const commission = isIncome ? ((parseFloat(amount) * (method.commission_value || 0)) / 100) + (method.commission_fixed || 0) : 0
-      
       const finalConcept = showCustomConcept ? customConcept : selectedConcept
 
       const { error } = await supabase.from('transactions').insert([{
@@ -297,7 +332,6 @@ export default function CajaDelDia() {
       }])
 
       if (error) throw error
-      
       setShowForm(false)
       loadData(user.id)
     } catch (err) {
@@ -326,8 +360,10 @@ export default function CajaDelDia() {
               {activeShift ? `Turno activo • ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}
             </p>
           </div>
-          <button onClick={() => router.push('/reportes')} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem', marginRight: '5px' }}>Reportes</button>
-          <button onClick={handleSignOut} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Salir</button>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <button onClick={() => router.push('/reportes')} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Reportes</button>
+            <button onClick={handleSignOut} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Salir</button>
+          </div>
         </div>
       </header>
 
@@ -362,42 +398,25 @@ export default function CajaDelDia() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-              <button 
-                onClick={() => handleOpenForm('INCOME')}
-                style={{ padding: '1rem', backgroundColor: '#86efac', color: '#14532d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>💰</span>
-                COBRO
+              <button onClick={() => handleOpenForm('INCOME')} style={{ padding: '1rem', backgroundColor: '#86efac', color: '#14532d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '1.5rem' }}>💰</span> COBRO
               </button>
-              <button 
-                onClick={() => handleOpenForm('EXPENSE')}
-                style={{ padding: '1rem', backgroundColor: '#fca5a5', color: '#7f1d1d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>💸</span>
-                GASTO
+              <button onClick={() => handleOpenForm('EXPENSE')} style={{ padding: '1rem', backgroundColor: '#fca5a5', color: '#7f1d1d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '1.5rem' }}>💸</span> GASTO
               </button>
             </div>
 
-            <button 
-              onClick={() => setShowCloseShift(true)}
-              style={{ width: '100%', padding: '0.75rem', backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', marginBottom: '1rem' }}
-            >
+            <button onClick={() => setShowCloseShift(true)} style={{ width: '100%', padding: '0.75rem', backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', marginBottom: '1rem' }}>
               Cerrar Caja
             </button>
           </>
         )}
 
-        {/* Turno Activo - Movimientos */}
         {activeShift && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
-              📖 Movimientos del Turno Actual
-            </h3>
-            
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>📖 Movimientos del Turno Actual</h3>
             {movements.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                Sin movimientos en este turno
-              </div>
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Sin movimientos en este turno</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 {movements.map(m => {
@@ -405,35 +424,26 @@ export default function CajaDelDia() {
                   const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
                   const commission = m.commission_amount || 0
                   const net = m.amount - commission
-                  
                   return (
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                            {isIncome ? '📥' : '📤'}
-                          </div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : '📤'}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
-                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}</div>
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
-                            {isIncome ? '+' : '-'}${m.amount.toFixed(2)}
-                          </div>
+                          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>{isIncome ? '+' : '-'}${m.amount.toFixed(2)}</div>
                         </div>
                       </div>
-                      
                       {isIncome && commission > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.75rem' }}>
                           <div style={{ color: '#64748b' }}>Comisión ({method?.name}):</div>
                           <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
                         </div>
                       )}
-                      
                       {isIncome && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
                           <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
@@ -448,13 +458,9 @@ export default function CajaDelDia() {
           </>
         )}
 
-        {/* Cierres Anteriores */}
         {closedShifts.length > 0 && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
-              📋 Cierres Anteriores
-            </h3>
-            
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>📋 Cierres Anteriores</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {closedShifts.map(shift => {
                 const shiftMovs = shiftMovements[shift.id] || []
@@ -464,26 +470,15 @@ export default function CajaDelDia() {
                 
                 return (
                   <div key={shift.id} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div 
-                      onClick={() => toggleShiftExpand(shift.id)}
-                      style={{ padding: '0.75rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                    >
+                    <div onClick={() => toggleShiftExpand(shift.id)} style={{ padding: '0.75rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>
-                          {new Date(shift.closed_at).toLocaleDateString('es-AR')} - {new Date(shift.closed_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                          {shiftMovs.length} movimientos • Saldo: ${finalBalance.toFixed(2)}
-                        </div>
+                        <div style={{ fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>{new Date(shift.closed_at).toLocaleDateString('es-AR')} - {new Date(shift.closed_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{shiftMovs.length} movimientos • Saldo: ${finalBalance.toFixed(2)}</div>
                       </div>
-                      <div style={{ fontSize: '1.25rem', color: '#64748b' }}>
-                        {isExpanded ? '▼' : '▶'}
-                      </div>
+                      <div style={{ fontSize: '1.25rem', color: '#64748b' }}>{isExpanded ? '▼' : '▶'}</div>
                     </div>
-                    
                     {isExpanded && (
                       <div style={{ padding: '0.75rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                        {/* Resumen del cierre */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
                           <div style={{ backgroundColor: '#dcfce7', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
                             <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700' }}>BRUTO</div>
@@ -498,12 +493,8 @@ export default function CajaDelDia() {
                             <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#ffffff' }}>${shiftTotals.net.toFixed(2)}</div>
                           </div>
                         </div>
-                        
-                        {/* Lista de movimientos */}
                         {shiftMovs.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.75rem' }}>
-                            Cargando movimientos...
-                          </div>
+                          <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.75rem' }}>Cargando movimientos...</div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {shiftMovs.map(m => {
@@ -511,19 +502,14 @@ export default function CajaDelDia() {
                               const method = paymentMethods.find(pm => pm.id === m.payment_method_id)
                               const commission = m.commission_amount || 0
                               const net = m.amount - commission
-                              
                               return (
                                 <div key={m.id} style={{ backgroundColor: 'white', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                       <div style={{ fontWeight: '600', color: '#0f172a' }}>{m.description}</div>
-                                      <div style={{ fontSize: '0.625rem', color: '#64748b' }}>
-                                        {new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}
-                                      </div>
+                                      <div style={{ fontSize: '0.625rem', color: '#64748b' }}>{new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}</div>
                                     </div>
-                                    <div style={{ fontWeight: '700', color: isIncome ? '#15803d' : '#b91c1c' }}>
-                                      {isIncome ? '+' : '-'}${m.amount.toFixed(2)}
-                                    </div>
+                                    <div style={{ fontWeight: '700', color: isIncome ? '#15803d' : '#b91c1c' }}>{isIncome ? '+' : '-'}${m.amount.toFixed(2)}</div>
                                   </div>
                                   {isIncome && commission > 0 && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', paddingTop: '0.25rem', borderTop: '1px dashed #e2e8f0' }}>
@@ -546,7 +532,7 @@ export default function CajaDelDia() {
         )}
       </div>
 
-      {/* Modal Apertura de Caja */}
+      {/* Modal Apertura de Caja INTELIGENTE */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -558,21 +544,42 @@ export default function CajaDelDia() {
             <form onSubmit={handleOpenShift}>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Monto inicial en caja</label>
+                
+                {lastShiftBalance > 0 && (
+                  <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.875rem', color: '#1e40af' }}>
+                    💡 <strong>Sugerencia:</strong> El último cierre fue de <strong>${lastShiftBalance.toFixed(2)}</strong>.
+                  </div>
+                )}
+
                 <input 
-                  type="number" step="0.01" min="0" value={openingAmount} onChange={e => setOpeningAmount(e.target.value)} 
+                  type="number" step="0.01" min="0" value={openingAmount} onChange={handleOpeningAmountChange} 
                   placeholder="0.00" required autoFocus
-                  style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right' }}
+                  style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: isAmountModified ? '2px solid #f59e0b' : '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right', backgroundColor: isAmountModified ? '#fffbeb' : 'white' }}
                 />
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem' }}>
-                  Ingresá el dinero físico que hay en caja al iniciar el turno
-                </p>
+                
+                {/* Campo de justificación de diferencia (Obligatorio si se modificó) */}
+                {isAmountModified && (
+                  <div style={{ marginTop: '1rem', animation: 'fadeIn 0.3s ease' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>
+                      ⚠️ Motivo de la diferencia (Obligatorio)
+                    </label>
+                    <textarea 
+                      value={differenceReason}
+                      onChange={(e) => setDifferenceReason(e.target.value)}
+                      placeholder="Ej: Saqué $2000 para pagar el flete, faltante de caja, etc."
+                      required
+                      rows="3"
+                      style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #f59e0b', borderRadius: '8px', boxSizing: 'border-box', resize: 'vertical' }}
+                    />
+                  </div>
+                )}
               </div>
 
               <button 
                 type="submit" disabled={creating}
                 style={{ width: '100%', padding: '1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}
               >
-                {creating ? 'Abriendo...' : 'Abrir Caja'}
+                {creating ? 'Abriendo...' : 'Confirmar Apertura'}
               </button>
             </form>
           </div>
@@ -584,7 +591,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
               <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -615,11 +622,7 @@ export default function CajaDelDia() {
               </div>
             </div>
 
-            <button 
-              onClick={handleCloseShift}
-              disabled={creating}
-              style={{ width: '100%', padding: '1rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}
-            >
+            <button onClick={handleCloseShift} disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
               {creating ? 'Cerrando...' : 'Confirmar Cierre'}
             </button>
           </div>
@@ -631,72 +634,31 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
-                {formType === 'INCOME' ? ' Cobro' : '💸 Gasto'}
-              </h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>¿Cuánto?</label>
-                <input 
-                  type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} 
-                  placeholder="0.00" required autoFocus
-                  style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right' }}
-                />
+                <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" required autoFocus style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right' }} />
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Concepto (opcional)</label>
-                
                 {!showCustomConcept ? (
                   <>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {conceptosList.map(concepto => (
-                        <button
-                          key={concepto}
-                          type="button"
-                          onClick={() => setSelectedConcept(concepto)}
-                          style={{
-                            padding: '0.5rem 0.75rem',
-                            backgroundColor: selectedConcept === concepto ? (formType === 'INCOME' ? '#dcfce7' : '#fee2e2') : '#f1f5f9',
-                            border: selectedConcept === concepto ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: selectedConcept === concepto ? '700' : '500',
-                            color: '#0f172a',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {concepto}
-                        </button>
+                        <button key={concepto} type="button" onClick={() => setSelectedConcept(concepto)} style={{ padding: '0.5rem 0.75rem', backgroundColor: selectedConcept === concepto ? (formType === 'INCOME' ? '#dcfce7' : '#fee2e2') : '#f1f5f9', border: selectedConcept === concepto ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.75rem', fontWeight: selectedConcept === concepto ? '700' : '500', color: '#0f172a', cursor: 'pointer' }}>{concepto}</button>
                       ))}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomConcept(true)}
-                      style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}
-                    >
-                      + Escribir otro concepto
-                    </button>
+                    <button type="button" onClick={() => setShowCustomConcept(true)} style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>+ Escribir otro concepto</button>
                   </>
                 ) : (
                   <>
-                    <input 
-                      type="text" 
-                      value={customConcept} 
-                      onChange={e => setCustomConcept(e.target.value)} 
-                      placeholder="Escribí el concepto..."
-                      style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => { setShowCustomConcept(false); setCustomConcept('') }}
-                      style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0 0 0' }}
-                    >
-                      ← Volver a la lista
-                    </button>
+                    <input type="text" value={customConcept} onChange={e => setCustomConcept(e.target.value)} placeholder="Escribí el concepto..." style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box' }} />
+                    <button type="button" onClick={() => { setShowCustomConcept(false); setCustomConcept('') }} style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0 0 0' }}>← Volver a la lista</button>
                   </>
                 )}
               </div>
@@ -704,20 +666,11 @@ export default function CajaDelDia() {
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
                 {paymentMethods.length === 0 ? (
-                  <div style={{ padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem' }}>
-                    ⚠️ No hay medios de pago configurados
-                  </div>
+                  <div style={{ padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem' }}>⚠️ No hay medios de pago configurados</div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                     {paymentMethods.map(method => (
-                      <label 
-                        key={method.id}
-                        style={{ 
-                          display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', 
-                          border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0',
-                          borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white'
-                        }}
-                      >
+                      <label key={method.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white' }}>
                         <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
                         <div>
                           <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{method.name}</div>
@@ -729,10 +682,7 @@ export default function CajaDelDia() {
                 )}
               </div>
 
-              <button 
-                type="submit" disabled={creating}
-                style={{ width: '100%', padding: '1rem', backgroundColor: formType === 'INCOME' ? '#16a34a' : '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}
-              >
+              <button type="submit" disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: formType === 'INCOME' ? '#16a34a' : '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
                 {creating ? 'Guardando...' : 'Confirmar'}
               </button>
             </form>
