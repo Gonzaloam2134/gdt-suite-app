@@ -28,7 +28,6 @@ export default function CajaDelDia() {
   const [showCustomConcept, setShowCustomConcept] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState('')
   
-  // Estados para apertura de caja inteligente
   const [openingAmount, setOpeningAmount] = useState('')
   const [lastShiftBalance, setLastShiftBalance] = useState(0)
   const [differenceReason, setDifferenceReason] = useState('')
@@ -84,7 +83,6 @@ export default function CajaDelDia() {
         setMovements([])
       }
 
-      // Cargar cierres anteriores
       const { data: closedData } = await supabase
         .from('shifts')
         .select('*')
@@ -94,7 +92,6 @@ export default function CajaDelDia() {
         .limit(10)
       setClosedShifts(closedData || [])
 
-      // Calcular el saldo del ÚLTIMO cierre para pre-cargarlo
       if (closedData && closedData.length > 0) {
         const lastClosed = closedData[0]
         const { data: lastTx } = await supabase
@@ -196,8 +193,6 @@ export default function CajaDelDia() {
   const handleOpeningAmountChange = (e) => {
     const newVal = e.target.value
     setOpeningAmount(newVal)
-    
-    // Detectar si el usuario modificó el monto sugerido
     if (newVal !== lastShiftBalance.toFixed(2)) {
       setIsAmountModified(true)
     } else {
@@ -209,8 +204,6 @@ export default function CajaDelDia() {
   const handleOpenShift = async (e) => {
     e.preventDefault()
     if (!openingAmount || parseFloat(openingAmount) < 0) return alert('Ingresá un monto válido')
-    
-    // Validación estricta: si cambió el monto, debe explicar por qué
     if (isAmountModified && !differenceReason.trim()) {
       return alert('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
     }
@@ -264,7 +257,7 @@ export default function CajaDelDia() {
           opened_by: user.id,
           status: 'OPEN',
           initial_amount: parseFloat(openingAmount),
-          opening_difference_reason: isAmountModified ? differenceReason : null // Guardamos el motivo si hay diferencia
+          opening_difference_reason: isAmountModified ? differenceReason : null
         }])
         .select()
         .single()
@@ -382,7 +375,12 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+            {/* 4 TARJETAS: Apertura, Bruto, Comisiones, Neto */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div style={{ backgroundColor: '#dbeafe', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.625rem', color: '#1e40af', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Apertura</div>
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#1d4ed8' }}>${(activeShift?.initial_amount || 0).toFixed(2)}</div>
+              </div>
               <div style={{ backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Bruto</div>
                 <div style={{ fontSize: '1rem', fontWeight: '800', color: '#15803d' }}>${totals.in.toFixed(2)}</div>
@@ -428,7 +426,7 @@ export default function CajaDelDia() {
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : '📤'}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : ''}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.created_at).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.name || 'Efectivo'}</div>
@@ -532,7 +530,7 @@ export default function CajaDelDia() {
         )}
       </div>
 
-      {/* Modal Apertura de Caja INTELIGENTE */}
+      {/* Modal Apertura de Caja */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -557,7 +555,6 @@ export default function CajaDelDia() {
                   style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: isAmountModified ? '2px solid #f59e0b' : '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right', backgroundColor: isAmountModified ? '#fffbeb' : 'white' }}
                 />
                 
-                {/* Campo de justificación de diferencia (Obligatorio si se modificó) */}
                 {isAmountModified && (
                   <div style={{ marginTop: '1rem', animation: 'fadeIn 0.3s ease' }}>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>
@@ -591,7 +588,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
               <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -634,7 +631,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? '💰 Cobro' : ' Gasto'}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
