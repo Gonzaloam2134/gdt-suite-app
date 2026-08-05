@@ -82,7 +82,7 @@ export default function Workspaces() {
         // Update
         const { error } = await supabase
           .from('workspaces')
-          .update({ name, description, currency, timezone, slug }) // Note: usually slug doesn't change, but for MVP it's fine
+          .update({ name, description, currency, timezone })
           .eq('id', editingWorkspace.id)
         
         if (error) throw error
@@ -123,7 +123,6 @@ export default function Workspaces() {
   }
 
   const enterWorkspace = (workspaceId) => {
-    // Guardamos el ID en localStorage para que el dashboard sepa cuál usar
     localStorage.setItem('activeWorkspaceId', workspaceId)
     router.push('/dashboard')
   }
@@ -185,7 +184,7 @@ export default function Workspaces() {
                 </p>
                 <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#9ca3af', marginBottom: '1rem' }}>
                   <span>💰 {ws.currency || 'ARS'}</span>
-                  <span> {ws.timezone ? ws.timezone.split('/')[1] : 'Default'}</span>
+                  <span>🕐 {ws.timezone ? ws.timezone.split('/')[1] : 'Default'}</span>
                 </div>
               </div>
               
@@ -201,7 +200,7 @@ export default function Workspaces() {
                   style={{ padding: '10px 15px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}
                   title="Editar"
                 >
-                  ✏️
+                  ️
                 </button>
                 <button 
                   onClick={() => handleDelete(ws.id, ws.name)}
@@ -253,7 +252,7 @@ export default function Workspaces() {
                     onChange={e => setCurrency(e.target.value)}
                     style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   >
-                    <option value="ARS">🇷 ARS (Peso Argentino)</option>
+                    <option value="ARS">🇦🇷 ARS (Peso Argentino)</option>
                     <option value="USD">🇸 USD (Dólar)</option>
                     <option value="EUR">🇺 EUR (Euro)</option>
                     <option value="BRL">🇧 BRL (Real)</option>
