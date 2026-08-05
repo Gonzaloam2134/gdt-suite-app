@@ -36,14 +36,12 @@ export default function Reportes() {
     try {
       setLoading(true)
 
-      // Cargar medios de pago para mostrar nombres
       const { data: pmData } = await supabase
         .from('payment_methods')
         .select('*')
         .eq('workspace_id', activeWorkspaceId)
       setPaymentMethods(pmData || [])
 
-      // Cargar todas las transacciones del workspace
       const { data: allTx } = await supabase
         .from('transactions')
         .select('*')
@@ -52,7 +50,6 @@ export default function Reportes() {
 
       const transactions = allTx || []
 
-      // Calcular totales globales
       const global = transactions.reduce((acc, curr) => {
         const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
         const commission = curr.commission_amount || 0
@@ -68,7 +65,6 @@ export default function Reportes() {
       }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
       setGlobalTotals(global)
 
-      // Totales de hoy
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const todayTx = transactions.filter(t => new Date(t.created_at) >= today)
@@ -87,7 +83,6 @@ export default function Reportes() {
       }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
       setTodayTotals(todayTot)
 
-      // Totales de la semana (últimos 7 días)
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
       const weekTx = transactions.filter(t => new Date(t.created_at) >= weekAgo)
@@ -106,7 +101,6 @@ export default function Reportes() {
       }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
       setWeekTotals(weekTot)
 
-      // Totales del mes (últimos 30 días)
       const monthAgo = new Date()
       monthAgo.setDate(monthAgo.getDate() - 30)
       const monthTx = transactions.filter(t => new Date(t.created_at) >= monthAgo)
@@ -125,7 +119,6 @@ export default function Reportes() {
       }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
       setMonthTotals(monthTot)
 
-      // Cantidad de shifts cerrados
       const { count: shiftsCount } = await supabase
         .from('shifts')
         .select('*', { count: 'exact', head: true })
@@ -133,7 +126,6 @@ export default function Reportes() {
         .eq('status', 'CLOSED')
       setTotalShifts(shiftsCount || 0)
 
-      // Top medios de pago (por cantidad de transacciones)
       const methodCounts = {}
       transactions.forEach(t => {
         if (t.payment_method_id) {
@@ -172,7 +164,6 @@ export default function Reportes() {
       </header>
 
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
-        {/* Resumen Global */}
         <div style={{ backgroundColor: '#0f172a', padding: '1.5rem', borderRadius: '12px', marginBottom: '1rem', textAlign: 'center' }}>
           <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Histórico</div>
           <div style={{ fontSize: '2rem', fontWeight: '900', color: '#ffffff' }}>${globalTotals.net.toFixed(2)}</div>
@@ -181,9 +172,7 @@ export default function Reportes() {
           </div>
         </div>
 
-        {/* Periodos */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          {/* Hoy */}
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>📅 Hoy</h3>
@@ -209,7 +198,6 @@ export default function Reportes() {
             </div>
           </div>
 
-          {/* Última semana */}
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>📆 Última Semana</h3>
@@ -235,10 +223,9 @@ export default function Reportes() {
             </div>
           </div>
 
-          {/* Último mes */}
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>️ Último Mes</h3>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>🗓️ Último Mes</h3>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{monthTotals.count} movs</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem' }}>
@@ -248,3 +235,52 @@ export default function Reportes() {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: '600' }}>COMIS</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#dc2626' }}>-${monthTotals.commissions.toFixed(2)}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: '600' }}>NETO</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#059669' }}>${monthTotals.net.toFixed(2)}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: '600' }}>GASTOS</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#b91c1c' }}>${monthTotals.out.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {topMethods.length > 0 && (
+          <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+            <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>🏆 Top Medios de Pago</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {topMethods.map((method, index) => (
+                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.25rem' }}>{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅'}</span>
+                    <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#0f172a' }}>{method.name}</span>
+                  </div>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#64748b' }}>{method.count} usos</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ backgroundColor: '#fef3c7', padding: '1rem', borderRadius: '10px', border: '1px solid #fcd34d', marginBottom: '1rem' }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#92400e' }}>📋 Resumen para el Contador (Mes)</h3>
+          <div style={{ fontSize: '0.75rem', color: '#78350f', lineHeight: '1.6' }}>
+            <div>Ventas brutas: <strong>${monthTotals.in.toFixed(2)}</strong></div>
+            <div>Comisiones de medios de pago: <strong>-${monthTotals.commissions.toFixed(2)}</strong></div>
+            <div>Ventas netas: <strong>${monthTotals.net.toFixed(2)}</strong></div>
+            <div>Gastos operativos: <strong>${monthTotals.out.toFixed(2)}</strong></div>
+            <div style={{ borderTop: '1px solid #fcd34d', paddingTop: '0.5rem', marginTop: '0.5rem', fontWeight: '700' }}>
+              Resultado neto: <strong>${(monthTotals.net - monthTotals.out).toFixed(2)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <BottomNav activeTab="reportes" />
+    </main>
+  )
+}
