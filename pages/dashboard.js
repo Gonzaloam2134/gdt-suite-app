@@ -46,7 +46,6 @@ export default function CajaDelDia() {
       const { data: wsData } = await supabase.from('workspaces').select('name').eq('id', activeWorkspaceId).single()
       if (wsData) setBusinessName(wsData.name)
 
-      // Buscar shift activo
       const { data: shiftData } = await supabase
         .from('shifts')
         .select('*')
@@ -58,7 +57,6 @@ export default function CajaDelDia() {
       
       setActiveShift(shiftData || null)
 
-      // Cargar movimientos del shift activo
       if (shiftData) {
         const { data: txData } = await supabase
           .from('transactions')
@@ -108,16 +106,57 @@ export default function CajaDelDia() {
 
     try {
       setCreating(true)
-      const { data: business } = await supabase.from('businesses').select('id').eq('workspace_id', activeWorkspaceId).limit(1)
-      const bizId = business?.[0]?.id || '00000000-0000-0000-0000-000000000000'
+      
+      let { data: businesses } = await supabase.from('businesses').select('id').eq('workspace_id', activeWorkspaceId).limit(1)
+      let bizId
+      if (businesses && businesses.length > 0) {
+        bizId = businesses[0].id
+      } else {
+        const { data: newBiz, error: bizError } = await supabase.from('businesses').insert([{ 
+          workspace_id: activeWorkspaceId, 
+          name: 'Principal', 
+          legal_name: 'Negocio Principal', 
+          tax_id: '00-00000000-0' 
+        }]).select('id').single()
+        if (bizError) throw bizError
+        bizId = newBiz.id
+      }
+
+      let { data: branches } = await supabase.from('branches').select('id').eq('business_id', bizId).limit(1)
+      let branchId
+      if (branches && branches.length > 0) {
+        branchId = branches[0].id
+      } else {
+        const { data: newBranch, error: branchError } = await supabase.from('branches').insert([{ 
+          business_id: bizId, 
+          name: 'Sucursal Principal', 
+          code: 'SUC-01' 
+        }]).select('id').single()
+        if (branchError) throw branchError
+        branchId = newBranch.id
+      }
+
+      let { data: cashPoints } = await supabase.from('cash_points').select('id').eq('branch_id', branchId).limit(1)
+      let cashPointId
+      if (cashPoints && cashPoints.length > 0) {
+        cashPointId = cashPoints[0].id
+      } else {
+        const { data: newCP, error: cpError } = await supabase.from('cash_points').insert([{ 
+          branch_id: branchId, 
+          name: 'Caja Principal', 
+          code: 'CAJA-01' 
+        }]).select('id').single()
+        if (cpError) throw cpError
+        cashPointId = newCP.id
+      }
 
       const { data: shift, error } = await supabase
         .from('shifts')
         .insert([{
           workspace_id: activeWorkspaceId,
           business_id: bizId,
-          branch_id: bizId,
-          cash_point_id: bizId,
+          branch_id: branchId,
+          cash_point_id: cashPointId,
           opened_by: user.id,
           status: 'OPEN',
           initial_amount: parseFloat(openingAmount)
@@ -152,7 +191,7 @@ export default function CajaDelDia() {
       setShowCloseShift(false)
       setActiveShift(null)
       setMovements([])
-      alert(`✅ Caja cerrada. Saldo final: $${currentBalance.toFixed(2)}`)
+      alert(`Caja cerrada. Saldo final: $${currentBalance.toFixed(2)}`)
     } catch (err) {
       alert(`Error: ${err.message}`)
     } finally {
@@ -208,7 +247,6 @@ export default function CajaDelDia() {
 
   return (
     <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '70px' }}>
-      {/* Header compacto */}
       <header style={{ backgroundColor: '#ffffff', padding: '1rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '600px', margin: '0 auto' }}>
           <div>
@@ -222,7 +260,6 @@ export default function CajaDelDia() {
       </header>
 
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
-        {/* Estado de la Caja */}
         {!activeShift ? (
           <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #cbd5e1', marginBottom: '1rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔒</div>
@@ -237,7 +274,6 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
-            {/* Resumen compacto */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <div style={{ backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px' }}>
                 <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '600', marginBottom: '0.25rem' }}>ENTRADAS</div>
@@ -253,7 +289,6 @@ export default function CajaDelDia() {
               </div>
             </div>
 
-            {/* Botones de acción compactos */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <button 
                 onClick={() => handleOpenForm('INCOME')}
@@ -266,12 +301,11 @@ export default function CajaDelDia() {
                 onClick={() => handleOpenForm('EXPENSE')}
                 style={{ padding: '1rem', backgroundColor: '#fca5a5', color: '#7f1d1d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}
               >
-                <span style={{ fontSize: '1.5rem' }}></span>
+                <span style={{ fontSize: '1.5rem' }}>💸</span>
                 GASTO
               </button>
             </div>
 
-            {/* Botón cerrar caja */}
             <button 
               onClick={() => setShowCloseShift(true)}
               style={{ width: '100%', padding: '0.75rem', backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', marginBottom: '1rem' }}
@@ -281,9 +315,8 @@ export default function CajaDelDia() {
           </>
         )}
 
-        {/* Lista de Movimientos compacta */}
         <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>
-           Movimientos del Turno
+          📖 Movimientos del Turno
         </h3>
         
         {movements.length === 0 ? (
@@ -301,7 +334,7 @@ export default function CajaDelDia() {
                 <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                      {isIncome ? '' : '📤'}
+                      {isIncome ? '📥' : '📤'}
                     </div>
                     <div>
                       <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.description}</div>
@@ -322,13 +355,12 @@ export default function CajaDelDia() {
         )}
       </div>
 
-      {/* Modal Apertura de Caja */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-  <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔓 Abrir Caja</h2>
-              <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}></button>
             </div>
 
             <form onSubmit={handleOpenShift}>
@@ -355,10 +387,9 @@ export default function CajaDelDia() {
         </div>
       )}
 
-      {/* Modal Cierre de Caja */}
       {showCloseShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-  <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
               <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
@@ -394,10 +425,9 @@ export default function CajaDelDia() {
         </div>
       )}
 
-      {/* Modal de Formulario */}
       {showForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-  <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
                 {formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}
