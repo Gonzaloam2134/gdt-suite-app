@@ -156,9 +156,8 @@ export default function Dashboard() {
   const handleCreateTransaction = async (e) => {
     e.preventDefault()
     
-    if (!selectedWorkspace) {
-      alert('Seleccioná un workspace primero!')
-      return
+// ✅ DEJAR ESTO:
+const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
     }
     
     if (!amount || amount <= 0) {
@@ -178,7 +177,8 @@ export default function Dashboard() {
 
     try {
       setCreating(true)
-      const workspace = workspaces.find(ws => ws.id === selectedWorkspace)
+   // ✅ DEJAR ESTO:
+const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
       const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod)
       
       // Crear jerarquía completa
