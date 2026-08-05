@@ -12,7 +12,6 @@ export default function Dashboard() {
   const [showTransactionForm, setShowTransactionForm] = useState(false)
   
   // Form state
-  const [selectedWorkspace, setSelectedWorkspace] = useState('')
   const [transactionType, setTransactionType] = useState('PAYMENT_RECEIVED')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
@@ -25,6 +24,7 @@ export default function Dashboard() {
   const [netAmount, setNetAmount] = useState(0)
   
   const router = useRouter()
+  const activeWorkspaceId = typeof window !== 'undefined' ? localStorage.getItem('activeWorkspaceId') : null
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -32,7 +32,11 @@ export default function Dashboard() {
         router.push('/')
       } else {
         setUser(session.user)
-        loadData(session.user.id)
+        if (activeWorkspaceId) {
+          loadData(session.user.id)
+        } else {
+          router.push('/workspaces')
+        }
       }
     })
 
@@ -45,25 +49,31 @@ export default function Dashboard() {
     })
 
     return () => subscription.unsubscribe()
-  }, [router])
+  }, [router, activeWorkspaceId])
 
   const loadData = async (userId) => {
     try {
       setLoading(true)
       setError(null)
 
+      if (!activeWorkspaceId) {
+        router.push('/workspaces')
+        return
+      }
+
       const { data: wsData, error: wsError } = await supabase
         .from('workspaces')
         .select('*')
-        .order('created_at', { ascending: false })
+        .eq('id', activeWorkspaceId)
+        .single()
 
       if (wsError) throw wsError
-      setWorkspaces(wsData || [])
+      setWorkspaces(wsData ? [wsData] : [])
 
       const { data: txData, error: txError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('created_by', userId)
+        .eq('workspace_id', activeWorkspaceId)
         .order('created_at', { ascending: false })
         .limit(20)
 
@@ -137,27 +147,12 @@ export default function Dashboard() {
     }
   }
 
-  const createTestWorkspace = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('workspaces')
-        .insert([{ name: 'Mi Primer Workspace', slug: `workspace-${Date.now()}` }])
-        .select()
-
-      if (error) throw error
-      
-      setWorkspaces([data[0], ...workspaces])
-      alert('✅ Workspace creado!')
-    } catch (err) {
-      alert(`Error: ${err.message}`)
-    }
-  }
-
   const handleCreateTransaction = async (e) => {
     e.preventDefault()
     
-// ✅ DEJAR ESTO:
-const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
+    if (!activeWorkspaceId) {
+      alert('No hay workspace activo!')
+      return
     }
     
     if (!amount || amount <= 0) {
@@ -177,8 +172,7 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
 
     try {
       setCreating(true)
-   // ✅ DEJAR ESTO:
-const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
+      const workspace = workspaces[0]
       const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod)
       
       // Crear jerarquía completa
@@ -281,7 +275,7 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
       'SUPPLIER_PAYMENT_MADE': '🏭 Pago a Proveedor',
       'CASH_WITHDRAWN': '💵 Retiro de Efectivo',
       'CASH_OPENED': '🔓 Apertura de Caja',
-      'CASH_CLOSED': ' Cierre de Caja',
+      'CASH_CLOSED': '🔒 Cierre de Caja',
       'MOVEMENT_REVERSED': '↩️ Movimiento Revertido'
     }
     return labels[type] || type
@@ -307,10 +301,10 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
   const getPaymentMethodIcon = (type) => {
     const icons = {
       'EFECTIVO': '💵',
-      'TARJETA_CREDITO': '💳',
+      'TARJETA_CREDITO': '',
       'TARJETA_DEBITO': '💳',
       'TRANSFERENCIA': '🏦',
-      'CHEQUE': '📝',
+      'CHEQUE': '',
       'PERSONALIZADO': '⚙️'
     }
     return icons[type] || '💰'
@@ -323,12 +317,18 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
         <div>
-          <h1 style={{ margin: 0 }}>🚀 GDT Suite - Dashboard</h1>
+          <h1 style={{ margin: 0 }}> GDT Suite - Dashboard</h1>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.8 }}>
-            Conectado como: {user.email}
+            Workspace: {workspaces[0]?.name || 'Cargando...'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => router.push('/workspaces')}
+            style={{ padding: '10px 20px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            🏢 Workspaces
+          </button>
           <button 
             onClick={() => router.push('/payment-methods')}
             style={{ padding: '10px 20px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
@@ -354,39 +354,6 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
         <div style={{ textAlign: 'center', padding: '3rem', fontSize: '18px' }}>Cargando datos...</div>
       ) : (
         <>
-          {/* Workspaces Section */}
-          <section style={{ marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2>📁 Workspaces ({workspaces.length})</h2>
-              <button 
-                onClick={createTestWorkspace}
-                style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                + Crear Workspace
-              </button>
-            </div>
-            
-            {workspaces.length === 0 ? (
-              <div style={{ padding: '2rem', backgroundColor: '#f3f4f6', borderRadius: '8px', textAlign: 'center', color: '#6b7280' }}>
-                No tenés workspaces todavía. Creá uno para empezar!
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                {workspaces.map(ws => (
-                  <div key={ws.id} style={{ padding: '1.5rem', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                    <h3 style={{ margin: '0 0 0.5rem 0' }}>{ws.name}</h3>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
-                      Slug: {ws.slug || 'N/A'}
-                    </p>
-                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#9ca3af' }}>
-                      Creado: {new Date(ws.created_at).toLocaleString('es-AR')}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
           {/* Transactions Section */}
           <section>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -394,14 +361,13 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
               <button 
                 onClick={() => {
                   setShowTransactionForm(!showTransactionForm)
-                  if (workspaces.length > 0 && !selectedWorkspace) {
-                    setSelectedWorkspace(workspaces[0].id)
-                    loadPaymentMethods(workspaces[0].id)
+                  if (activeWorkspaceId) {
+                    loadPaymentMethods(activeWorkspaceId)
                   }
                 }}
                 style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
-                {showTransactionForm ? ' Cancelar' : '+ Nueva Transacción'}
+                {showTransactionForm ? '❌ Cancelar' : '+ Nueva Transacción'}
               </button>
             </div>
 
@@ -410,47 +376,24 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
               <div style={{ padding: '2rem', backgroundColor: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: '8px', marginBottom: '2rem' }}>
                 <h3 style={{ marginTop: 0 }}>Crear Nueva Transacción</h3>
                 <form onSubmit={handleCreateTransaction}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                        Workspace *
-                      </label>
-                      <select 
-                        value={selectedWorkspace}
-                        onChange={(e) => {
-                          setSelectedWorkspace(e.target.value)
-                          loadPaymentMethods(e.target.value)
-                          setSelectedPaymentMethod('')
-                        }}
-                        required
-                        style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                      >
-                        <option value="">Seleccioná un workspace...</option>
-                        {workspaces.map(ws => (
-                          <option key={ws.id} value={ws.id}>{ws.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                        Tipo de Transacción *
-                      </label>
-                      <select 
-                        value={transactionType}
-                        onChange={(e) => setTransactionType(e.target.value)}
-                        required
-                        style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                      >
-                        <option value="PAYMENT_RECEIVED">💰 Cobro Recibido</option>
-                        <option value="EXPENSE_REGISTERED">💸 Gasto Registrado</option>
-                        <option value="SUPPLIER_PAYMENT_MADE">🏭 Pago a Proveedor</option>
-                        <option value="CASH_WITHDRAWN">💵 Retiro de Efectivo</option>
-                        <option value="CASH_OPENED">🔓 Apertura de Caja</option>
-                        <option value="CASH_CLOSED"> Cierre de Caja</option>
-                        <option value="MOVEMENT_REVERSED">↩️ Movimiento Revertido</option>
-                      </select>
-                    </div>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                      Tipo de Transacción *
+                    </label>
+                    <select 
+                      value={transactionType}
+                      onChange={(e) => setTransactionType(e.target.value)}
+                      required
+                      style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                    >
+                      <option value="PAYMENT_RECEIVED"> Cobro Recibido</option>
+                      <option value="EXPENSE_REGISTERED">💸 Gasto Registrado</option>
+                      <option value="SUPPLIER_PAYMENT_MADE">🏭 Pago a Proveedor</option>
+                      <option value="CASH_WITHDRAWN">💵 Retiro de Efectivo</option>
+                      <option value="CASH_OPENED">🔓 Apertura de Caja</option>
+                      <option value="CASH_CLOSED"> Cierre de Caja</option>
+                      <option value="MOVEMENT_REVERSED">↩️ Movimiento Revertido</option>
+                    </select>
                   </div>
 
                   {/* Payment Method Selection */}
@@ -460,8 +403,8 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
                     </label>
                     {paymentMethods.length === 0 ? (
                       <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '4px', color: '#92400e' }}>
-                        ⚠️ No hay medios de pago configurados para este workspace. 
-                        <a href="/payment-methods" style={{ marginLeft: '5px', color: '#3b82f6' }}>Configurar medios de pago →</a>
+                        ⚠️ No hay medios de pago configurados. 
+                        <a href="/payment-methods" style={{ marginLeft: '5px', color: '#3b82f6' }}>Configurar →</a>
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gap: '1rem' }}>
@@ -548,7 +491,7 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
                   {/* Commission Summary */}
                   {selectedPaymentMethod && amount && (
                     <div style={{ padding: '1rem', backgroundColor: '#dbeafe', borderRadius: '4px', marginBottom: '1rem' }}>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}> Resumen de la Transacción</h4>
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>📝 Resumen de la Transacción</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                         <div>
                           <div style={{ fontSize: '12px', color: '#6b7280' }}>Monto Bruto</div>
@@ -621,31 +564,4 @@ const workspace = workspaces[0]; // Ya que ahora solo cargamos el activo
                               {getTransactionTypeLabel(tx.type)}
                             </span>
                           </td>
-                          <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
-                            {method ? `${method.name} ${method.subtype ? `(${method.subtype})` : ''}` : '-'}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold', fontSize: '16px' }}>
-                            ${tx.amount?.toFixed(2)}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', color: '#ef4444', fontSize: '14px' }}>
-                            -${(tx.commission_amount || 0).toFixed(2)}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold', color: '#10b981', fontSize: '16px' }}>
-                            ${net.toFixed(2)}
-                          </td>
-                          <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px', color: '#6b7280' }}>
-                            {new Date(tx.created_at).toLocaleString('es-AR')}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </>
-      )}
-    </main>
-  )
-}
+                          <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14
