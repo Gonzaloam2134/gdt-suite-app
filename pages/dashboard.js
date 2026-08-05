@@ -3,6 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 
+// Conceptos predefinidos
+const CONCEPTOS_INGRESO = ['Venta del día', 'Venta mostrador', 'Delivery', 'Servicios', 'Otros ingresos']
+const CONCEPTOS_GASTO = ['Proveedor', 'Luz', 'Gas', 'Agua', 'Internet', 'Alquiler', 'Sueldos', 'Impuestos', 'Insumos', 'Otros gastos']
+
 export default function CajaDelDia() {
   const [user, setUser] = useState(null)
   const [businessName, setBusinessName] = useState('Mi Negocio')
@@ -17,6 +21,9 @@ export default function CajaDelDia() {
   
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
+  const [selectedConcept, setSelectedConcept] = useState('')
+  const [customConcept, setCustomConcept] = useState('')
+  const [showCustomConcept, setShowCustomConcept] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState('')
   const [openingAmount, setOpeningAmount] = useState('')
   const [creating, setCreating] = useState(false)
@@ -69,11 +76,13 @@ export default function CajaDelDia() {
         setMovements([])
       }
       
+      // Cargar medios de pago SIEMPRE (no solo si hay shift)
       const { data: pmData } = await supabase
         .from('payment_methods')
         .select('*')
         .eq('workspace_id', activeWorkspaceId)
         .eq('is_active', true)
+        .order('name', { ascending: true })
       setPaymentMethods(pmData || [])
     } catch (err) {
       console.error(err)
@@ -96,6 +105,9 @@ export default function CajaDelDia() {
     setFormType(type)
     setAmount('')
     setDescription('')
+    setSelectedConcept('')
+    setCustomConcept('')
+    setShowCustomConcept(false)
     setSelectedMethod('')
     setShowForm(true)
   }
@@ -201,7 +213,8 @@ export default function CajaDelDia() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!amount || !description || !selectedMethod) return alert('Completá todos los campos')
+    if (!amount || amount <= 0) return alert('Ingresá un monto válido')
+    if (!selectedMethod) return alert('Seleccioná un medio de pago')
     if (!activeShift) return alert('Primero abrí la caja')
 
     try {
@@ -210,6 +223,9 @@ export default function CajaDelDia() {
       const isIncome = formType === 'INCOME'
       const type = isIncome ? 'PAYMENT_RECEIVED' : 'EXPENSE_REGISTERED'
       const commission = isIncome ? ((parseFloat(amount) * (method.commission_value || 0)) / 100) + (method.commission_fixed || 0) : 0
+      
+      // Usar concepto personalizado si se escribió uno, sino el seleccionado
+      const finalConcept = showCustomConcept ? customConcept : selectedConcept
 
       const { error } = await supabase.from('transactions').insert([{
         shift_id: activeShift.id,
@@ -222,8 +238,8 @@ export default function CajaDelDia() {
         commission_amount: commission,
         payment_method_id: method.id,
         payment_status: 'ACREDITED',
-        description,
-        category: formType === 'INCOME' ? 'Ventas' : 'Gastos',
+        description: finalConcept || (isIncome ? 'Cobro' : 'Gasto'),
+        category: finalConcept || (isIncome ? 'Ventas' : 'Gastos'),
         created_by: user.id
       }])
 
@@ -245,6 +261,8 @@ export default function CajaDelDia() {
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center', fontSize: '14px' }}>Cargando...</div>
 
+  const conceptosList = formType === 'INCOME' ? CONCEPTOS_INGRESO : CONCEPTOS_GASTO
+
   return (
     <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '70px' }}>
       <header style={{ backgroundColor: '#ffffff', padding: '1rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -262,7 +280,7 @@ export default function CajaDelDia() {
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
         {!activeShift ? (
           <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #cbd5e1', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔒</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}></div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1rem' }}>Caja Cerrada</h3>
             <p style={{ margin: '0 0 1rem 0', color: '#64748b', fontSize: '0.875rem' }}>Abrí la caja para empezar a operar</p>
             <button 
@@ -355,12 +373,13 @@ export default function CajaDelDia() {
         )}
       </div>
 
+      {/* Modal Apertura de Caja */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔓 Abrir Caja</h2>
-              <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}></button>
+              <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
             <form onSubmit={handleOpenShift}>
@@ -387,6 +406,7 @@ export default function CajaDelDia() {
         </div>
       )}
 
+      {/* Modal Cierre de Caja */}
       {showCloseShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -425,6 +445,7 @@ export default function CajaDelDia() {
         </div>
       )}
 
+      {/* Modal de Formulario Cobro/Gasto */}
       {showForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -436,6 +457,7 @@ export default function CajaDelDia() {
             </div>
 
             <form onSubmit={handleSubmit}>
+              {/* Monto */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>¿Cuánto?</label>
                 <input 
@@ -445,34 +467,88 @@ export default function CajaDelDia() {
                 />
               </div>
 
+              {/* Concepto - Lista predefinida */}
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Concepto</label>
-                <input 
-                  type="text" value={description} onChange={e => setDescription(e.target.value)} 
-                  placeholder={formType === 'INCOME' ? 'Ej: Venta del día' : 'Ej: Proveedor'} required
-                  style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box' }}
-                />
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Concepto (opcional)</label>
+                
+                {!showCustomConcept ? (
+                  <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {conceptosList.map(concepto => (
+                        <button
+                          key={concepto}
+                          type="button"
+                          onClick={() => setSelectedConcept(concepto)}
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            backgroundColor: selectedConcept === concepto ? (formType === 'INCOME' ? '#dcfce7' : '#fee2e2') : '#f1f5f9',
+                            border: selectedConcept === concepto ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: selectedConcept === concepto ? '700' : '500',
+                            color: '#0f172a',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {concepto}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomConcept(true)}
+                      style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}
+                    >
+                      + Escribir otro concepto
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input 
+                      type="text" 
+                      value={customConcept} 
+                      onChange={e => setCustomConcept(e.target.value)} 
+                      placeholder="Escribí el concepto..."
+                      style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setShowCustomConcept(false); setCustomConcept('') }}
+                      style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0 0 0' }}
+                    >
+                      ← Volver a la lista
+                    </button>
+                  </>
+                )}
               </div>
 
+              {/* Medio de pago */}
               <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                  {paymentMethods.map(method => (
-                    <label 
-                      key={method.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', 
-                        border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0',
-                        borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white'
-                      }}
-                    >
-                      <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
-                      <div>
-                        <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{method.name}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
+                {paymentMethods.length === 0 ? (
+                  <div style={{ padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem' }}>
+                    ⚠️ No hay medios de pago configurados
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                    {paymentMethods.map(method => (
+                      <label 
+                        key={method.id}
+                        style={{ 
+                          display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', 
+                          border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0',
+                          borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white'
+                        }}
+                      >
+                        <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
+                        <div>
+                          <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{method.name}</div>
+                          {method.subtype && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{method.subtype}</div>}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button 
