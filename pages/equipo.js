@@ -16,7 +16,7 @@ export default function Equipo() {
   const [sending, setSending] = useState(false)
   
   const router = useRouter()
-  const { loading: roleLoading } = useRoleCheck(3) // 3 = Solo Dueño/Admin
+  const { loading: roleLoading } = useRoleCheck(3) // 3 = Solo Dueño/SuperAdmin
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function Equipo() {
       
       setUserRole(roleData?.rol || null)
 
-      // 2. Obtener miembros actuales
+      // 2. Obtener miembros actuales (incluyendo usuario_id para poder eliminar)
       const { data: membersData } = await supabase
         .from('roles_usuario')
         .select(`
@@ -128,7 +128,7 @@ export default function Equipo() {
     }
   }
 
-     if (loading || roleLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Verificando permisos...</div>
+  if (loading || roleLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Verificando permisos...</div>
   if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
   return (
@@ -228,9 +228,7 @@ export default function Equipo() {
                     </span>
                     {!isCurrentUser && member.rol !== 'DUEÑO' && (
                       <button 
-                        onClick={() => handleRemoveMember(member.usuario_id)} // Nota: necesitas agregar usuario_id a la consulta si lo usas, o manejarlo diferente. 
-                        // Para simplificar el MVP, si el perfil no tiene usuario_id en la consulta, podemos omitir la eliminación por ahora o agregarla en la consulta.
-                        // Corregimos la consulta arriba para incluir usuario_id:
+                        onClick={() => handleRemoveMember(member.usuario_id)}
                         style={{ padding: '0.5rem', backgroundColor: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
                       >
                         Eliminar
