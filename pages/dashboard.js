@@ -217,7 +217,9 @@ setUserRole(roleData?.rol || null)
   const handleOpenShift = async (e) => {
     e.preventDefault()
     if (!openingAmount || parseFloat(openingAmount) < 0) return alert('Ingresá un monto válido')
-    if (isAmountModified && !differenceReason.trim()) {
+    
+    // Solo pedir justificación si hay un balance anterior Y se modificó
+    if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) {
       return alert('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
     }
 
