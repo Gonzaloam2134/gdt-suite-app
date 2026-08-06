@@ -57,6 +57,7 @@ export default function Equipo() {
       const { data: membersData } = await supabase
         .from('roles_usuario')
         .select(`
+          usuario_id,
           rol,
           perfiles (email, nombre)
         `)
