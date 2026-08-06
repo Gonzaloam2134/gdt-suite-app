@@ -7,6 +7,7 @@ const CONCEPTOS_INGRESO = ['Venta del día', 'Venta mostrador', 'Delivery', 'Ser
 const CONCEPTOS_GASTO = ['Proveedor', 'Luz', 'Gas', 'Agua', 'Internet', 'Alquiler', 'Sueldos', 'Impuestos', 'Insumos', 'Otros gastos']
 
 export default function CajaDelDia() {
+  const [userRole, setUserRole] = useState(null)
   const [user, setUser] = useState(null)
   const [businessName, setBusinessName] = useState('Mi Negocio')
   const [movements, setMovements] = useState([])
@@ -57,6 +58,15 @@ export default function CajaDelDia() {
   const loadData = async (userId) => {
     try {
       setLoading(true)
+      // Cargar rol del usuario
+const { data: roleData } = await supabase
+  .from('roles_usuario')
+  .select('rol')
+  .eq('local_id', activeLocalId)
+  .eq('usuario_id', userId)
+  .single()
+
+setUserRole(roleData?.rol || null)
       const { data: wsData } = await supabase.from('locales').select('nombre').eq('id', activeLocalId).single()
       if (wsData) setBusinessName(wsData.nombre)
 
@@ -353,10 +363,13 @@ export default function CajaDelDia() {
               {activeShift ? `Turno activo • ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            <button onClick={() => router.push('/reportes')} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Reportes</button>
-            <button onClick={handleSignOut} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Salir</button>
-          </div>
+<div style={{ display: 'flex', gap: '5px' }}>
+  <button onClick={() => router.push('/reportes')} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Reportes</button>
+  {userRole === 'SUPER_ADMIN' && (
+    <button onClick={() => router.push('/admin')} style={{ padding: '6px 10px', backgroundColor: '#1e40af', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '700' }}> Consola</button>
+  )}
+  <button onClick={handleSignOut} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Salir</button>
+</div>
         </div>
       </header>
 
