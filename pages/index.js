@@ -40,7 +40,7 @@ export default function Home() {
       if (error) {
         alert(`Error: ${error.message || JSON.stringify(error)}`)
       } else {
-        alert('Cuenta creada! Redirigiendo...')
+        alert('✅ Cuenta creada. Redirigiendo...')
         router.push('/locales')
       }
     } catch (err) {
@@ -72,20 +72,20 @@ export default function Home() {
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>🚀 GDT Suite - Panel de Control</h1>
+      <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>🚀 GDT Suite</h1>
       
       {user ? (
-        <div style={{ padding: '20px', backgroundColor: '#d1fae5', borderRadius: '8px' }}>
+        <div style={{ padding: '20px', backgroundColor: '#d1fae5', borderRadius: '8px', textAlign: 'center' }}>
           <h2>✅ Sesión iniciada</h2>
           <p><strong>Email:</strong> {user.email}</p>
           <p>Redirigiendo a tus locales...</p>
-          <button onClick={handleSignOut} style={{ padding: '10px 20px', cursor: 'pointer', marginTop: '10px' }}>
+          <button onClick={handleSignOut} style={{ padding: '10px 20px', cursor: 'pointer', marginTop: '10px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px' }}>
             Cerrar Sesión
           </button>
         </div>
       ) : (
         <div style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
-          <h3>Iniciar Sesión / Registrarse</h3>
+          <h3 style={{ textAlign: 'center', marginBottom: '1rem' }}>Iniciar Sesión / Registrarse</h3>
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <input 
               type="email" 
@@ -93,7 +93,7 @@ export default function Home() {
               value={email} 
               onChange={e => setEmail(e.target.value)} 
               required 
-              style={{ padding: '10px', fontSize: '16px' }}
+              style={{ padding: '12px', fontSize: '16px', borderRadius: '4px', border: '1px solid #d1d5db' }}
             />
             <input 
               type="password" 
@@ -102,13 +102,13 @@ export default function Home() {
               onChange={e => setPassword(e.target.value)} 
               required 
               minLength="6"
-              style={{ padding: '10px', fontSize: '16px' }}
+              style={{ padding: '12px', fontSize: '16px', borderRadius: '4px', border: '1px solid #d1d5db' }}
             />
             <button 
               type="submit" 
               onClick={handleSignIn} 
               disabled={loading}
-              style={{ padding: '12px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px' }}
+              style={{ padding: '12px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
             >
               {loading ? 'Procesando...' : 'Iniciar Sesión'}
             </button>
@@ -116,7 +116,7 @@ export default function Home() {
               type="button" 
               onClick={handleSignUp} 
               disabled={loading}
-              style={{ padding: '12px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px' }}
+              style={{ padding: '12px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
             >
               {loading ? 'Procesando...' : 'Registrarse'}
             </button>
