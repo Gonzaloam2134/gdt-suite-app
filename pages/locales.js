@@ -40,7 +40,7 @@ export default function Locales() {
       const { data, error } = await supabase
         .from('locales')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('creado_en', { ascending: false })
 
       if (error) throw error
       setLocales(data || [])
@@ -78,6 +78,7 @@ export default function Locales() {
       const slug = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now().toString().slice(-4)
       
       if (editingLocal) {
+        // MODO EDICIÓN
         const { error } = await supabase
           .from('locales')
           .update({ nombre: name, descripcion: description, moneda: currency, zona_horaria: timezone })
@@ -86,12 +87,21 @@ export default function Locales() {
         if (error) throw error
         alert('✅ Local actualizado')
       } else {
-        const { error } = await supabase
+        // MODO CREACIÓN
+        const { data, error } = await supabase
           .from('locales')
           .insert([{ nombre: name, descripcion: description, moneda: currency, zona_horaria: timezone, slug }])
+          .select()
+          .single()
         
         if (error) throw error
-        alert('✅ Local creado')
+        
+        alert('✅ Local creado. Redirigiendo al dashboard...')
+        
+        // REDIRECCIÓN AUTOMÁTICA AL DASHBOARD
+        localStorage.setItem('activeLocalId', data.id)
+        router.push('/dashboard')
+        return
       }
       
       setShowModal(false)
@@ -135,7 +145,7 @@ export default function Locales() {
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
         <div>
-          <h1 style={{ margin: 0 }}>🏢 Mis Locales</h1>
+          <h1 style={{ margin: 0 }}> Mis Locales</h1>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.8 }}>
             Seleccioná o gestioná tus espacios de trabajo
           </p>
@@ -248,7 +258,7 @@ export default function Locales() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   >
                     <option value="ARS">🇦🇷 ARS (Peso Argentino)</option>
-                    <option value="USD">🇸 USD (Dólar)</option>
+                    <option value="USD">🇺 USD (Dólar)</option>
                     <option value="EUR">🇪🇺 EUR (Euro)</option>
                   </select>
                 </div>
