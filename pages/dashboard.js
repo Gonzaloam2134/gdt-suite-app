@@ -203,7 +203,10 @@ setUserRole(roleData?.rol || null)
   const handleOpeningAmountChange = (e) => {
     const newVal = e.target.value
     setOpeningAmount(newVal)
-    if (newVal !== lastShiftBalance.toFixed(2)) {
+    
+    // Solo marcar como modificado si hay un balance anterior Y es diferente
+    // Si lastShiftBalance es 0 (primera vez), no pedir justificación
+    if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) {
       setIsAmountModified(true)
     } else {
       setIsAmountModified(false)
