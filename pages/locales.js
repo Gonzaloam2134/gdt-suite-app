@@ -9,7 +9,6 @@ export default function Locales() {
   const [showModal, setShowModal] = useState(false)
   const [editingLocal, setEditingLocal] = useState(null)
   
-  // Form state
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [currency, setCurrency] = useState('ARS')
@@ -41,7 +40,7 @@ export default function Locales() {
       const { data, error } = await supabase
         .from('locales')
         .select('*')
-        .order('creado_en', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) throw error
       setLocales(data || [])
@@ -181,7 +180,7 @@ export default function Locales() {
                 </p>
                 <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#9ca3af', marginBottom: '1rem' }}>
                   <span>💰 {local.moneda || 'ARS'}</span>
-                  <span>🕐 {local.zona_horaria ? local.zona_horaria.split('/')[1] : 'Default'}</span>
+                  <span> {local.zona_horaria ? local.zona_horaria.split('/')[1] : 'Default'}</span>
                 </div>
               </div>
               
@@ -249,7 +248,7 @@ export default function Locales() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   >
                     <option value="ARS">🇦🇷 ARS (Peso Argentino)</option>
-                    <option value="USD">🇺🇸 USD (Dólar)</option>
+                    <option value="USD">🇸 USD (Dólar)</option>
                     <option value="EUR">🇪🇺 EUR (Euro)</option>
                   </select>
                 </div>
