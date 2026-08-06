@@ -379,37 +379,102 @@ export default function MediosPago() {
         )}
       </div>
 
-      {/* Modal Crear/Editar Medio de Pago */}
+            {/* Modal Crear/Editar Medio de Pago */}
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>{editingMethod ? 'Editar Medio de Pago' : 'Nuevo Medio de Pago'}</h2>
             <form onSubmit={handleSave}>
+              
+              {/* CATEGORÍA con botón + */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Categoría *</label>
-                <select 
-                  value={selectedCategory} 
-                  onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setUseCustomSubcategory(false); }}
-                  required
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
-                >
-                  <option value="">Seleccionar categoría...</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
-                  ))}
-                </select>
+                {!showNewCategoryInput ? (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select 
+                      value={selectedCategory} 
+                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setUseCustomSubcategory(false); }}
+                      required
+                      style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
+                    >
+                      <option value="">Seleccionar categoría...</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                      ))}
+                    </select>
+                    <button 
+                      type="button"
+                      onClick={() => setShowNewCategoryInput(true)}
+                      style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}
+                      title="Agregar nueva categoría"
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      type="text"
+                      value={newCategoryName}
+                      onChange={e => setNewCategoryName(e.target.value)}
+                      placeholder="Nombre de la categoría..."
+                      required
+                      style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
+                    />
+                    <input 
+                      type="text"
+                      value={newCategoryIcon}
+                      onChange={e => setNewCategoryIcon(e.target.value)}
+                      placeholder="Ícono"
+                      maxLength="2"
+                      style={{ width: '60px', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', textAlign: 'center' }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        if (!newCategoryName.trim()) return alert('El nombre es obligatorio')
+                        try {
+                          const { data, error } = await supabase
+                            .from('categorias_pago')
+                            .insert([{ nombre: newCategoryName.trim(), icono: newCategoryIcon || '' }])
+                            .select()
+                            .single()
+                          if (error) throw error
+                          setCategories([...categories, data])
+                          setSelectedCategory(data.id)
+                          setNewCategoryName('')
+                          setNewCategoryIcon('')
+                          setShowNewCategoryInput(false)
+                        } catch (err) {
+                          alert('Error: ' + err.message)
+                        }
+                      }}
+                      style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      ✓
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); setNewCategoryIcon(''); }}
+                      style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
 
+              {/* SUBCATEGORÍA con botón + */}
               {selectedCategory && (
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Subcategoría *</label>
-                  {!useCustomSubcategory ? (
-                    <>
+                  {!showNewSubcategoryInput ? (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <select 
                         value={selectedSubcategory} 
                         onChange={e => setSelectedSubcategory(e.target.value)}
                         required
-                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', marginBottom: '0.5rem' }}
+                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', marginBottom: '0.5rem' }}
                       >
                         <option value="">Seleccionar subcategoría...</option>
                         {filteredSubcategories.map(sub => (
@@ -418,30 +483,54 @@ export default function MediosPago() {
                       </select>
                       <button 
                         type="button"
-                        onClick={() => setUseCustomSubcategory(true)}
-                        style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}
+                        onClick={() => setShowNewSubcategoryInput(true)}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}
+                        title="Agregar nueva subcategoría"
                       >
-                        + Usar subcategoría personalizada
+                        +
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input 
                         type="text"
-                        value={customSubcategory}
-                        onChange={e => setCustomSubcategory(e.target.value)}
+                        value={newSubcategoryName}
+                        onChange={e => setNewSubcategoryName(e.target.value)}
                         placeholder="Nombre de la subcategoría..."
                         required
-                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', marginBottom: '0.5rem' }}
+                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
                       />
                       <button 
                         type="button"
-                        onClick={() => { setUseCustomSubcategory(false); setCustomSubcategory(''); }}
-                        style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}
+                        onClick={async () => {
+                          if (!newSubcategoryName.trim()) return alert('El nombre es obligatorio')
+                          try {
+                            const { data, error } = await supabase
+                              .from('subcategorias_pago')
+                              .insert([{ categoria_id: selectedCategory, nombre: newSubcategoryName.trim() }])
+                              .select()
+                              .single()
+                            if (error) throw error
+                            setSubcategories([...subcategories, data])
+                            setSelectedSubcategory(data.id)
+                            setNewSubcategoryName('')
+                            setShowNewSubcategoryInput(false)
+                          } catch (err) {
+                            alert('Error: ' + err.message)
+                          }
+                        }}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                       >
-                        ← Volver a la lista
+                        ✓
                       </button>
-                    </>
+                      <button 
+                        type="button"
+                        onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
