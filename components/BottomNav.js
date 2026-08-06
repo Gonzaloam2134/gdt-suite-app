@@ -5,9 +5,9 @@ export default function BottomNav({ activeTab }) {
 
   const tabs = [
     { id: 'caja', label: 'Caja', icon: '💰', path: '/dashboard' },
-    { id: 'equipo', label: 'Equipo', icon: '', path: '/equipo' },
+    { id: 'equipo', label: 'Equipo', icon: '👥', path: '/equipo' },
     { id: 'reportes', label: 'Reportes', icon: '📊', path: '/reportes' },
-    { id: 'config', label: 'Ajustes', icon: '️', path: '/configuracion' }
+    { id: 'config', label: 'Ajustes', icon: '⚙️', path: '/configuracion' }
   ]
 
   return (
