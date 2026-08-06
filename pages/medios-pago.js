@@ -17,30 +17,26 @@ export default function MediosPago() {
   const [categories, setCategories] = useState([])
   const [subcategories, setSubcategories] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  // Modal principal
   const [showModal, setShowModal] = useState(false)
   const [editingMethod, setEditingMethod] = useState(null)
-  const [showCategoryModal, setShowCategoryModal] = useState(false)
-  const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
+  
+  // Estados para inputs inline de nueva categoría/subcategoría
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
-  const [showNewSubcategoryInput, setShowNewSubcategoryInput] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryIcon, setNewCategoryIcon] = useState('')
+  
+  const [showNewSubcategoryInput, setShowNewSubcategoryInput] = useState(false)
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
+
   // Form state
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubcategory, setSelectedSubcategory] = useState('')
-  const [customSubcategory, setCustomSubcategory] = useState('')
-  const [useCustomSubcategory, setUseCustomSubcategory] = useState(false)
   const [commissionType, setCommissionType] = useState('NINGUNA')
   const [commissionValue, setCommissionValue] = useState('')
   const [commissionFixed, setCommissionFixed] = useState('')
   const [active, setActive] = useState(true)
-  
-  // New category/subcategory state
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [newCategoryIcon, setNewCategoryIcon] = useState('')
-  const [newSubcategoryName, setNewSubcategoryName] = useState('')
-  const [newSubcategoryCategory, setNewSubcategoryCategory] = useState('')
   
   const router = useRouter()
   const { loading: roleLoading } = useRoleCheck(2)
@@ -107,12 +103,18 @@ export default function MediosPago() {
     setEditingMethod(null)
     setSelectedCategory('')
     setSelectedSubcategory('')
-    setCustomSubcategory('')
-    setUseCustomSubcategory(false)
     setCommissionType('NINGUNA')
     setCommissionValue('')
     setCommissionFixed('')
     setActive(true)
+    
+    // Resetear estados inline
+    setShowNewCategoryInput(false)
+    setNewCategoryName('')
+    setNewCategoryIcon('')
+    setShowNewSubcategoryInput(false)
+    setNewSubcategoryName('')
+    
     setShowModal(true)
   }
 
@@ -122,12 +124,13 @@ export default function MediosPago() {
     const cat = subcat?.categorias_pago
     setSelectedCategory(cat?.id || '')
     setSelectedSubcategory(subcat?.id || '')
-    setCustomSubcategory('')
-    setUseCustomSubcategory(false)
     setCommissionType(method.tipo_comision || 'NINGUNA')
     setCommissionValue(method.valor_comision?.toString() || '')
     setCommissionFixed(method.monto_fijo_comision?.toString() || '')
     setActive(method.activo !== false)
+    
+    setShowNewCategoryInput(false)
+    setShowNewSubcategoryInput(false)
     setShowModal(true)
   }
 
@@ -136,13 +139,13 @@ export default function MediosPago() {
     
     let finalSubcategoryId = selectedSubcategory
     
-    // Si usa subcategoría personalizada, crearla
-    if (useCustomSubcategory && customSubcategory.trim()) {
+    // Si usa subcategoría personalizada inline, crearla
+    if (showNewSubcategoryInput && newSubcategoryName.trim()) {
       const { data: newSubcat, error: subcatError } = await supabase
         .from('subcategorias_pago')
         .insert([{
           categoria_id: selectedCategory,
-          nombre: customSubcategory.trim()
+          nombre: newSubcategoryName.trim()
         }])
         .select()
         .single()
@@ -155,7 +158,7 @@ export default function MediosPago() {
     }
 
     if (!finalSubcategoryId) {
-      alert('Seleccioná una subcategoría')
+      alert('Seleccioná o creá una subcategoría')
       return
     }
 
@@ -191,53 +194,6 @@ export default function MediosPago() {
       }
       
       setShowModal(false)
-      loadData()
-    } catch (err) {
-      alert(`Error: ${err.message}`)
-    }
-  }
-
-  const handleCreateCategory = async (e) => {
-    e.preventDefault()
-    if (!newCategoryName.trim()) return alert('El nombre es obligatorio')
-
-    try {
-      const { error } = await supabase
-        .from('categorias_pago')
-        .insert([{
-          nombre: newCategoryName.trim(),
-          icono: newCategoryIcon || ''
-        }])
-      
-      if (error) throw error
-      alert('✅ Categoría creada')
-      setNewCategoryName('')
-      setNewCategoryIcon('')
-      setShowCategoryModal(false)
-      loadData()
-    } catch (err) {
-      alert(`Error: ${err.message}`)
-    }
-  }
-
-  const handleCreateSubcategory = async (e) => {
-    e.preventDefault()
-    if (!newSubcategoryName.trim()) return alert('El nombre es obligatorio')
-    if (!newSubcategoryCategory) return alert('Seleccioná una categoría')
-
-    try {
-      const { error } = await supabase
-        .from('subcategorias_pago')
-        .insert([{
-          categoria_id: newSubcategoryCategory,
-          nombre: newSubcategoryName.trim()
-        }])
-      
-      if (error) throw error
-      alert('✅ Subcategoría creada')
-      setNewSubcategoryName('')
-      setNewSubcategoryCategory('')
-      setShowSubcategoryModal(false)
       loadData()
     } catch (err) {
       alert(`Error: ${err.message}`)
@@ -306,18 +262,6 @@ export default function MediosPago() {
           >
             + Nuevo Medio de Pago
           </button>
-          <button 
-            onClick={() => setShowCategoryModal(true)}
-            style={{ padding: '0.75rem 1.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-          >
-            + Categoría
-          </button>
-          <button 
-            onClick={() => setShowSubcategoryModal(true)}
-            style={{ padding: '0.75rem 1.5rem', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-          >
-            + Subcategoría
-          </button>
         </div>
 
         {groupedMethods.length === 0 ? (
@@ -383,21 +327,21 @@ export default function MediosPago() {
         )}
       </div>
 
-            {/* Modal Crear/Editar Medio de Pago */}
+      {/* Modal Crear/Editar Medio de Pago */}
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>{editingMethod ? 'Editar Medio de Pago' : 'Nuevo Medio de Pago'}</h2>
             <form onSubmit={handleSave}>
               
-              {/* CATEGORÍA con botón + */}
+              {/* CATEGORÍA con botón + inline */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Categoría *</label>
                 {!showNewCategoryInput ? (
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <select 
                       value={selectedCategory} 
-                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setUseCustomSubcategory(false); }}
+                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setShowNewSubcategoryInput(false); }}
                       required
                       style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
                     >
@@ -468,7 +412,7 @@ export default function MediosPago() {
                 )}
               </div>
 
-              {/* SUBCATEGORÍA con botón + */}
+              {/* SUBCATEGORÍA con botón + inline */}
               {selectedCategory && (
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Subcategoría *</label>
@@ -478,7 +422,7 @@ export default function MediosPago() {
                         value={selectedSubcategory} 
                         onChange={e => setSelectedSubcategory(e.target.value)}
                         required
-                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', marginBottom: '0.5rem' }}
+                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
                       >
                         <option value="">Seleccionar subcategoría...</option>
                         {filteredSubcategories.map(sub => (
@@ -612,105 +556,6 @@ export default function MediosPago() {
                   style={{ padding: '0.75rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                 >
                   {editingMethod ? 'Guardar Cambios' : 'Crear Medio de Pago'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Nueva Categoría */}
-      {showCategoryModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '400px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Nueva Categoría</h2>
-            <form onSubmit={handleCreateCategory}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Nombre *</label>
-                <input 
-                  type="text"
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  required
-                  placeholder="Ej: Criptomonedas"
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Ícono (emoji)</label>
-                <input 
-                  type="text"
-                  value={newCategoryIcon}
-                  onChange={e => setNewCategoryIcon(e.target.value)}
-                  placeholder="Ej: ₿"
-                  maxLength="2"
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowCategoryModal(false)}
-                  style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  style={{ padding: '0.75rem 1.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  Crear Categoría
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Nueva Subcategoría */}
-      {showSubcategoryModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '400px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Nueva Subcategoría</h2>
-            <form onSubmit={handleCreateSubcategory}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Categoría *</label>
-                <select 
-                  value={newSubcategoryCategory}
-                  onChange={e => setNewSubcategoryCategory(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
-                >
-                  <option value="">Seleccionar categoría...</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Nombre *</label>
-                <input 
-                  type="text"
-                  value={newSubcategoryName}
-                  onChange={e => setNewSubcategoryName(e.target.value)}
-                  required
-                  placeholder="Ej: Bitcoin, Ethereum..."
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowSubcategoryModal(false)}
-                  style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  style={{ padding: '0.75rem 1.5rem', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  Crear Subcategoría
                 </button>
               </div>
             </form>
