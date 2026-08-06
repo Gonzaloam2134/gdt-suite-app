@@ -10,18 +10,16 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // Verificar sesión activa y redirigir a workspaces si está logueado
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        router.push('/workspaces')
+        router.push('/locales')
       }
       setUser(session?.user ?? null)
     })
 
-    // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        router.push('/workspaces')
+        router.push('/locales')
       }
       setUser(session?.user ?? null)
     })
@@ -36,21 +34,16 @@ export default function Home() {
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
-        options: {
-          data: { full_name: 'Nuevo Usuario' }
-        }
+        options: { data: { full_name: 'Nuevo Usuario' } }
       })
       
       if (error) {
-        console.error('Signup error:', error)
         alert(`Error: ${error.message || JSON.stringify(error)}`)
       } else {
-        console.log('Signup success:', data)
         alert('Cuenta creada! Redirigiendo...')
-        router.push('/workspaces')
+        router.push('/locales')
       }
     } catch (err) {
-      console.error('Unexpected error:', err)
       alert(`Error inesperado: ${err.message}`)
     } finally {
       setLoading(false)
@@ -64,14 +57,9 @@ export default function Home() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       
       if (error) {
-        console.error('Login error:', error)
         alert(`Error: ${error.message || JSON.stringify(error)}`)
-      } else {
-        console.log('Login success:', data)
-        // La redirección a /workspaces se hace automáticamente por el onAuthStateChange
       }
     } catch (err) {
-      console.error('Unexpected error:', err)
       alert(`Error inesperado: ${err.message}`)
     } finally {
       setLoading(false)
@@ -84,14 +72,13 @@ export default function Home() {
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto' }}>
-      <h1> GDT Suite - Panel de Control</h1>
+      <h1>🚀 GDT Suite - Panel de Control</h1>
       
       {user ? (
         <div style={{ padding: '20px', backgroundColor: '#d1fae5', borderRadius: '8px' }}>
           <h2>✅ Sesión iniciada</h2>
           <p><strong>Email:</strong> {user.email}</p>
-          <p><strong>ID:</strong> {user.id}</p>
-          <p>Redirigiendo a workspaces...</p>
+          <p>Redirigiendo a tus locales...</p>
           <button onClick={handleSignOut} style={{ padding: '10px 20px', cursor: 'pointer', marginTop: '10px' }}>
             Cerrar Sesión
           </button>
