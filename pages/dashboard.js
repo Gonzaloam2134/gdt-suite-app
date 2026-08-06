@@ -337,6 +337,30 @@ setUserRole(roleData?.rol || null)
       if (error) throw error
       setShowForm(false)
       loadData(user.id)
+            // --- Lógica de Invitaciones Pendientes ---
+      const { data: pendingInvites } = await supabase
+        .from('invitaciones')
+        .select('id, local_id, rol, locales(nombre)')
+        .eq('email', user.email)
+        .eq('estado', 'pendiente')
+
+      if (pendingInvites && pendingInvites.length > 0) {
+        const invite = pendingInvites[0]
+        const accept = window.confirm(`¡Hola! Tienes una invitación pendiente para unirte a "${invite.locales?.nombre || 'un local'}" como ${invite.rol}. ¿Deseas aceptarla?`)
+        
+        if (accept) {
+          await supabase.from('roles_usuario').insert({
+            local_id: invite.local_id,
+            usuario_id: user.id,
+            rol: invite.rol
+          })
+          await supabase.from('invitaciones').update({ estado: 'aceptada' }).eq('id', invite.id)
+          
+          alert('✅ ¡Te has unido al local exitosamente!')
+          window.location.reload()
+        }
+      }
+      // -----------------------------------------
     } catch (err) {
       alert(`Error: ${err.message}`)
     } finally {
