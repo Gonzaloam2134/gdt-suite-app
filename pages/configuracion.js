@@ -4,10 +4,19 @@ import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 import { useRoleCheck } from '../lib/useRoleCheck'
 
+// Definimos los niveles de permiso para una validación limpia
+const NIVELES = {
+  'OPERADOR': 1,
+  'ADMINISTRADOR': 2,
+  'DUEÑO': 3,
+  'SUPER_ADMIN': 3
+}
+
 export default function Configuracion() {
   const [user, setUser] = useState(null)
   const router = useRouter()
-  const { loading: roleLoading, role } = useRoleCheck(2) // Nivel 2: Admin y Dueño
+  // Nivel 2: Permite entrar a Administrador, Dueño y Super Admin. Bloquea a Operador.
+  const { loading: roleLoading, role } = useRoleCheck(2) 
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -21,13 +30,13 @@ export default function Configuracion() {
     router.push('/')
   }
 
-  if (roleLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
+  if (roleLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Verificando permisos...</div>
   if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
   const menuItems = [
-    { label: ' Mi Equipo', desc: 'Invitar y gestionar roles', path: '/equipo', minRole: 3 }, // Solo Dueño
-    { label: '💳 Medios de Pago', desc: 'Configurar tarjetas, QR, comisiones', path: '/medios-pago', minRole: 2 },
-    { label: '🏢 Mis Locales', desc: 'Gestionar negocios', path: '/locales', minRole: 1 },
+    { label: '👥 Mi Equipo', desc: 'Invitar y gestionar roles', path: '/equipo', minRole: 3 }, // Solo Dueño/SuperAdmin
+    { label: '💳 Medios de Pago', desc: 'Configurar tarjetas, QR, comisiones', path: '/medios-pago', minRole: 2 }, // Admin y arriba
+    { label: '🏢 Mis Locales', desc: 'Gestionar negocios', path: '/locales', minRole: 1 }, // Todos los roles
   ]
 
   return (
@@ -42,8 +51,8 @@ export default function Configuracion() {
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {menuItems.map((item, index) => {
-            // Ocultar opciones si el rol no es suficiente
-            if (role && (role === 'OPERADOR' && item.minRole > 1) || (role === 'ADMINISTRADOR' && item.minRole > 2)) {
+            // Lógica limpia: Si el nivel del usuario es menor al requerido, no renderiza el botón
+            if (role && NIVELES[role] < item.minRole) {
               return null
             }
             
@@ -60,7 +69,8 @@ export default function Configuracion() {
                   cursor: 'pointer',
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  width: '100%'
                 }}
               >
                 <div>
