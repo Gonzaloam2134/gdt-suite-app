@@ -15,7 +15,7 @@ export default function Reportes() {
   const [paymentMethods, setPaymentMethods] = useState([])
   
   const router = useRouter()
-  const activeWorkspaceId = typeof window !== 'undefined' ? localStorage.getItem('activeWorkspaceId') : null
+  const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -23,113 +23,86 @@ export default function Reportes() {
         router.push('/')
       } else {
         setUser(session.user)
-        if (activeWorkspaceId) {
+        if (activeLocalId) {
           loadReportes()
         } else {
-          router.push('/workspaces')
+          router.push('/locales')
         }
       }
     })
-  }, [router, activeWorkspaceId])
+  }, [router, activeLocalId])
 
   const loadReportes = async () => {
     try {
       setLoading(true)
 
+      // 1. Cargar medios de pago
       const { data: pmData } = await supabase
-        .from('payment_methods')
+        .from('medios_pago')
         .select('*')
-        .eq('workspace_id', activeWorkspaceId)
+        .eq('local_id', activeLocalId)
       setPaymentMethods(pmData || [])
 
+      // 2. Cargar todas las transacciones del local
       const { data: allTx } = await supabase
-        .from('transactions')
+        .from('transacciones')
         .select('*')
-        .eq('workspace_id', activeWorkspaceId)
-        .order('created_at', { ascending: false })
+        .eq('local_id', activeLocalId)
+        .order('creado_en', { ascending: false })
 
       const transactions = allTx || []
 
-      const global = transactions.reduce((acc, curr) => {
-        const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
-        const commission = curr.commission_amount || 0
-        if (isIncome) {
-          acc.in += curr.amount
-          acc.commissions += commission
-          acc.net += curr.amount - commission
-        } else {
-          acc.out += curr.amount
-        }
-        acc.count++
-        return acc
-      }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
-      setGlobalTotals(global)
+      // Función auxiliar para calcular totales (evita repetir código)
+      const calculateTotals = (txList) => {
+        return txList.reduce((acc, curr) => {
+          const isIncome = curr.tipo === 'COBRO_RECIBIDO' || curr.tipo === 'CAJA_ABIERTA'
+          const commission = curr.comision_monto || 0
+          if (isIncome) {
+            acc.in += curr.monto
+            acc.commissions += commission
+            acc.net += curr.monto - commission
+          } else {
+            acc.out += curr.monto
+          }
+          acc.count++
+          return acc
+        }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
+      }
 
+      // 3. Calcular totales globales
+      setGlobalTotals(calculateTotals(transactions))
+
+      // 4. Totales de hoy
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      const todayTx = transactions.filter(t => new Date(t.created_at) >= today)
-      const todayTot = todayTx.reduce((acc, curr) => {
-        const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
-        const commission = curr.commission_amount || 0
-        if (isIncome) {
-          acc.in += curr.amount
-          acc.commissions += commission
-          acc.net += curr.amount - commission
-        } else {
-          acc.out += curr.amount
-        }
-        acc.count++
-        return acc
-      }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
-      setTodayTotals(todayTot)
+      const todayTx = transactions.filter(t => new Date(t.creado_en) >= today)
+      setTodayTotals(calculateTotals(todayTx))
 
+      // 5. Totales de la semana (últimos 7 días)
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
-      const weekTx = transactions.filter(t => new Date(t.created_at) >= weekAgo)
-      const weekTot = weekTx.reduce((acc, curr) => {
-        const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
-        const commission = curr.commission_amount || 0
-        if (isIncome) {
-          acc.in += curr.amount
-          acc.commissions += commission
-          acc.net += curr.amount - commission
-        } else {
-          acc.out += curr.amount
-        }
-        acc.count++
-        return acc
-      }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
-      setWeekTotals(weekTot)
+      const weekTx = transactions.filter(t => new Date(t.creado_en) >= weekAgo)
+      setWeekTotals(calculateTotals(weekTx))
 
+      // 6. Totales del mes (últimos 30 días)
       const monthAgo = new Date()
       monthAgo.setDate(monthAgo.getDate() - 30)
-      const monthTx = transactions.filter(t => new Date(t.created_at) >= monthAgo)
-      const monthTot = monthTx.reduce((acc, curr) => {
-        const isIncome = curr.type === 'PAYMENT_RECEIVED' || curr.type === 'CASH_OPENED'
-        const commission = curr.commission_amount || 0
-        if (isIncome) {
-          acc.in += curr.amount
-          acc.commissions += commission
-          acc.net += curr.amount - commission
-        } else {
-          acc.out += curr.amount
-        }
-        acc.count++
-        return acc
-      }, { in: 0, out: 0, commissions: 0, net: 0, count: 0 })
-      setMonthTotals(monthTot)
+      const monthTx = transactions.filter(t => new Date(t.creado_en) >= monthAgo)
+      setMonthTotals(calculateTotals(monthTx))
 
+      // 7. Cantidad de turnos cerrados
       const { count: shiftsCount } = await supabase
-        .from('shifts')
+        .from('turnos')
         .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', activeWorkspaceId)
-        .eq('status', 'CLOSED')
+        .eq('local_id', activeLocalId)
+        .eq('estado', 'CERRADO')
       setTotalShifts(shiftsCount || 0)
 
+      // 8. Top medios de pago
       const methodCounts = {}
       transactions.forEach(t => {
-        if (t.payment_method_id) {
-          methodCounts[t.payment_method_id] = (methodCounts[t.payment_method_id] || 0) + 1
+        if (t.medio_pago_id) {
+          methodCounts[t.medio_pago_id] = (methodCounts[t.medio_pago_id] || 0) + 1
         }
       })
       const sorted = Object.entries(methodCounts)
@@ -137,12 +110,12 @@ export default function Reportes() {
         .slice(0, 5)
         .map(([methodId, count]) => {
           const method = pmData?.find(m => m.id === methodId)
-          return { name: method?.name || 'Desconocido', count }
+          return { name: method?.nombre || 'Desconocido', count }
         })
       setTopMethods(sorted)
 
     } catch (err) {
-      console.error('Error loading reportes:', err)
+      console.error('Error cargando reportes:', err)
     } finally {
       setLoading(false)
     }
@@ -173,6 +146,7 @@ export default function Reportes() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          {/* Hoy */}
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>📅 Hoy</h3>
@@ -198,6 +172,7 @@ export default function Reportes() {
             </div>
           </div>
 
+          {/* Última Semana */}
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>📆 Última Semana</h3>
@@ -223,6 +198,7 @@ export default function Reportes() {
             </div>
           </div>
 
+          {/* Último Mes */}
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>🗓️ Último Mes</h3>
