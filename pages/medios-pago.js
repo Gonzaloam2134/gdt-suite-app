@@ -21,7 +21,11 @@ export default function MediosPago() {
   const [editingMethod, setEditingMethod] = useState(null)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false)
-  
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
+  const [showNewSubcategoryInput, setShowNewSubcategoryInput] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryIcon, setNewCategoryIcon] = useState('')
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
   // Form state
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubcategory, setSelectedSubcategory] = useState('')
