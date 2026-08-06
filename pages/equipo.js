@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
+import { useRoleCheck } from '../lib/useRoleCheck'
 
 export default function Equipo() {
   const [user, setUser] = useState(null)
@@ -15,6 +16,7 @@ export default function Equipo() {
   const [sending, setSending] = useState(false)
   
   const router = useRouter()
+  const { loading: roleLoading } = useRoleCheck(3) // 3 = Solo Dueño/Admin
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
   useEffect(() => {
@@ -45,13 +47,6 @@ export default function Equipo() {
         .single()
       
       setUserRole(roleData?.rol || null)
-
-      // Si no es DUEÑO ni SUPER_ADMIN, redirigir
-      if (roleData?.rol !== 'DUEÑO' && roleData?.rol !== 'SUPER_ADMIN') {
-        alert('No tienes permisos para gestionar el equipo.')
-        router.push('/dashboard')
-        return
-      }
 
       // 2. Obtener miembros actuales
       const { data: membersData } = await supabase
@@ -133,7 +128,7 @@ export default function Equipo() {
     }
   }
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando equipo...</div>
+     if (loading || roleLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Verificando permisos...</div>
   if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
   return (
