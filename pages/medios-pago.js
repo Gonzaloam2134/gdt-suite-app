@@ -30,10 +30,11 @@ export default function MediosPago() {
 
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubcategory, setSelectedSubcategory] = useState('')
+  const [methodName, setMethodName] = useState('') // NUEVO: nombre personalizado
   const [commissionType, setCommissionType] = useState('NINGUNA')
   const [commissionValue, setCommissionValue] = useState('')
   const [commissionFixed, setCommissionFixed] = useState('')
-  const [diasAcreditacion, setDiasAcreditacion] = useState('0') // NUEVO
+  const [diasAcreditacion, setDiasAcreditacion] = useState('0')
   const [active, setActive] = useState(true)
   
   const router = useRouter()
@@ -98,6 +99,7 @@ export default function MediosPago() {
     setEditingMethod(null)
     setSelectedCategory('')
     setSelectedSubcategory('')
+    setMethodName('')
     setCommissionType('NINGUNA')
     setCommissionValue('')
     setCommissionFixed('')
@@ -117,6 +119,7 @@ export default function MediosPago() {
     const cat = subcat?.categorias_pago
     setSelectedCategory(cat?.id || '')
     setSelectedSubcategory(subcat?.id || '')
+    setMethodName(method.nombre || subcat?.nombre || '')
     setCommissionType(method.tipo_comision || 'NINGUNA')
     setCommissionValue(method.valor_comision?.toString() || '')
     setCommissionFixed(method.monto_fijo_comision?.toString() || '')
@@ -151,8 +154,12 @@ export default function MediosPago() {
       return
     }
 
+    // Si no puso nombre personalizado, usar el de la subcategoría
+    const finalName = methodName.trim() || subcategories.find(s => s.id === finalSubcategoryId)?.nombre || 'Medio de pago'
+
     try {
       const payload = {
+        nombre: finalName,
         subcategoria_id: finalSubcategoryId,
         tipo_comision: commissionType,
         valor_comision: commissionValue ? parseFloat(commissionValue) : 0,
@@ -259,7 +266,7 @@ export default function MediosPago() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                       <div>
                         <h4 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}>
-                          {method.subcategorias_pago?.nombre || 'Sin nombre'}
+                          {method.nombre || method.subcategorias_pago?.nombre || 'Sin nombre'}
                         </h4>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -312,7 +319,7 @@ export default function MediosPago() {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <select 
                       value={selectedCategory} 
-                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setShowNewSubcategoryInput(false); }}
+                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setMethodName(''); setShowNewSubcategoryInput(false); }}
                       required
                       style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
                     >
@@ -350,7 +357,17 @@ export default function MediosPago() {
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Subcategoría *</label>
                   {!showNewSubcategoryInput ? (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select value={selectedSubcategory} onChange={e => setSelectedSubcategory(e.target.value)} required style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}>
+                      <select 
+                        value={selectedSubcategory} 
+                        onChange={e => {
+                          setSelectedSubcategory(e.target.value)
+                          // Autocompletar nombre con la subcategoría seleccionada
+                          const sub = subcategories.find(s => s.id === e.target.value)
+                          if (sub && !methodName) setMethodName(sub.nombre)
+                        }}
+                        required
+                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
+                      >
                         <option value="">Seleccionar subcategoría...</option>
                         {filteredSubcategories.map(sub => (<option key={sub.id} value={sub.id}>{sub.nombre}</option>))}
                       </select>
@@ -366,6 +383,7 @@ export default function MediosPago() {
                           if (error) throw error
                           setSubcategories([...subcategories, data])
                           setSelectedSubcategory(data.id)
+                          setMethodName(data.nombre)
                           setNewSubcategoryName('')
                           setShowNewSubcategoryInput(false)
                         } catch (err) { alert('Error: ' + err.message) }
@@ -373,6 +391,25 @@ export default function MediosPago() {
                       <button type="button" onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✕</button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* NOMBRE PERSONALIZADO - NUEVO */}
+              {selectedSubcategory && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                    Nombre del medio de pago
+                  </label>
+                  <input 
+                    type="text"
+                    value={methodName}
+                    onChange={e => setMethodName(e.target.value)}
+                    placeholder="Ej: Visa Crédito Galicia"
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
+                  />
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    💡 Dejá vacío para usar el nombre de la subcategoría
+                  </div>
                 </div>
               )}
 
@@ -401,7 +438,7 @@ export default function MediosPago() {
                 </>
               )}
 
-              {/* DÍAS DE ACREDITACIÓN - NUEVO */}
+              {/* DÍAS DE ACREDITACIÓN */}
               <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0369a1' }}>
                   ⏱️ Días de acreditación
