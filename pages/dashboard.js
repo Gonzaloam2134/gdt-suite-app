@@ -395,7 +395,7 @@ export default function CajaDelDia() {
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
         {!activeShift ? (
           <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #cbd5e1', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}></div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔒</div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1rem' }}>Caja Cerrada</h3>
             <p style={{ margin: '0 0 1rem 0', color: '#64748b', fontSize: '0.875rem' }}>Abrí la caja para empezar a operar</p>
             <button 
@@ -428,7 +428,7 @@ export default function CajaDelDia() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <button onClick={() => handleOpenForm('INCOME')} style={{ padding: '1rem', backgroundColor: '#86efac', color: '#14532d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>💰</span> COBRO
+                <span style={{ fontSize: '1.5rem' }}></span> COBRO
               </button>
               <button onClick={() => handleOpenForm('EXPENSE')} style={{ padding: '1rem', backgroundColor: '#fca5a5', color: '#7f1d1d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>💸</span> GASTO
@@ -459,7 +459,7 @@ export default function CajaDelDia() {
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : '📤'}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : ''}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
@@ -569,7 +569,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔓 Abrir Caja</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Abrir Caja</h2>
               <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
             <form onSubmit={handleOpenShift}>
@@ -921,7 +921,7 @@ export default function CajaDelDia() {
                                 onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName(''); }}
                                 style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
                               >
-                                
+                                ✕
                               </button>
                             </div>
                           )}
