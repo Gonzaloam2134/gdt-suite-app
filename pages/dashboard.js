@@ -6,6 +6,13 @@ import BottomNav from '../components/BottomNav'
 const CONCEPTOS_INGRESO = ['Venta del día', 'Venta mostrador', 'Delivery', 'Servicios', 'Otros ingresos']
 const CONCEPTOS_GASTO = ['Proveedor', 'Luz', 'Gas', 'Agua', 'Internet', 'Alquiler', 'Sueldos', 'Impuestos', 'Insumos', 'Otros gastos']
 
+const BANCOS_ARGENTINA = [
+  'Galicia', 'Santander Río', 'BBVA', 'Macro', 'Nación', 'ICBC',
+  'Brubank', 'Supervielle', 'HSBC', 'Citibank', 'Patagonia',
+  'Provincia', 'Ciudad', 'Comafi', 'Hipotecario', 'Itaú',
+  'BMA', 'Credicoop', 'Industrial', 'BICA'
+]
+
 export default function CajaDelDia() {
   const [user, setUser] = useState(null)
   const [businessName, setBusinessName] = useState('Mi Negocio')
@@ -41,9 +48,11 @@ export default function CajaDelDia() {
   const [showQuickAddMethod, setShowQuickAddMethod] = useState(false)
   const [quickMethodName, setQuickMethodName] = useState('')
   const [quickMethodCategory, setQuickMethodCategory] = useState('')
+  const [quickMethodBanco, setQuickMethodBanco] = useState('')
   const [quickMethodHasCommission, setQuickMethodHasCommission] = useState(false)
   const [quickMethodCommissionPct, setQuickMethodCommissionPct] = useState('')
   const [quickMethodCommissionFixed, setQuickMethodCommissionFixed] = useState('')
+  const [quickMethodDiasAcreditacion, setQuickMethodDiasAcreditacion] = useState('0')
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
@@ -218,9 +227,11 @@ export default function CajaDelDia() {
     setShowQuickAddMethod(false)
     setQuickMethodName('')
     setQuickMethodCategory(categories.length > 0 ? categories[0].id : '')
+    setQuickMethodBanco('')
     setQuickMethodHasCommission(false)
     setQuickMethodCommissionPct('')
     setQuickMethodCommissionFixed('')
+    setQuickMethodDiasAcreditacion('0')
   }
 
   const handleOpeningAmountChange = (e) => {
@@ -559,7 +570,6 @@ export default function CajaDelDia() {
         )}
       </div>
 
-      {/* Modales de Apertura y Cierre (sin cambios) */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -640,7 +650,6 @@ export default function CajaDelDia() {
         </div>
       )}
 
-      {/* Modal de Cobro / Gasto con Quick Add de Medio de Pago */}
       {showForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -703,6 +712,7 @@ export default function CajaDelDia() {
                             <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
                             <div>
                               <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{cat?.icono || ''} {subcat?.nombre || 'Medio'}</div>
+                              {method.banco_emisor && <div style={{ fontSize: '0.625rem', color: '#64748b' }}>{method.banco_emisor}</div>}
                             </div>
                           </label>
                         )
@@ -713,24 +723,44 @@ export default function CajaDelDia() {
                   <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>Nuevo medio de pago rápido</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      
+                      {/* Categoría */}
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Categoría</label>
+                        <select 
+                          value={quickMethodCategory} 
+                          onChange={e => setQuickMethodCategory(e.target.value)}
+                          style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Nombre del medio */}
                       <input 
                         type="text" 
                         value={quickMethodName} 
                         onChange={e => setQuickMethodName(e.target.value)} 
-                        placeholder="Nombre (ej: Mercado Pago QR)" 
-                        required
+                        placeholder="Nombre (ej: Visa Crédito Galicia)" 
                         style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
                       />
+
+                      {/* Banco emisor */}
                       <select 
-                        value={quickMethodCategory} 
-                        onChange={e => setQuickMethodCategory(e.target.value)}
-                        style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                        value={quickMethodBanco} 
+                        onChange={e => setQuickMethodBanco(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
                       >
-                        {categories.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                        <option value="">Banco emisor (opcional)</option>
+                        {BANCOS_ARGENTINA.map(banco => (
+                          <option key={banco} value={banco}>{banco}</option>
                         ))}
                       </select>
                       
+                      {/* Comisión */}
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
                         <input type="checkbox" checked={quickMethodHasCommission} onChange={e => setQuickMethodHasCommission(e.target.checked)} />
                         ¿Tiene comisión?
@@ -755,10 +785,24 @@ export default function CajaDelDia() {
                         </div>
                       )}
 
+                      {/* Días de acreditación */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+                        <label style={{ fontWeight: '600', color: '#64748b' }}>Se acredita en:</label>
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="60"
+                          value={quickMethodDiasAcreditacion} 
+                          onChange={e => setQuickMethodDiasAcreditacion(e.target.value)} 
+                          style={{ width: '60px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center' }} 
+                        />
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>días</span>
+                      </div>
+
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                         <button 
                           type="button" 
-                          onClick={() => { setShowQuickAddMethod(false); setQuickMethodName(''); setQuickMethodHasCommission(false); setQuickMethodCommissionPct(''); setQuickMethodCommissionFixed(''); }}
+                          onClick={() => { setShowQuickAddMethod(false); setQuickMethodName(''); setQuickMethodBanco(''); setQuickMethodHasCommission(false); setQuickMethodCommissionPct(''); setQuickMethodCommissionFixed(''); setQuickMethodDiasAcreditacion('0'); }}
                           style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer' }}
                         >
                           Cancelar
@@ -767,6 +811,7 @@ export default function CajaDelDia() {
                           type="button" 
                           onClick={async () => {
                             if (!quickMethodName.trim()) return alert('El nombre es obligatorio')
+                            if (!quickMethodCategory) return alert('Seleccioná una categoría')
                             try {
                               setCreating(true)
                               // 1. Encontrar o crear subcategoría
@@ -785,9 +830,11 @@ export default function CajaDelDia() {
                               const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
                                 local_id: activeLocalId,
                                 subcategoria_id: subcat.id,
+                                banco_emisor: quickMethodBanco || null,
                                 tipo_comision: comisionType,
                                 valor_comision: quickMethodCommissionPct ? parseFloat(quickMethodCommissionPct) : 0,
                                 monto_fijo_comision: quickMethodCommissionFixed ? parseFloat(quickMethodCommissionFixed) : 0,
+                                dias_acreditacion: parseInt(quickMethodDiasAcreditacion) || 0,
                                 activo: true
                               }]).select(`*, subcategorias_pago(id, nombre, categorias_pago(id, nombre, icono))`).single()
 
@@ -797,9 +844,11 @@ export default function CajaDelDia() {
                               setSelectedMethod(newMethod.id)
                               setShowQuickAddMethod(false)
                               setQuickMethodName('')
+                              setQuickMethodBanco('')
                               setQuickMethodHasCommission(false)
                               setQuickMethodCommissionPct('')
                               setQuickMethodCommissionFixed('')
+                              setQuickMethodDiasAcreditacion('0')
                             } catch (err) {
                               alert('Error al crear medio de pago: ' + err.message)
                             } finally {
