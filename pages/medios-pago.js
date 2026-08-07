@@ -18,11 +18,9 @@ export default function MediosPago() {
   const [subcategories, setSubcategories] = useState([])
   const [loading, setLoading] = useState(true)
   
-  // Modal principal
   const [showModal, setShowModal] = useState(false)
   const [editingMethod, setEditingMethod] = useState(null)
   
-  // Estados para inputs inline de nueva categoría/subcategoría
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryIcon, setNewCategoryIcon] = useState('')
@@ -30,12 +28,12 @@ export default function MediosPago() {
   const [showNewSubcategoryInput, setShowNewSubcategoryInput] = useState(false)
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
 
-  // Form state
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubcategory, setSelectedSubcategory] = useState('')
   const [commissionType, setCommissionType] = useState('NINGUNA')
   const [commissionValue, setCommissionValue] = useState('')
   const [commissionFixed, setCommissionFixed] = useState('')
+  const [diasAcreditacion, setDiasAcreditacion] = useState('0') // NUEVO
   const [active, setActive] = useState(true)
   
   const router = useRouter()
@@ -61,7 +59,6 @@ export default function MediosPago() {
     try {
       setLoading(true)
       
-      // Cargar categorías
       const { data: catData } = await supabase
         .from('categorias_pago')
         .select('*')
@@ -69,7 +66,6 @@ export default function MediosPago() {
         .order('orden', { ascending: true })
       setCategories(catData || [])
 
-      // Cargar subcategorías
       const { data: subcatData } = await supabase
         .from('subcategorias_pago')
         .select('*')
@@ -77,7 +73,6 @@ export default function MediosPago() {
         .order('nombre', { ascending: true })
       setSubcategories(subcatData || [])
 
-      // Cargar medios de pago del local
       const { data: pmData } = await supabase
         .from('medios_pago')
         .select(`
@@ -106,15 +101,13 @@ export default function MediosPago() {
     setCommissionType('NINGUNA')
     setCommissionValue('')
     setCommissionFixed('')
+    setDiasAcreditacion('0')
     setActive(true)
-    
-    // Resetear estados inline
     setShowNewCategoryInput(false)
     setNewCategoryName('')
     setNewCategoryIcon('')
     setShowNewSubcategoryInput(false)
     setNewSubcategoryName('')
-    
     setShowModal(true)
   }
 
@@ -127,8 +120,8 @@ export default function MediosPago() {
     setCommissionType(method.tipo_comision || 'NINGUNA')
     setCommissionValue(method.valor_comision?.toString() || '')
     setCommissionFixed(method.monto_fijo_comision?.toString() || '')
+    setDiasAcreditacion((method.dias_acreditacion || 0).toString())
     setActive(method.activo !== false)
-    
     setShowNewCategoryInput(false)
     setShowNewSubcategoryInput(false)
     setShowModal(true)
@@ -139,14 +132,10 @@ export default function MediosPago() {
     
     let finalSubcategoryId = selectedSubcategory
     
-    // Si usa subcategoría personalizada inline, crearla
     if (showNewSubcategoryInput && newSubcategoryName.trim()) {
       const { data: newSubcat, error: subcatError } = await supabase
         .from('subcategorias_pago')
-        .insert([{
-          categoria_id: selectedCategory,
-          nombre: newSubcategoryName.trim()
-        }])
+        .insert([{ categoria_id: selectedCategory, nombre: newSubcategoryName.trim() }])
         .select()
         .single()
       
@@ -163,16 +152,19 @@ export default function MediosPago() {
     }
 
     try {
+      const payload = {
+        subcategoria_id: finalSubcategoryId,
+        tipo_comision: commissionType,
+        valor_comision: commissionValue ? parseFloat(commissionValue) : 0,
+        monto_fijo_comision: commissionFixed ? parseFloat(commissionFixed) : 0,
+        dias_acreditacion: parseInt(diasAcreditacion) || 0,
+        activo: active
+      }
+
       if (editingMethod) {
         const { error } = await supabase
           .from('medios_pago')
-          .update({
-            subcategoria_id: finalSubcategoryId,
-            tipo_comision: commissionType,
-            valor_comision: commissionValue ? parseFloat(commissionValue) : 0,
-            monto_fijo_comision: commissionFixed ? parseFloat(commissionFixed) : 0,
-            activo: active
-          })
+          .update(payload)
           .eq('id', editingMethod.id)
         
         if (error) throw error
@@ -180,14 +172,7 @@ export default function MediosPago() {
       } else {
         const { error } = await supabase
           .from('medios_pago')
-          .insert([{
-            local_id: activeLocalId,
-            subcategoria_id: finalSubcategoryId,
-            tipo_comision: commissionType,
-            valor_comision: commissionValue ? parseFloat(commissionValue) : 0,
-            monto_fijo_comision: commissionFixed ? parseFloat(commissionFixed) : 0,
-            activo: active
-          }])
+          .insert([{ local_id: activeLocalId, ...payload }])
         
         if (error) throw error
         alert('✅ Medio de pago creado')
@@ -216,13 +201,8 @@ export default function MediosPago() {
 
   const handleDelete = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este medio de pago?')) return
-
     try {
-      const { error } = await supabase
-        .from('medios_pago')
-        .delete()
-        .eq('id', id)
-      
+      const { error } = await supabase.from('medios_pago').delete().eq('id', id)
       if (error) throw error
       loadData()
     } catch (err) {
@@ -235,10 +215,8 @@ export default function MediosPago() {
     router.push('/')
   }
 
-  // Filtrar subcategorías por categoría seleccionada
   const filteredSubcategories = subcategories.filter(s => s.categoria_id === selectedCategory)
 
-  // Agrupar medios de pago por categoría
   const groupedMethods = categories.map(cat => ({
     category: cat,
     methods: paymentMethods.filter(m => m.subcategorias_pago?.categorias_pago?.id === cat.id)
@@ -285,31 +263,24 @@ export default function MediosPago() {
                         </h4>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          onClick={() => openEditModal(method)}
-                          style={{ padding: '0.5rem', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(method.id)}
-                          style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
+                        <button onClick={() => openEditModal(method)} style={{ padding: '0.5rem', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>✏️</button>
+                        <button onClick={() => handleDelete(method.id)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>🗑️</button>
                       </div>
                     </div>
-
-                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Comisión:</span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: method.tipo_comision === 'NINGUNA' ? '#10b981' : '#f59e0b' }}>
+                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                        <span style={{ color: '#64748b' }}>Comisión:</span>
+                        <span style={{ fontWeight: '600', color: method.tipo_comision === 'NINGUNA' ? '#10b981' : '#f59e0b' }}>
                           {method.tipo_comision === 'NINGUNA' ? 'Sin comisión' : 
                            method.tipo_comision === 'PORCENTAJE' ? `${method.valor_comision}%` :
                            method.tipo_comision === 'FIJO' ? `$${method.monto_fijo_comision}` :
                            `${method.valor_comision}% + $${method.monto_fijo_comision}`}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                        <span style={{ color: '#64748b' }}>Acreditación:</span>
+                        <span style={{ fontWeight: '600', color: '#0f172a' }}>
+                          {method.dias_acreditacion === 0 ? 'Inmediata' : `${method.dias_acreditacion} días`}
                         </span>
                       </div>
                       <button 
@@ -327,14 +298,14 @@ export default function MediosPago() {
         )}
       </div>
 
-      {/* Modal Crear/Editar Medio de Pago */}
+      {/* Modal Crear/Editar */}
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>{editingMethod ? 'Editar Medio de Pago' : 'Nuevo Medio de Pago'}</h2>
             <form onSubmit={handleSave}>
               
-              {/* CATEGORÍA con botón + inline */}
+              {/* CATEGORÍA */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Categoría *</label>
                 {!showNewCategoryInput ? (
@@ -350,149 +321,66 @@ export default function MediosPago() {
                         <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
                       ))}
                     </select>
-                    <button 
-                      type="button"
-                      onClick={() => setShowNewCategoryInput(true)}
-                      style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}
-                      title="Agregar nueva categoría"
-                    >
-                      +
-                    </button>
+                    <button type="button" onClick={() => setShowNewCategoryInput(true)} style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}>+</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input 
-                      type="text"
-                      value={newCategoryName}
-                      onChange={e => setNewCategoryName(e.target.value)}
-                      placeholder="Nombre de la categoría..."
-                      required
-                      style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
-                    />
-                    <input 
-                      type="text"
-                      value={newCategoryIcon}
-                      onChange={e => setNewCategoryIcon(e.target.value)}
-                      placeholder="Ícono"
-                      maxLength="2"
-                      style={{ width: '60px', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', textAlign: 'center' }}
-                    />
-                    <button 
-                      type="button"
-                      onClick={async () => {
-                        if (!newCategoryName.trim()) return alert('El nombre es obligatorio')
-                        try {
-                          const { data, error } = await supabase
-                            .from('categorias_pago')
-                            .insert([{ nombre: newCategoryName.trim(), icono: newCategoryIcon || '' }])
-                            .select()
-                            .single()
-                          if (error) throw error
-                          setCategories([...categories, data])
-                          setSelectedCategory(data.id)
-                          setNewCategoryName('')
-                          setNewCategoryIcon('')
-                          setShowNewCategoryInput(false)
-                        } catch (err) {
-                          alert('Error: ' + err.message)
-                        }
-                      }}
-                      style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                    >
-                      ✓
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); setNewCategoryIcon(''); }}
-                      style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                    >
-                      ✕
-                    </button>
+                    <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Nombre..." required style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }} />
+                    <input type="text" value={newCategoryIcon} onChange={e => setNewCategoryIcon(e.target.value)} placeholder="Ícono" maxLength="2" style={{ width: '60px', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', textAlign: 'center' }} />
+                    <button type="button" onClick={async () => {
+                      if (!newCategoryName.trim()) return alert('El nombre es obligatorio')
+                      try {
+                        const { data, error } = await supabase.from('categorias_pago').insert([{ nombre: newCategoryName.trim(), icono: newCategoryIcon || '' }]).select().single()
+                        if (error) throw error
+                        setCategories([...categories, data])
+                        setSelectedCategory(data.id)
+                        setNewCategoryName('')
+                        setNewCategoryIcon('')
+                        setShowNewCategoryInput(false)
+                      } catch (err) { alert('Error: ' + err.message) }
+                    }} style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
+                    <button type="button" onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); setNewCategoryIcon(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}></button>
                   </div>
                 )}
               </div>
 
-              {/* SUBCATEGORÍA con botón + inline */}
+              {/* SUBCATEGORÍA */}
               {selectedCategory && (
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Subcategoría *</label>
                   {!showNewSubcategoryInput ? (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select 
-                        value={selectedSubcategory} 
-                        onChange={e => setSelectedSubcategory(e.target.value)}
-                        required
-                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
-                      >
+                      <select value={selectedSubcategory} onChange={e => setSelectedSubcategory(e.target.value)} required style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}>
                         <option value="">Seleccionar subcategoría...</option>
-                        {filteredSubcategories.map(sub => (
-                          <option key={sub.id} value={sub.id}>{sub.nombre}</option>
-                        ))}
+                        {filteredSubcategories.map(sub => (<option key={sub.id} value={sub.id}>{sub.nombre}</option>))}
                       </select>
-                      <button 
-                        type="button"
-                        onClick={() => setShowNewSubcategoryInput(true)}
-                        style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}
-                        title="Agregar nueva subcategoría"
-                      >
-                        +
-                      </button>
+                      <button type="button" onClick={() => setShowNewSubcategoryInput(true)} style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}>+</button>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input 
-                        type="text"
-                        value={newSubcategoryName}
-                        onChange={e => setNewSubcategoryName(e.target.value)}
-                        placeholder="Nombre de la subcategoría..."
-                        required
-                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
-                      />
-                      <button 
-                        type="button"
-                        onClick={async () => {
-                          if (!newSubcategoryName.trim()) return alert('El nombre es obligatorio')
-                          try {
-                            const { data, error } = await supabase
-                              .from('subcategorias_pago')
-                              .insert([{ categoria_id: selectedCategory, nombre: newSubcategoryName.trim() }])
-                              .select()
-                              .single()
-                            if (error) throw error
-                            setSubcategories([...subcategories, data])
-                            setSelectedSubcategory(data.id)
-                            setNewSubcategoryName('')
-                            setShowNewSubcategoryInput(false)
-                          } catch (err) {
-                            alert('Error: ' + err.message)
-                          }
-                        }}
-                        style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        ✓
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }}
-                        style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        ✕
-                      </button>
+                      <input type="text" value={newSubcategoryName} onChange={e => setNewSubcategoryName(e.target.value)} placeholder="Nombre..." required style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }} />
+                      <button type="button" onClick={async () => {
+                        if (!newSubcategoryName.trim()) return alert('El nombre es obligatorio')
+                        try {
+                          const { data, error } = await supabase.from('subcategorias_pago').insert([{ categoria_id: selectedCategory, nombre: newSubcategoryName.trim() }]).select().single()
+                          if (error) throw error
+                          setSubcategories([...subcategories, data])
+                          setSelectedSubcategory(data.id)
+                          setNewSubcategoryName('')
+                          setShowNewSubcategoryInput(false)
+                        } catch (err) { alert('Error: ' + err.message) }
+                      }} style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
+                      <button type="button" onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✕</button>
                     </div>
                   )}
                 </div>
               )}
 
+              {/* COMISIÓN */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Tipo de Comisión</label>
-                <select 
-                  value={commissionType} 
-                  onChange={e => setCommissionType(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
-                >
-                  {Object.entries(TIPOS_COMISION).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
+                <select value={commissionType} onChange={e => setCommissionType(e.target.value)} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}>
+                  {Object.entries(TIPOS_COMISION).map(([value, label]) => (<option key={value} value={value}>{label}</option>))}
                 </select>
               </div>
 
@@ -501,60 +389,51 @@ export default function MediosPago() {
                   {(commissionType === 'PORCENTAJE' || commissionType === 'MIXTO') && (
                     <div style={{ marginBottom: '1rem' }}>
                       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Porcentaje (%)</label>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={commissionValue} 
-                        onChange={e => setCommissionValue(e.target.value)} 
-                        placeholder="Ej: 2.5"
-                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
-                      />
+                      <input type="number" step="0.01" min="0" max="100" value={commissionValue} onChange={e => setCommissionValue(e.target.value)} placeholder="Ej: 2.5" style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
                     </div>
                   )}
-
                   {(commissionType === 'FIJO' || commissionType === 'MIXTO') && (
                     <div style={{ marginBottom: '1rem' }}>
                       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Monto Fijo ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        min="0"
-                        value={commissionFixed} 
-                        onChange={e => setCommissionFixed(e.target.value)} 
-                        placeholder="Ej: 10"
-                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
-                      />
+                      <input type="number" step="0.01" min="0" value={commissionFixed} onChange={e => setCommissionFixed(e.target.value)} placeholder="Ej: 10" style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
                     </div>
                   )}
                 </>
               )}
 
+              {/* DÍAS DE ACREDITACIÓN - NUEVO */}
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0369a1' }}>
+                  ⏱️ Días de acreditación
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="60"
+                    value={diasAcreditacion} 
+                    onChange={e => setDiasAcreditacion(e.target.value)} 
+                    style={{ width: '80px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem', textAlign: 'center', fontWeight: '700' }} 
+                  />
+                  <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
+                    {diasAcreditacion === '0' ? '(Acreditación inmediata - Efectivo/QR)' : 'días para que el dinero llegue a tu cuenta'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
+                  💡 Ejemplos: Efectivo = 0, Débito = 1-2, QR = 1, Crédito = 14-30, Transferencia = 1-3
+                </div>
+              </div>
+
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={active} 
-                    onChange={e => setActive(e.target.checked)}
-                    style={{ width: '20px', height: '20px' }}
-                  />
+                  <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} style={{ width: '20px', height: '20px' }} />
                   <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>Medio de pago activo</span>
                 </label>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowModal(false)}
-                  style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  style={{ padding: '0.75rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                >
+                <button type="button" onClick={() => setShowModal(false)} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Cancelar</button>
+                <button type="submit" style={{ padding: '0.75rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
                   {editingMethod ? 'Guardar Cambios' : 'Crear Medio de Pago'}
                 </button>
               </div>
