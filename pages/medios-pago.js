@@ -12,26 +12,10 @@ const TIPOS_COMISION = {
 }
 
 const BANCOS_ARGENTINA = [
-  'Galicia',
-  'Santander Río',
-  'BBVA',
-  'Macro',
-  'Nación',
-  'ICBC',
-  'Brubank',
-  'Supervielle',
-  'HSBC',
-  'Citibank',
-  'Patagonia',
-  'Provincia',
-  'Ciudad',
-  'Comafi',
-  'Hipotecario',
-  'Itaú',
-  'BMA',
-  'Credicoop',
-  'Industrial',
-  'BICA'
+  'Galicia', 'Santander Río', 'BBVA', 'Macro', 'Nación', 'ICBC',
+  'Brubank', 'Supervielle', 'HSBC', 'Citibank', 'Patagonia',
+  'Provincia', 'Ciudad', 'Comafi', 'Hipotecario', 'Itaú',
+  'BMA', 'Credicoop', 'Industrial', 'BICA'
 ]
 
 export default function MediosPago() {
@@ -40,6 +24,7 @@ export default function MediosPago() {
   const [categories, setCategories] = useState([])
   const [subcategories, setSubcategories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [debugInfo, setDebugInfo] = useState('')
   
   const [showModal, setShowModal] = useState(false)
   const [editingMethod, setEditingMethod] = useState(null)
@@ -84,37 +69,47 @@ export default function MediosPago() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setDebugInfo(`Local ID: ${activeLocalId}`)
       
-      const { data: catData } = await supabase
+      const { data: catData, error: catError } = await supabase
         .from('categorias_pago')
         .select('*')
         .eq('activo', true)
         .order('orden', { ascending: true })
+      if (catError) console.error('Error categorías:', catError)
       setCategories(catData || [])
 
-      const { data: subcatData } = await supabase
+      const { data: subcatData, error: subcatError } = await supabase
         .from('subcategorias_pago')
         .select('*')
         .eq('activo', true)
         .order('nombre', { ascending: true })
+      if (subcatError) console.error('Error subcategorías:', subcatError)
       setSubcategories(subcatData || [])
 
-      const { data: pmData } = await supabase
+      const { data: pmData, error: pmError } = await supabase
         .from('medios_pago')
         .select(`
           *,
-          subcategorias_pago (
+          subcategorias_pago!inner (
             id,
             nombre,
-            categorias_pago (id, nombre, icono)
+            categorias_pago!inner (id, nombre, icono)
           )
         `)
         .eq('local_id', activeLocalId)
         .order('creado_en', { ascending: false })
+      
+      if (pmError) {
+        console.error('Error medios de pago:', pmError)
+        setDebugInfo(prev => `${prev} | Error: ${pmError.message}`)
+      } else {
+        setDebugInfo(prev => `${prev} | Medios encontrados: ${pmData?.length || 0}`)
+      }
       setPaymentMethods(pmData || [])
     } catch (err) {
       console.error('Error cargando datos:', err)
-      alert('Error cargando datos: ' + err.message)
+      setDebugInfo(prev => `${prev} | Excepción: ${err.message}`)
     } finally {
       setLoading(false)
     }
@@ -213,14 +208,12 @@ export default function MediosPago() {
           .from('medios_pago')
           .update(payload)
           .eq('id', editingMethod.id)
-        
         if (error) throw error
         alert('✅ Medio de pago actualizado')
       } else {
         const { error } = await supabase
           .from('medios_pago')
           .insert([{ local_id: activeLocalId, ...payload }])
-        
         if (error) throw error
         alert('✅ Medio de pago creado')
       }
@@ -238,7 +231,6 @@ export default function MediosPago() {
         .from('medios_pago')
         .update({ activo: !method.activo })
         .eq('id', method.id)
-      
       if (error) throw error
       loadData()
     } catch (err) {
@@ -280,6 +272,13 @@ export default function MediosPago() {
       </header>
 
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        {/* Debug info - quitar en producción */}
+        {debugInfo && (
+          <div style={{ padding: '0.5rem', backgroundColor: '#fef3c7', borderRadius: '6px', fontSize: '0.75rem', color: '#92400e', marginBottom: '1rem' }}>
+             {debugInfo}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <button 
             onClick={openCreateModal}
@@ -292,7 +291,10 @@ export default function MediosPago() {
         {groupedMethods.length === 0 ? (
           <div style={{ padding: '3rem', backgroundColor: '#f3f4f6', borderRadius: '10px', textAlign: 'center', color: '#6b7280' }}>
             <h3>No hay medios de pago configurados</h3>
-            <p>Agregá tu primer medio de pago para empezar a cobrar.</p>
+            <p>Hacé clic en "+ Nuevo Medio de Pago" para agregar el primero.</p>
+            <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+              Categorías disponibles: {categories.length} | Subcategorías: {subcategories.length}
+            </div>
           </div>
         ) : (
           groupedMethods.map(group => (
@@ -315,8 +317,8 @@ export default function MediosPago() {
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => openEditModal(method)} style={{ padding: '0.5rem', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>️</button>
-                        <button onClick={() => handleDelete(method.id)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>🗑️</button>
+                        <button onClick={() => openEditModal(method)} style={{ padding: '0.5rem', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>✏️</button>
+                        <button onClick={() => handleDelete(method.id)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>️</button>
                       </div>
                     </div>
                     <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -350,27 +352,22 @@ export default function MediosPago() {
         )}
       </div>
 
-      {/* Modal Crear/Editar - CORREGIDO */}
+      {/* Modal */}
       {showModal && (
         <div 
           style={{ 
             position: 'fixed', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            bottom: 0, 
+            top: 0, left: 0, right: 0, bottom: 0, 
             backgroundColor: 'rgba(0,0,0,0.5)', 
             display: 'flex', 
             justifyContent: 'center', 
             alignItems: 'flex-start',
             paddingTop: '2rem',
             zIndex: 1000, 
-            padding: '2rem 1rem',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            padding: '2rem 1rem'
           }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false)
-          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false) }}
         >
           <div 
             style={{ 
@@ -379,8 +376,7 @@ export default function MediosPago() {
               borderRadius: '12px', 
               width: '100%', 
               maxWidth: '600px',
-              marginBottom: '2rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+              marginBottom: '2rem'
             }}
           >
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>{editingMethod ? 'Editar Medio de Pago' : 'Nuevo Medio de Pago'}</h2>
