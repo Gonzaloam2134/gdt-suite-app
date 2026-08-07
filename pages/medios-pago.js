@@ -11,6 +11,30 @@ const TIPOS_COMISION = {
   'MIXTO': 'Porcentaje + Fijo'
 }
 
+// Bancos más comunes en Argentina
+const BANCOS_ARGENTINA = [
+  'Galicia',
+  'Santander Río',
+  'BBVA',
+  'Macro',
+  'Nación',
+  'ICBC',
+  'Brubank',
+  'Supervielle',
+  'HSBC',
+  'Citibank',
+  'Patagonia',
+  'Provincia',
+  'Ciudad',
+  'Comafi',
+  'Hipotecario',
+  'Itaú',
+  'BMA',
+  'Credicoop',
+  'Industrial',
+  'BICA'
+]
+
 export default function MediosPago() {
   const [user, setUser] = useState(null)
   const [paymentMethods, setPaymentMethods] = useState([])
@@ -30,7 +54,9 @@ export default function MediosPago() {
 
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubcategory, setSelectedSubcategory] = useState('')
-  const [methodName, setMethodName] = useState('') // NUEVO: nombre personalizado
+  const [bancoEmisor, setBancoEmisor] = useState('')
+  const [customBanco, setCustomBanco] = useState('')
+  const [useCustomBanco, setUseCustomBanco] = useState(false)
   const [commissionType, setCommissionType] = useState('NINGUNA')
   const [commissionValue, setCommissionValue] = useState('')
   const [commissionFixed, setCommissionFixed] = useState('')
@@ -99,7 +125,9 @@ export default function MediosPago() {
     setEditingMethod(null)
     setSelectedCategory('')
     setSelectedSubcategory('')
-    setMethodName('')
+    setBancoEmisor('')
+    setCustomBanco('')
+    setUseCustomBanco(false)
     setCommissionType('NINGUNA')
     setCommissionValue('')
     setCommissionFixed('')
@@ -119,7 +147,22 @@ export default function MediosPago() {
     const cat = subcat?.categorias_pago
     setSelectedCategory(cat?.id || '')
     setSelectedSubcategory(subcat?.id || '')
-    setMethodName(method.nombre || subcat?.nombre || '')
+    
+    // Verificar si el banco está en la lista predefinida
+    if (method.banco_emisor && BANCOS_ARGENTINA.includes(method.banco_emisor)) {
+      setBancoEmisor(method.banco_emisor)
+      setUseCustomBanco(false)
+      setCustomBanco('')
+    } else if (method.banco_emisor) {
+      setBancoEmisor('OTRO')
+      setUseCustomBanco(true)
+      setCustomBanco(method.banco_emisor)
+    } else {
+      setBancoEmisor('')
+      setUseCustomBanco(false)
+      setCustomBanco('')
+    }
+    
     setCommissionType(method.tipo_comision || 'NINGUNA')
     setCommissionValue(method.valor_comision?.toString() || '')
     setCommissionFixed(method.monto_fijo_comision?.toString() || '')
@@ -154,12 +197,12 @@ export default function MediosPago() {
       return
     }
 
-    // Si no puso nombre personalizado, usar el de la subcategoría
-    const finalName = methodName.trim() || subcategories.find(s => s.id === finalSubcategoryId)?.nombre || 'Medio de pago'
+    // Determinar el banco emisor final
+    const finalBanco = useCustomBanco ? customBanco.trim() : bancoEmisor || null
 
     try {
       const payload = {
-        nombre: finalName,
+        banco_emisor: finalBanco,
         subcategoria_id: finalSubcategoryId,
         tipo_comision: commissionType,
         valor_comision: commissionValue ? parseFloat(commissionValue) : 0,
@@ -266,12 +309,17 @@ export default function MediosPago() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                       <div>
                         <h4 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}>
-                          {method.nombre || method.subcategorias_pago?.nombre || 'Sin nombre'}
+                          {method.subcategorias_pago?.nombre || 'Sin nombre'}
                         </h4>
+                        {method.banco_emisor && (
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                             {method.banco_emisor}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => openEditModal(method)} style={{ padding: '0.5rem', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>✏️</button>
-                        <button onClick={() => handleDelete(method.id)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>🗑️</button>
+                        <button onClick={() => handleDelete(method.id)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>️</button>
                       </div>
                     </div>
                     <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -319,7 +367,7 @@ export default function MediosPago() {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <select 
                       value={selectedCategory} 
-                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setMethodName(''); setShowNewSubcategoryInput(false); }}
+                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setBancoEmisor(''); setShowNewSubcategoryInput(false); }}
                       required
                       style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
                     >
@@ -346,7 +394,7 @@ export default function MediosPago() {
                         setShowNewCategoryInput(false)
                       } catch (err) { alert('Error: ' + err.message) }
                     }} style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
-                    <button type="button" onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); setNewCategoryIcon(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}></button>
+                    <button type="button" onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); setNewCategoryIcon(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✕</button>
                   </div>
                 )}
               </div>
@@ -361,9 +409,10 @@ export default function MediosPago() {
                         value={selectedSubcategory} 
                         onChange={e => {
                           setSelectedSubcategory(e.target.value)
-                          // Autocompletar nombre con la subcategoría seleccionada
-                          const sub = subcategories.find(s => s.id === e.target.value)
-                          if (sub && !methodName) setMethodName(sub.nombre)
+                          // Resetear banco al cambiar subcategoría
+                          setBancoEmisor('')
+                          setUseCustomBanco(false)
+                          setCustomBanco('')
                         }}
                         required
                         style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
@@ -383,32 +432,62 @@ export default function MediosPago() {
                           if (error) throw error
                           setSubcategories([...subcategories, data])
                           setSelectedSubcategory(data.id)
-                          setMethodName(data.nombre)
                           setNewSubcategoryName('')
                           setShowNewSubcategoryInput(false)
                         } catch (err) { alert('Error: ' + err.message) }
                       }} style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
-                      <button type="button" onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✕</button>
+                      <button type="button" onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}></button>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* NOMBRE PERSONALIZADO - NUEVO */}
+              {/* BANCO EMISOR - NUEVO */}
               {selectedSubcategory && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-                    Nombre del medio de pago
+                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>
+                    🏦 Banco Emisor
                   </label>
-                  <input 
-                    type="text"
-                    value={methodName}
-                    onChange={e => setMethodName(e.target.value)}
-                    placeholder="Ej: Visa Crédito Galicia"
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
-                  />
+                  {!useCustomBanco ? (
+                    <select 
+                      value={bancoEmisor} 
+                      onChange={e => {
+                        if (e.target.value === 'OTRO') {
+                          setUseCustomBanco(true)
+                          setBancoEmisor('OTRO')
+                        } else {
+                          setBancoEmisor(e.target.value)
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', marginBottom: '0.5rem' }}
+                    >
+                      <option value="">Seleccionar banco...</option>
+                      {BANCOS_ARGENTINA.map(banco => (
+                        <option key={banco} value={banco}>{banco}</option>
+                      ))}
+                      <option value="OTRO">Otro (especificar)...</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text"
+                        value={customBanco}
+                        onChange={e => setCustomBanco(e.target.value)}
+                        placeholder="Nombre del banco..."
+                        required
+                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => { setUseCustomBanco(false); setCustomBanco(''); setBancoEmisor(''); }}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    💡 Dejá vacío para usar el nombre de la subcategoría
+                    💡 Opcional para Efectivo. Obligatorio para tarjetas y transferencias.
                   </div>
                 </div>
               )}
@@ -438,10 +517,10 @@ export default function MediosPago() {
                 </>
               )}
 
-              {/* DÍAS DE ACREDITACIÓN */}
+              {/* DÍAS DE ACREDITACIÓN - SEPARADO */}
               <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0369a1' }}>
-                  ⏱️ Días de acreditación
+                  ⏱️ Se acredita en
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <input 
@@ -453,7 +532,7 @@ export default function MediosPago() {
                     style={{ width: '80px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem', textAlign: 'center', fontWeight: '700' }} 
                   />
                   <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
-                    {diasAcreditacion === '0' ? '(Acreditación inmediata - Efectivo/QR)' : 'días para que el dinero llegue a tu cuenta'}
+                    {diasAcreditacion === '0' ? 'días (Acreditación inmediata)' : 'días'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
