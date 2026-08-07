@@ -31,7 +31,6 @@ export default function CajaDelDia() {
   const [shiftMovements, setShiftMovements] = useState({})
   
   const [amount, setAmount] = useState('')
-  const [description, setDescription] = useState('')
   const [selectedConcept, setSelectedConcept] = useState('')
   const [customConcept, setCustomConcept] = useState('')
   const [showCustomConcept, setShowCustomConcept] = useState(false)
@@ -44,7 +43,7 @@ export default function CajaDelDia() {
   
   const [creating, setCreating] = useState(false)
 
-  // Estados para el "Quick Add" de medios de pago
+  // Quick Add states
   const [showQuickAddMethod, setShowQuickAddMethod] = useState(false)
   const [quickMethodCategory, setQuickMethodCategory] = useState('')
   const [quickMethodSubcategory, setQuickMethodSubcategory] = useState('')
@@ -54,7 +53,6 @@ export default function CajaDelDia() {
   const [quickMethodCommissionFixed, setQuickMethodCommissionFixed] = useState('')
   const [quickMethodDiasAcreditacion, setQuickMethodDiasAcreditacion] = useState('0')
   
-  // Estados para "Nuevo" en cada campo
   const [showNewCategoryQuick, setShowNewCategoryQuick] = useState(false)
   const [showNewOperatorQuick, setShowNewOperatorQuick] = useState(false)
   const [showNewBancoQuick, setShowNewBancoQuick] = useState(false)
@@ -78,7 +76,6 @@ export default function CajaDelDia() {
         }
       }
     })
-    return () => {}
   }, [router, activeLocalId])
 
   const loadData = async (userId) => {
@@ -223,27 +220,12 @@ export default function CajaDelDia() {
   const handleOpenForm = (type) => {
     setFormType(type)
     setAmount('')
-    setDescription('')
     setSelectedConcept('')
     setCustomConcept('')
     setShowCustomConcept(false)
     setSelectedMethod('')
     setShowForm(true)
-    
     setShowQuickAddMethod(false)
-    setQuickMethodCategory('')
-    setQuickMethodSubcategory('')
-    setQuickMethodBanco('')
-    setQuickMethodHasCommission(false)
-    setQuickMethodCommissionPct('')
-    setQuickMethodCommissionFixed('')
-    setQuickMethodDiasAcreditacion('0')
-    setShowNewCategoryQuick(false)
-    setShowNewOperatorQuick(false)
-    setShowNewBancoQuick(false)
-    setNewCategoryQuickName('')
-    setNewOperatorQuickName('')
-    setNewBancoQuickName('')
   }
 
   const handleOpeningAmountChange = (e) => {
@@ -413,7 +395,7 @@ export default function CajaDelDia() {
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
         {!activeShift ? (
           <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #cbd5e1', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔒</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}></div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1rem' }}>Caja Cerrada</h3>
             <p style={{ margin: '0 0 1rem 0', color: '#64748b', fontSize: '0.875rem' }}>Abrí la caja para empezar a operar</p>
             <button 
@@ -461,7 +443,7 @@ export default function CajaDelDia() {
 
         {activeShift && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}> Movimientos del Turno Actual</h3>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>Movimientos del Turno Actual</h3>
             {movements.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Sin movimientos en este turno</div>
             ) : (
@@ -477,7 +459,7 @@ export default function CajaDelDia() {
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '' : '📤'}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : '📤'}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
@@ -509,7 +491,7 @@ export default function CajaDelDia() {
 
         {closedShifts.length > 0 && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}> Cierres Anteriores</h3>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>Cierres Anteriores</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {closedShifts.map(shift => {
                 const shiftMovs = shiftMovements[shift.id] || []
@@ -667,7 +649,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? ' Cobro' : '💸 Gasto'}</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -705,7 +687,7 @@ export default function CajaDelDia() {
                       onClick={() => setShowQuickAddMethod(true)}
                       style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
                     >
-                      + Agregar nuevo
+                      + Nuevo
                     </button>
                   )}
                 </div>
@@ -721,14 +703,36 @@ export default function CajaDelDia() {
                       {paymentMethods.map(method => {
                         const subcat = method.subcategorias_pago
                         const cat = subcat?.categorias_pago
+                        const isSelected = selectedMethod === method.id
                         return (
-                          <label key={method.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white' }}>
-                            <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
-                            <div>
-                              <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{cat?.icono || ''} {subcat?.nombre || 'Medio'}</div>
-                              {method.banco_emisor && <div style={{ fontSize: '0.625rem', color: '#64748b' }}>{method.banco_emisor}</div>}
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setSelectedMethod(method.id)}
+                            style={{
+                              padding: '1rem',
+                              border: isSelected ? `3px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '2px solid #e2e8f0',
+                              borderRadius: '10px',
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white',
+                              textAlign: 'left',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a' }}>
+                              {cat?.icono || ''} {method.nombre || subcat?.nombre || 'Medio'}
                             </div>
-                          </label>
+                            {method.banco_emisor && (
+                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{method.banco_emisor}</div>
+                            )}
+                            {isSelected && (
+                              <div style={{ fontSize: '0.7rem', color: formType === 'INCOME' ? '#16a34a' : '#dc2626', fontWeight: '700', marginTop: '0.25rem' }}>
+                                ✓ Seleccionado
+                              </div>
+                            )}
+                          </button>
                         )
                       })}
                     </div>
@@ -738,7 +742,6 @@ export default function CajaDelDia() {
                     <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>Nuevo medio de pago</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       
-                      {/* 1. MEDIO DE PAGO (Categoría) */}
                       <div>
                         <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Medio de pago *</label>
                         {!showNewCategoryQuick ? (
@@ -805,7 +808,6 @@ export default function CajaDelDia() {
                         )}
                       </div>
 
-                      {/* 2. OPERADOR (Subcategoría) */}
                       {quickMethodCategory && (
                         <div>
                           <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Operador</label>
@@ -872,7 +874,6 @@ export default function CajaDelDia() {
                         </div>
                       )}
 
-                      {/* 3. BANCO EMISOR */}
                       {quickMethodSubcategory && (
                         <div>
                           <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Banco Emisor</label>
@@ -920,14 +921,13 @@ export default function CajaDelDia() {
                                 onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName(''); }}
                                 style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
                               >
-                                ✕
+                                
                               </button>
                             </div>
                           )}
                         </div>
                       )}
                       
-                      {/* 4. COMISIÓN */}
                       {quickMethodBanco && (
                         <>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
@@ -960,7 +960,6 @@ export default function CajaDelDia() {
                             </div>
                           )}
 
-                          {/* 5. SE ACREDITA EN */}
                           <div style={{ marginTop: '0.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Se acredita en</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1009,13 +1008,13 @@ export default function CajaDelDia() {
                                   
                                   const comisionType = quickMethodHasCommission ? (quickMethodCommissionPct && quickMethodCommissionFixed ? 'MIXTO' : quickMethodCommissionPct ? 'PORCENTAJE' : 'FIJO') : 'NINGUNA'
                                   
-                                  // Obtener nombres para generar el nombre del medio de pago
                                   const categoryName = categories.find(c => c.id === quickMethodCategory)?.nombre || ''
                                   const operatorName = subcategories.find(s => s.id === quickMethodSubcategory)?.nombre || ''
+                                  const generatedName = `${categoryName} - ${operatorName}${quickMethodBanco ? ' (' + quickMethodBanco + ')' : ''}`
                                   
                                   const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
                                     local_id: activeLocalId,
-                                    nombre: `${categoryName} - ${operatorName}${quickMethodBanco ? ' (' + quickMethodBanco + ')' : ''}`,
+                                    nombre: generatedName,
                                     subcategoria_id: quickMethodSubcategory,
                                     banco_emisor: quickMethodBanco || null,
                                     tipo_comision: comisionType,
@@ -1062,8 +1061,8 @@ export default function CajaDelDia() {
                 )}
               </div>
 
-              <button type="submit" disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: formType === 'INCOME' ? '#16a34a' : '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
-                {creating ? 'Guardando...' : 'Confirmar'}
+              <button type="submit" disabled={creating || !selectedMethod} style={{ width: '100%', padding: '1rem', backgroundColor: formType === 'INCOME' ? '#16a34a' : '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer', opacity: (!selectedMethod || creating) ? 0.5 : 1 }}>
+                {creating ? 'Guardando...' : !selectedMethod ? 'Seleccioná un medio de pago' : 'Confirmar'}
               </button>
             </form>
           </div>
