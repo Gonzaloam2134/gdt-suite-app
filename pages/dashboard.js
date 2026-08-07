@@ -11,6 +11,8 @@ export default function CajaDelDia() {
   const [businessName, setBusinessName] = useState('Mi Negocio')
   const [movements, setMovements] = useState([])
   const [paymentMethods, setPaymentMethods] = useState([])
+  const [categories, setCategories] = useState([])
+  const [subcategories, setSubcategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formType, setFormType] = useState('INCOME')
@@ -34,6 +36,14 @@ export default function CajaDelDia() {
   const [isAmountModified, setIsAmountModified] = useState(false)
   
   const [creating, setCreating] = useState(false)
+
+  // Estados para el "Quick Add" de medios de pago
+  const [showQuickAddMethod, setShowQuickAddMethod] = useState(false)
+  const [quickMethodName, setQuickMethodName] = useState('')
+  const [quickMethodCategory, setQuickMethodCategory] = useState('')
+  const [quickMethodHasCommission, setQuickMethodHasCommission] = useState(false)
+  const [quickMethodCommissionPct, setQuickMethodCommissionPct] = useState('')
+  const [quickMethodCommissionFixed, setQuickMethodCommissionFixed] = useState('')
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
@@ -58,11 +68,9 @@ export default function CajaDelDia() {
     try {
       setLoading(true)
       
-      // Cargar nombre del local
       const { data: localData } = await supabase.from('locales').select('nombre').eq('id', activeLocalId).single()
       if (localData) setBusinessName(localData.nombre)
 
-      // Cargar turno activo
       const { data: shiftData } = await supabase
         .from('turnos')
         .select('*')
@@ -74,7 +82,6 @@ export default function CajaDelDia() {
       
       setActiveShift(shiftData || null)
 
-      // Cargar movimientos del turno activo
       if (shiftData) {
         const { data: txData } = await supabase
           .from('transacciones')
@@ -87,7 +94,6 @@ export default function CajaDelDia() {
         setMovements([])
       }
 
-      // Cargar cierres anteriores
       const { data: closedData } = await supabase
         .from('turnos')
         .select('*')
@@ -97,7 +103,6 @@ export default function CajaDelDia() {
         .limit(10)
       setClosedShifts(closedData || [])
 
-      // Calcular balance del último cierre
       if (closedData && closedData.length > 0) {
         const lastClosed = closedData[0]
         const { data: lastTx } = await supabase
@@ -126,14 +131,27 @@ export default function CajaDelDia() {
         setOpeningAmount('')
       }
       
-      // Cargar medios de pago
       const { data: pmData } = await supabase
         .from('medios_pago')
-        .select('*')
+        .select(`
+          *,
+          subcategorias_pago (
+            id,
+            nombre,
+            categorias_pago (id, nombre, icono)
+          )
+        `)
         .eq('local_id', activeLocalId)
         .eq('activo', true)
-        .order('nombre', { ascending: true })
+        .order('creado_en', { ascending: false })
       setPaymentMethods(pmData || [])
+
+      // Cargar categorías y subcategorías para el "Quick Add"
+      const { data: catData } = await supabase.from('categorias_pago').select('*').eq('activo', true).order('orden', { ascending: true })
+      const { data: subcatData } = await supabase.from('subcategorias_pago').select('*').eq('activo', true).order('nombre', { ascending: true })
+      setCategories(catData || [])
+      setSubcategories(subcatData || [])
+
     } catch (err) {
       console.error('Error cargando datos:', err)
     } finally {
@@ -195,13 +213,19 @@ export default function CajaDelDia() {
     setShowCustomConcept(false)
     setSelectedMethod('')
     setShowForm(true)
+    
+    // Resetear estados del quick add
+    setShowQuickAddMethod(false)
+    setQuickMethodName('')
+    setQuickMethodCategory(categories.length > 0 ? categories[0].id : '')
+    setQuickMethodHasCommission(false)
+    setQuickMethodCommissionPct('')
+    setQuickMethodCommissionFixed('')
   }
 
   const handleOpeningAmountChange = (e) => {
     const newVal = e.target.value
     setOpeningAmount(newVal)
-    
-    // Solo marcar como modificado si hay un balance anterior Y es diferente
     if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) {
       setIsAmountModified(true)
     } else {
@@ -213,62 +237,42 @@ export default function CajaDelDia() {
   const handleOpenShift = async (e) => {
     e.preventDefault()
     if (!openingAmount || parseFloat(openingAmount) < 0) return alert('Ingresá un monto válido')
-    
-    // Solo pedir justificación si hay un balance anterior Y se modificó
     if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) {
       return alert('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
     }
 
     try {
       setCreating(true)
-      
-      // 1. Buscar o crear negocio
       let { data: businesses } = await supabase.from('negocios').select('id').eq('local_id', activeLocalId).limit(1)
       let bizId
       if (businesses && businesses.length > 0) {
         bizId = businesses[0].id
       } else {
-        const { data: newBiz, error: bizError } = await supabase.from('negocios').insert([{ 
-          local_id: activeLocalId, 
-          nombre: 'Principal', 
-          razon_social: 'Negocio Principal', 
-          cuit: '00-00000000-0' 
-        }]).select('id').single()
+        const { data: newBiz, error: bizError } = await supabase.from('negocios').insert([{ local_id: activeLocalId, nombre: 'Principal', razon_social: 'Negocio Principal', cuit: '00-00000000-0' }]).select('id').single()
         if (bizError) throw bizError
         bizId = newBiz.id
       }
 
-      // 2. Buscar o crear sucursal
       let { data: branches } = await supabase.from('sucursales').select('id').eq('negocio_id', bizId).limit(1)
       let branchId
       if (branches && branches.length > 0) {
         branchId = branches[0].id
       } else {
-        const { data: newBranch, error: branchError } = await supabase.from('sucursales').insert([{ 
-          negocio_id: bizId, 
-          nombre: 'Sucursal Principal', 
-          codigo: 'SUC-01' 
-        }]).select('id').single()
+        const { data: newBranch, error: branchError } = await supabase.from('sucursales').insert([{ negocio_id: bizId, nombre: 'Sucursal Principal', codigo: 'SUC-01' }]).select('id').single()
         if (branchError) throw branchError
         branchId = newBranch.id
       }
 
-      // 3. Buscar o crear caja
       let { data: cashPoints } = await supabase.from('cajas').select('id').eq('sucursal_id', branchId).limit(1)
       let cashPointId
       if (cashPoints && cashPoints.length > 0) {
         cashPointId = cashPoints[0].id
       } else {
-        const { data: newCP, error: cpError } = await supabase.from('cajas').insert([{ 
-          sucursal_id: branchId, 
-          nombre: 'Caja Principal', 
-          codigo: 'CAJA-01' 
-        }]).select('id').single()
+        const { data: newCP, error: cpError } = await supabase.from('cajas').insert([{ sucursal_id: branchId, nombre: 'Caja Principal', codigo: 'CAJA-01' }]).select('id').single()
         if (cpError) throw cpError
         cashPointId = newCP.id
       }
 
-      // 4. Crear el turno
       const { data: shift, error } = await supabase
         .from('turnos')
         .insert([{
@@ -302,11 +306,7 @@ export default function CajaDelDia() {
     if (!activeShift) return
     try {
       setCreating(true)
-      const { error } = await supabase.from('turnos').update({ 
-        estado: 'CERRADO', 
-        cerrado_en: new Date().toISOString(), 
-        cerrado_por: user.id 
-      }).eq('id', activeShift.id)
+      const { error } = await supabase.from('turnos').update({ estado: 'CERRADO', cerrado_en: new Date().toISOString(), cerrado_por: user.id }).eq('id', activeShift.id)
       if (error) throw error
       
       setShowCloseShift(false)
@@ -445,6 +445,8 @@ export default function CajaDelDia() {
                 {movements.map(m => {
                   const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
                   const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
+                  const subcat = method?.subcategorias_pago
+                  const cat = subcat?.categorias_pago
                   const commission = m.comision_monto || 0
                   const net = m.monto - commission
                   return (
@@ -454,7 +456,7 @@ export default function CajaDelDia() {
                           <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : '📤'}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.nombre || 'Efectivo'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
@@ -463,7 +465,7 @@ export default function CajaDelDia() {
                       </div>
                       {isIncome && commission > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.75rem' }}>
-                          <div style={{ color: '#64748b' }}>Comisión ({method?.nombre}):</div>
+                          <div style={{ color: '#64748b' }}>Comisión:</div>
                           <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
                         </div>
                       )}
@@ -523,6 +525,8 @@ export default function CajaDelDia() {
                             {shiftMovs.map(m => {
                               const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
                               const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
+                              const subcat = method?.subcategorias_pago
+                              const cat = subcat?.categorias_pago
                               const commission = m.comision_monto || 0
                               const net = m.monto - commission
                               return (
@@ -530,7 +534,7 @@ export default function CajaDelDia() {
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                       <div style={{ fontWeight: '600', color: '#0f172a' }}>{m.descripcion}</div>
-                                      <div style={{ fontSize: '0.625rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {method?.nombre || 'Efectivo'}</div>
+                                      <div style={{ fontSize: '0.625rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
                                     </div>
                                     <div style={{ fontWeight: '700', color: isIncome ? '#15803d' : '#b91c1c' }}>{isIncome ? '+' : '-'}${m.monto.toFixed(2)}</div>
                                   </div>
@@ -555,6 +559,7 @@ export default function CajaDelDia() {
         )}
       </div>
 
+      {/* Modales de Apertura y Cierre (sin cambios) */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -562,44 +567,32 @@ export default function CajaDelDia() {
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔓 Abrir Caja</h2>
               <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
-
             <form onSubmit={handleOpenShift}>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Monto inicial en caja</label>
-                
                 {lastShiftBalance > 0 && (
                   <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.875rem', color: '#1e40af' }}>
                     💡 <strong>Sugerencia:</strong> El último cierre fue de <strong>${lastShiftBalance.toFixed(2)}</strong>.
                   </div>
                 )}
-
                 <input 
                   type="number" step="0.01" min="0" value={openingAmount} onChange={handleOpeningAmountChange} 
                   placeholder="0.00" required autoFocus
                   style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: isAmountModified ? '2px solid #f59e0b' : '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right', backgroundColor: isAmountModified ? '#fffbeb' : 'white' }}
                 />
-                
                 {isAmountModified && (
                   <div style={{ marginTop: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>
-                      ️ Motivo de la diferencia (Obligatorio)
-                    </label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>⚠️ Motivo de la diferencia (Obligatorio)</label>
                     <textarea 
-                      value={differenceReason}
-                      onChange={(e) => setDifferenceReason(e.target.value)}
+                      value={differenceReason} onChange={(e) => setDifferenceReason(e.target.value)}
                       placeholder="Ej: Saqué $2000 para pagar el flete, faltante de caja, etc."
-                      required
-                      rows="3"
+                      required rows="3"
                       style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #f59e0b', borderRadius: '8px', boxSizing: 'border-box', resize: 'vertical' }}
                     />
                   </div>
                 )}
               </div>
-
-              <button 
-                type="submit" disabled={creating}
-                style={{ width: '100%', padding: '1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}
-              >
+              <button type="submit" disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
                 {creating ? 'Abriendo...' : 'Confirmar Apertura'}
               </button>
             </form>
@@ -614,7 +607,6 @@ export default function CajaDelDia() {
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
               <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
-
             <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Monto inicial:</span>
@@ -641,7 +633,6 @@ export default function CajaDelDia() {
                 <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>${currentBalance.toFixed(2)}</span>
               </div>
             </div>
-
             <button onClick={handleCloseShift} disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
               {creating ? 'Cerrando...' : 'Confirmar Cierre'}
             </button>
@@ -649,6 +640,7 @@ export default function CajaDelDia() {
         </div>
       )}
 
+      {/* Modal de Cobro / Gasto con Quick Add de Medio de Pago */}
       {showForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -683,20 +675,143 @@ export default function CajaDelDia() {
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
-                {paymentMethods.length === 0 ? (
-                  <div style={{ padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem' }}>⚠️ No hay medios de pago configurados</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label style={{ fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
+                  {!showQuickAddMethod && (
+                    <button 
+                      type="button"
+                      onClick={() => setShowQuickAddMethod(true)}
+                      style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                    >
+                      + Crear uno nuevo
+                    </button>
+                  )}
+                </div>
+
+                {!showQuickAddMethod ? (
+                  paymentMethods.length === 0 ? (
+                    <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem', textAlign: 'center' }}>
+                      No hay medios de pago. <button type="button" onClick={() => setShowQuickAddMethod(true)} style={{ color: '#92400e', fontWeight: 'bold', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>Creá uno rápido aquí</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                      {paymentMethods.map(method => {
+                        const subcat = method.subcategorias_pago
+                        const cat = subcat?.categorias_pago
+                        return (
+                          <label key={method.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white' }}>
+                            <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
+                            <div>
+                              <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{cat?.icono || ''} {subcat?.nombre || 'Medio'}</div>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                    {paymentMethods.map(method => (
-                      <label key={method.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: selectedMethod === method.id ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMethod === method.id ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white' }}>
-                        <input type="radio" name="method" value={method.id} checked={selectedMethod === method.id} onChange={() => setSelectedMethod(method.id)} style={{ width: '16px', height: '16px' }} />
-                        <div>
-                          <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{method.nombre}</div>
-                          {method.subtipo && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{method.subtipo}</div>}
-                        </div>
+                  <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>Nuevo medio de pago rápido</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <input 
+                        type="text" 
+                        value={quickMethodName} 
+                        onChange={e => setQuickMethodName(e.target.value)} 
+                        placeholder="Nombre (ej: Mercado Pago QR)" 
+                        required
+                        style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                      />
+                      <select 
+                        value={quickMethodCategory} 
+                        onChange={e => setQuickMethodCategory(e.target.value)}
+                        style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                      >
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                        ))}
+                      </select>
+                      
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+                        <input type="checkbox" checked={quickMethodHasCommission} onChange={e => setQuickMethodHasCommission(e.target.checked)} />
+                        ¿Tiene comisión?
                       </label>
-                    ))}
+
+                      {quickMethodHasCommission && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                          <input 
+                            type="number" step="0.01" min="0" max="100"
+                            value={quickMethodCommissionPct} 
+                            onChange={e => setQuickMethodCommissionPct(e.target.value)} 
+                            placeholder="% (ej: 2.5)"
+                            style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                          />
+                          <input 
+                            type="number" step="0.01" min="0"
+                            value={quickMethodCommissionFixed} 
+                            onChange={e => setQuickMethodCommissionFixed(e.target.value)} 
+                            placeholder="$ Fijo (ej: 10)"
+                            style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                          />
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => { setShowQuickAddMethod(false); setQuickMethodName(''); setQuickMethodHasCommission(false); setQuickMethodCommissionPct(''); setQuickMethodCommissionFixed(''); }}
+                          style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer' }}
+                        >
+                          Cancelar
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={async () => {
+                            if (!quickMethodName.trim()) return alert('El nombre es obligatorio')
+                            try {
+                              setCreating(true)
+                              // 1. Encontrar o crear subcategoría
+                              let subcat = subcategories.find(s => s.categoria_id === quickMethodCategory && s.nombre.toLowerCase() === quickMethodName.trim().toLowerCase())
+                              
+                              if (!subcat) {
+                                const { data: newSubcat, error: subErr } = await supabase.from('subcategorias_pago').insert([{ categoria_id: quickMethodCategory, nombre: quickMethodName.trim() }]).select().single()
+                                if (subErr) throw subErr
+                                subcat = newSubcat
+                                setSubcategories([...subcategories, subcat])
+                              }
+
+                              // 2. Crear medio de pago
+                              const comisionType = quickMethodHasCommission ? (quickMethodCommissionPct && quickMethodCommissionFixed ? 'MIXTO' : quickMethodCommissionPct ? 'PORCENTAJE' : 'FIJO') : 'NINGUNA'
+                              
+                              const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
+                                local_id: activeLocalId,
+                                subcategoria_id: subcat.id,
+                                tipo_comision: comisionType,
+                                valor_comision: quickMethodCommissionPct ? parseFloat(quickMethodCommissionPct) : 0,
+                                monto_fijo_comision: quickMethodCommissionFixed ? parseFloat(quickMethodCommissionFixed) : 0,
+                                activo: true
+                              }]).select(`*, subcategorias_pago(id, nombre, categorias_pago(id, nombre, icono))`).single()
+
+                              if (methodErr) throw methodErr
+
+                              setPaymentMethods([...paymentMethods, newMethod])
+                              setSelectedMethod(newMethod.id)
+                              setShowQuickAddMethod(false)
+                              setQuickMethodName('')
+                              setQuickMethodHasCommission(false)
+                              setQuickMethodCommissionPct('')
+                              setQuickMethodCommissionFixed('')
+                            } catch (err) {
+                              alert('Error al crear medio de pago: ' + err.message)
+                            } finally {
+                              setCreating(false)
+                            }
+                          }}
+                          style={{ flex: 1, padding: '0.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer' }}
+                        >
+                          Guardar y usar
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
