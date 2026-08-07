@@ -46,13 +46,21 @@ export default function CajaDelDia() {
 
   // Estados para el "Quick Add" de medios de pago
   const [showQuickAddMethod, setShowQuickAddMethod] = useState(false)
-  const [quickMethodName, setQuickMethodName] = useState('')
   const [quickMethodCategory, setQuickMethodCategory] = useState('')
+  const [quickMethodSubcategory, setQuickMethodSubcategory] = useState('')
   const [quickMethodBanco, setQuickMethodBanco] = useState('')
   const [quickMethodHasCommission, setQuickMethodHasCommission] = useState(false)
   const [quickMethodCommissionPct, setQuickMethodCommissionPct] = useState('')
   const [quickMethodCommissionFixed, setQuickMethodCommissionFixed] = useState('')
   const [quickMethodDiasAcreditacion, setQuickMethodDiasAcreditacion] = useState('0')
+  
+  // Estados para "Nuevo" en cada campo
+  const [showNewCategoryQuick, setShowNewCategoryQuick] = useState(false)
+  const [showNewOperatorQuick, setShowNewOperatorQuick] = useState(false)
+  const [showNewBancoQuick, setShowNewBancoQuick] = useState(false)
+  const [newCategoryQuickName, setNewCategoryQuickName] = useState('')
+  const [newOperatorQuickName, setNewOperatorQuickName] = useState('')
+  const [newBancoQuickName, setNewBancoQuickName] = useState('')
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
@@ -155,7 +163,6 @@ export default function CajaDelDia() {
         .order('creado_en', { ascending: false })
       setPaymentMethods(pmData || [])
 
-      // Cargar categorías y subcategorías para el "Quick Add"
       const { data: catData } = await supabase.from('categorias_pago').select('*').eq('activo', true).order('orden', { ascending: true })
       const { data: subcatData } = await supabase.from('subcategorias_pago').select('*').eq('activo', true).order('nombre', { ascending: true })
       setCategories(catData || [])
@@ -223,15 +230,20 @@ export default function CajaDelDia() {
     setSelectedMethod('')
     setShowForm(true)
     
-    // Resetear estados del quick add
     setShowQuickAddMethod(false)
-    setQuickMethodName('')
-    setQuickMethodCategory(categories.length > 0 ? categories[0].id : '')
+    setQuickMethodCategory('')
+    setQuickMethodSubcategory('')
     setQuickMethodBanco('')
     setQuickMethodHasCommission(false)
     setQuickMethodCommissionPct('')
     setQuickMethodCommissionFixed('')
     setQuickMethodDiasAcreditacion('0')
+    setShowNewCategoryQuick(false)
+    setShowNewOperatorQuick(false)
+    setShowNewBancoQuick(false)
+    setNewCategoryQuickName('')
+    setNewOperatorQuickName('')
+    setNewBancoQuickName('')
   }
 
   const handleOpeningAmountChange = (e) => {
@@ -379,6 +391,7 @@ export default function CajaDelDia() {
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center', fontSize: '14px' }}>Cargando...</div>
 
   const conceptosList = formType === 'INCOME' ? CONCEPTOS_INGRESO : CONCEPTOS_GASTO
+  const filteredSubcategories = subcategories.filter(s => s.categoria_id === quickMethodCategory)
 
   return (
     <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '70px' }}>
@@ -496,7 +509,7 @@ export default function CajaDelDia() {
 
         {closedShifts.length > 0 && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>📋 Cierres Anteriores</h3>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}> Cierres Anteriores</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {closedShifts.map(shift => {
                 const shiftMovs = shiftMovements[shift.id] || []
@@ -686,13 +699,13 @@ export default function CajaDelDia() {
               <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <label style={{ fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
-                  {!showQuickAddMethod && (
+                  {!showQuickAddMethod && paymentMethods.length > 0 && (
                     <button 
                       type="button"
                       onClick={() => setShowQuickAddMethod(true)}
                       style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
                     >
-                      + Crear uno nuevo
+                      + Agregar nuevo
                     </button>
                   )}
                 </div>
@@ -700,7 +713,8 @@ export default function CajaDelDia() {
                 {!showQuickAddMethod ? (
                   paymentMethods.length === 0 ? (
                     <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem', textAlign: 'center' }}>
-                      No hay medios de pago. <button type="button" onClick={() => setShowQuickAddMethod(true)} style={{ color: '#92400e', fontWeight: 'bold', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>Creá uno rápido aquí</button>
+                      <div style={{ marginBottom: '0.5rem' }}>No hay medios de pago configurados</div>
+                      <button type="button" onClick={() => setShowQuickAddMethod(true)} style={{ color: '#92400e', fontWeight: 'bold', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>+ Crear medio de pago</button>
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
@@ -721,145 +735,323 @@ export default function CajaDelDia() {
                   )
                 ) : (
                   <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>Nuevo medio de pago rápido</h4>
+                    <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>Nuevo medio de pago</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       
-                      {/* Categoría */}
+                      {/* 1. MEDIO DE PAGO (Categoría) */}
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Categoría</label>
-                        <select 
-                          value={quickMethodCategory} 
-                          onChange={e => setQuickMethodCategory(e.target.value)}
-                          style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
-                        >
-                          <option value="">Seleccionar...</option>
-                          {categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
-                          ))}
-                        </select>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Medio de pago *</label>
+                        {!showNewCategoryQuick ? (
+                          <select 
+                            value={quickMethodCategory} 
+                            onChange={e => {
+                              if (e.target.value === 'NEW') {
+                                setShowNewCategoryQuick(true)
+                                setQuickMethodCategory('')
+                              } else {
+                                setQuickMethodCategory(e.target.value)
+                                setQuickMethodSubcategory('')
+                              }
+                            }}
+                            style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                          >
+                            <option value="">Seleccionar...</option>
+                            {categories.map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                            ))}
+                            <option value="NEW">+ Nuevo medio de pago</option>
+                          </select>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input 
+                              type="text"
+                              value={newCategoryQuickName}
+                              onChange={e => setNewCategoryQuickName(e.target.value)}
+                              placeholder="Nombre (ej: Cripto)"
+                              style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                            />
+                            <button 
+                              type="button"
+                              onClick={async () => {
+                                if (!newCategoryQuickName.trim()) return alert('Ingresá un nombre')
+                                try {
+                                  const { data, error } = await supabase.from('categorias_pago').insert([{ 
+                                    nombre: newCategoryQuickName.trim(), 
+                                    icono: '💳',
+                                    orden: 99,
+                                    activo: true
+                                  }]).select().single()
+                                  if (error) throw error
+                                  setCategories([...categories, data])
+                                  setQuickMethodCategory(data.id)
+                                  setShowNewCategoryQuick(false)
+                                  setNewCategoryQuickName('')
+                                } catch (err) {
+                                  alert('Error: ' + err.message)
+                                }
+                              }}
+                              style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                            >
+                              Guardar
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => { setShowNewCategoryQuick(false); setNewCategoryQuickName(''); }}
+                              style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Nombre del medio */}
-                      <input 
-                        type="text" 
-                        value={quickMethodName} 
-                        onChange={e => setQuickMethodName(e.target.value)} 
-                        placeholder="Nombre (ej: Visa Crédito Galicia)" 
-                        style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
-                      />
-
-                      {/* Banco emisor */}
-                      <select 
-                        value={quickMethodBanco} 
-                        onChange={e => setQuickMethodBanco(e.target.value)}
-                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
-                      >
-                        <option value="">Banco emisor (opcional)</option>
-                        {BANCOS_ARGENTINA.map(banco => (
-                          <option key={banco} value={banco}>{banco}</option>
-                        ))}
-                      </select>
-                      
-                      {/* Comisión */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-                        <input type="checkbox" checked={quickMethodHasCommission} onChange={e => setQuickMethodHasCommission(e.target.checked)} />
-                        ¿Tiene comisión?
-                      </label>
-
-                      {quickMethodHasCommission && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                          <input 
-                            type="number" step="0.01" min="0" max="100"
-                            value={quickMethodCommissionPct} 
-                            onChange={e => setQuickMethodCommissionPct(e.target.value)} 
-                            placeholder="% (ej: 2.5)"
-                            style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
-                          />
-                          <input 
-                            type="number" step="0.01" min="0"
-                            value={quickMethodCommissionFixed} 
-                            onChange={e => setQuickMethodCommissionFixed(e.target.value)} 
-                            placeholder="$ Fijo (ej: 10)"
-                            style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
-                          />
+                      {/* 2. OPERADOR (Subcategoría) */}
+                      {quickMethodCategory && (
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Operador</label>
+                          {!showNewOperatorQuick ? (
+                            <select 
+                              value={quickMethodSubcategory} 
+                              onChange={e => {
+                                if (e.target.value === 'NEW') {
+                                  setShowNewOperatorQuick(true)
+                                  setQuickMethodSubcategory('')
+                                } else {
+                                  setQuickMethodSubcategory(e.target.value)
+                                }
+                              }}
+                              style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                            >
+                              <option value="">Seleccionar...</option>
+                              {filteredSubcategories.map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.nombre}</option>
+                              ))}
+                              <option value="NEW">+ Nuevo operador</option>
+                            </select>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <input 
+                                type="text"
+                                value={newOperatorQuickName}
+                                onChange={e => setNewOperatorQuickName(e.target.value)}
+                                placeholder="Nombre (ej: Naranja X)"
+                                style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                              />
+                              <button 
+                                type="button"
+                                onClick={async () => {
+                                  if (!newOperatorQuickName.trim()) return alert('Ingresá un nombre')
+                                  try {
+                                    const { data, error } = await supabase.from('subcategorias_pago').insert([{ 
+                                      categoria_id: quickMethodCategory,
+                                      nombre: newOperatorQuickName.trim(),
+                                      activo: true
+                                    }]).select().single()
+                                    if (error) throw error
+                                    setSubcategories([...subcategories, data])
+                                    setQuickMethodSubcategory(data.id)
+                                    setShowNewOperatorQuick(false)
+                                    setNewOperatorQuickName('')
+                                  } catch (err) {
+                                    alert('Error: ' + err.message)
+                                  }
+                                }}
+                                style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                              >
+                                Guardar
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => { setShowNewOperatorQuick(false); setNewOperatorQuickName(''); }}
+                                style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      {/* Días de acreditación */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-                        <label style={{ fontWeight: '600', color: '#64748b' }}>Se acredita en:</label>
-                        <input 
-                          type="number" 
-                          min="0" 
-                          max="60"
-                          value={quickMethodDiasAcreditacion} 
-                          onChange={e => setQuickMethodDiasAcreditacion(e.target.value)} 
-                          style={{ width: '60px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center' }} 
-                        />
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>días</span>
-                      </div>
+                      {/* 3. BANCO EMISOR */}
+                      {quickMethodSubcategory && (
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Banco Emisor</label>
+                          {!showNewBancoQuick ? (
+                            <select 
+                              value={quickMethodBanco} 
+                              onChange={e => {
+                                if (e.target.value === 'NEW') {
+                                  setShowNewBancoQuick(true)
+                                  setQuickMethodBanco('')
+                                } else {
+                                  setQuickMethodBanco(e.target.value)
+                                }
+                              }}
+                              style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                            >
+                              <option value="">Seleccionar banco...</option>
+                              {BANCOS_ARGENTINA.map(banco => (
+                                <option key={banco} value={banco}>{banco}</option>
+                              ))}
+                              <option value="NEW">+ Otro banco</option>
+                            </select>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <input 
+                                type="text"
+                                value={newBancoQuickName}
+                                onChange={e => setNewBancoQuickName(e.target.value)}
+                                placeholder="Nombre del banco"
+                                style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setQuickMethodBanco(newBancoQuickName)
+                                  setShowNewBancoQuick(false)
+                                  setNewBancoQuickName('')
+                                }}
+                                style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                              >
+                                Guardar
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName(''); }}
+                                style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* 4. COMISIÓN */}
+                      {quickMethodBanco && (
+                        <>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+                            <input type="checkbox" checked={quickMethodHasCommission} onChange={e => setQuickMethodHasCommission(e.target.checked)} />
+                            ¿Tiene comisión?
+                          </label>
 
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button 
-                          type="button" 
-                          onClick={() => { setShowQuickAddMethod(false); setQuickMethodName(''); setQuickMethodBanco(''); setQuickMethodHasCommission(false); setQuickMethodCommissionPct(''); setQuickMethodCommissionFixed(''); setQuickMethodDiasAcreditacion('0'); }}
-                          style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer' }}
-                        >
-                          Cancelar
-                        </button>
-                        <button 
-                          type="button" 
-                          onClick={async () => {
-                            if (!quickMethodName.trim()) return alert('El nombre es obligatorio')
-                            if (!quickMethodCategory) return alert('Seleccioná una categoría')
-                            try {
-                              setCreating(true)
-                              // 1. Encontrar o crear subcategoría
-                              let subcat = subcategories.find(s => s.categoria_id === quickMethodCategory && s.nombre.toLowerCase() === quickMethodName.trim().toLowerCase())
-                              
-                              if (!subcat) {
-                                const { data: newSubcat, error: subErr } = await supabase.from('subcategorias_pago').insert([{ categoria_id: quickMethodCategory, nombre: quickMethodName.trim() }]).select().single()
-                                if (subErr) throw subErr
-                                subcat = newSubcat
-                                setSubcategories([...subcategories, subcat])
-                              }
+                          {quickMethodHasCommission && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                              <div>
+                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.7rem', color: '#64748b' }}>%</label>
+                                <input 
+                                  type="number" step="0.01" min="0" max="100"
+                                  value={quickMethodCommissionPct} 
+                                  onChange={e => setQuickMethodCommissionPct(e.target.value)} 
+                                  placeholder="2.5"
+                                  style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.7rem', color: '#64748b' }}>Fija ($)</label>
+                                <input 
+                                  type="number" step="0.01" min="0"
+                                  value={quickMethodCommissionFixed} 
+                                  onChange={e => setQuickMethodCommissionFixed(e.target.value)} 
+                                  placeholder="10"
+                                  style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                                />
+                              </div>
+                            </div>
+                          )}
 
-                              // 2. Crear medio de pago
-                              const comisionType = quickMethodHasCommission ? (quickMethodCommissionPct && quickMethodCommissionFixed ? 'MIXTO' : quickMethodCommissionPct ? 'PORCENTAJE' : 'FIJO') : 'NINGUNA'
-                              
-                              const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
-                                local_id: activeLocalId,
-                                subcategoria_id: subcat.id,
-                                banco_emisor: quickMethodBanco || null,
-                                tipo_comision: comisionType,
-                                valor_comision: quickMethodCommissionPct ? parseFloat(quickMethodCommissionPct) : 0,
-                                monto_fijo_comision: quickMethodCommissionFixed ? parseFloat(quickMethodCommissionFixed) : 0,
-                                dias_acreditacion: parseInt(quickMethodDiasAcreditacion) || 0,
-                                activo: true
-                              }]).select(`*, subcategorias_pago(id, nombre, categorias_pago(id, nombre, icono))`).single()
+                          {/* 5. SE ACREDITA EN */}
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Se acredita en</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <input 
+                                type="number" 
+                                min="0" 
+                                max="60"
+                                value={quickMethodDiasAcreditacion} 
+                                onChange={e => setQuickMethodDiasAcreditacion(e.target.value)} 
+                                style={{ width: '80px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center' }} 
+                              />
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>días</span>
+                            </div>
+                          </div>
 
-                              if (methodErr) throw methodErr
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                            <button 
+                              type="button" 
+                              onClick={() => { 
+                                setShowQuickAddMethod(false)
+                                setQuickMethodCategory('')
+                                setQuickMethodSubcategory('')
+                                setQuickMethodBanco('')
+                                setQuickMethodHasCommission(false)
+                                setQuickMethodCommissionPct('')
+                                setQuickMethodCommissionFixed('')
+                                setQuickMethodDiasAcreditacion('0')
+                                setShowNewCategoryQuick(false)
+                                setShowNewOperatorQuick(false)
+                                setShowNewBancoQuick(false)
+                                setNewCategoryQuickName('')
+                                setNewOperatorQuickName('')
+                                setNewBancoQuickName('')
+                              }}
+                              style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer' }}
+                            >
+                              Cancelar
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={async () => {
+                                if (!quickMethodCategory) return alert('Seleccioná un medio de pago')
+                                if (!quickMethodSubcategory) return alert('Seleccioná un operador')
+                                try {
+                                  setCreating(true)
+                                  
+                                  const comisionType = quickMethodHasCommission ? (quickMethodCommissionPct && quickMethodCommissionFixed ? 'MIXTO' : quickMethodCommissionPct ? 'PORCENTAJE' : 'FIJO') : 'NINGUNA'
+                                  
+                                  const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
+                                    local_id: activeLocalId,
+                                    subcategoria_id: quickMethodSubcategory,
+                                    banco_emisor: quickMethodBanco || null,
+                                    tipo_comision: comisionType,
+                                    valor_comision: quickMethodCommissionPct ? parseFloat(quickMethodCommissionPct) : 0,
+                                    monto_fijo_comision: quickMethodCommissionFixed ? parseFloat(quickMethodCommissionFixed) : 0,
+                                    dias_acreditacion: parseInt(quickMethodDiasAcreditacion) || 0,
+                                    activo: true
+                                  }]).select(`*, subcategorias_pago(id, nombre, categorias_pago(id, nombre, icono))`).single()
 
-                              setPaymentMethods([...paymentMethods, newMethod])
-                              setSelectedMethod(newMethod.id)
-                              setShowQuickAddMethod(false)
-                              setQuickMethodName('')
-                              setQuickMethodBanco('')
-                              setQuickMethodHasCommission(false)
-                              setQuickMethodCommissionPct('')
-                              setQuickMethodCommissionFixed('')
-                              setQuickMethodDiasAcreditacion('0')
-                            } catch (err) {
-                              alert('Error al crear medio de pago: ' + err.message)
-                            } finally {
-                              setCreating(false)
-                            }
-                          }}
-                          style={{ flex: 1, padding: '0.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer' }}
-                        >
-                          Guardar y usar
-                        </button>
-                      </div>
+                                  if (methodErr) throw methodErr
+
+                                  setPaymentMethods([...paymentMethods, newMethod])
+                                  setSelectedMethod(newMethod.id)
+                                  setShowQuickAddMethod(false)
+                                  
+                                  setQuickMethodCategory('')
+                                  setQuickMethodSubcategory('')
+                                  setQuickMethodBanco('')
+                                  setQuickMethodHasCommission(false)
+                                  setQuickMethodCommissionPct('')
+                                  setQuickMethodCommissionFixed('')
+                                  setQuickMethodDiasAcreditacion('0')
+                                  setShowNewCategoryQuick(false)
+                                  setShowNewOperatorQuick(false)
+                                  setShowNewBancoQuick(false)
+                                  setNewCategoryQuickName('')
+                                  setNewOperatorQuickName('')
+                                  setNewBancoQuickName('')
+                                } catch (err) {
+                                  alert('Error al crear medio de pago: ' + err.message)
+                                } finally {
+                                  setCreating(false)
+                                }
+                              }}
+                              style={{ flex: 1, padding: '0.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer' }}
+                            >
+                              Guardar y usar
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
