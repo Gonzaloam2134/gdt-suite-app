@@ -24,28 +24,26 @@ export default function MediosPago() {
   const [categories, setCategories] = useState([])
   const [subcategories, setSubcategories] = useState([])
   const [loading, setLoading] = useState(true)
-  const [debugInfo, setDebugInfo] = useState('')
   
   const [showModal, setShowModal] = useState(false)
   const [editingMethod, setEditingMethod] = useState(null)
   
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [newCategoryIcon, setNewCategoryIcon] = useState('')
-  
-  const [showNewSubcategoryInput, setShowNewSubcategoryInput] = useState(false)
-  const [newSubcategoryName, setNewSubcategoryName] = useState('')
-
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubcategory, setSelectedSubcategory] = useState('')
   const [bancoEmisor, setBancoEmisor] = useState('')
-  const [customBanco, setCustomBanco] = useState('')
-  const [useCustomBanco, setUseCustomBanco] = useState(false)
   const [commissionType, setCommissionType] = useState('NINGUNA')
   const [commissionValue, setCommissionValue] = useState('')
   const [commissionFixed, setCommissionFixed] = useState('')
   const [diasAcreditacion, setDiasAcreditacion] = useState('0')
   const [active, setActive] = useState(true)
+  
+  // Estados para "Nuevo" en cada campo
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [showNewOperator, setShowNewOperator] = useState(false)
+  const [showNewBanco, setShowNewBanco] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newOperatorName, setNewOperatorName] = useState('')
+  const [newBancoName, setNewBancoName] = useState('')
   
   const router = useRouter()
   const { loading: roleLoading } = useRoleCheck(2)
@@ -69,47 +67,37 @@ export default function MediosPago() {
   const loadData = async () => {
     try {
       setLoading(true)
-      setDebugInfo(`Local ID: ${activeLocalId}`)
       
-      const { data: catData, error: catError } = await supabase
+      const { data: catData } = await supabase
         .from('categorias_pago')
         .select('*')
         .eq('activo', true)
         .order('orden', { ascending: true })
-      if (catError) console.error('Error categorías:', catError)
       setCategories(catData || [])
 
-      const { data: subcatData, error: subcatError } = await supabase
+      const { data: subcatData } = await supabase
         .from('subcategorias_pago')
         .select('*')
         .eq('activo', true)
         .order('nombre', { ascending: true })
-      if (subcatError) console.error('Error subcategorías:', subcatError)
       setSubcategories(subcatData || [])
 
-      const { data: pmData, error: pmError } = await supabase
+      const { data: pmData } = await supabase
         .from('medios_pago')
         .select(`
           *,
-          subcategorias_pago!inner (
+          subcategorias_pago (
             id,
             nombre,
-            categorias_pago!inner (id, nombre, icono)
+            categorias_pago (id, nombre, icono)
           )
         `)
         .eq('local_id', activeLocalId)
         .order('creado_en', { ascending: false })
-      
-      if (pmError) {
-        console.error('Error medios de pago:', pmError)
-        setDebugInfo(prev => `${prev} | Error: ${pmError.message}`)
-      } else {
-        setDebugInfo(prev => `${prev} | Medios encontrados: ${pmData?.length || 0}`)
-      }
       setPaymentMethods(pmData || [])
     } catch (err) {
       console.error('Error cargando datos:', err)
-      setDebugInfo(prev => `${prev} | Excepción: ${err.message}`)
+      alert('Error cargando datos: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -120,18 +108,17 @@ export default function MediosPago() {
     setSelectedCategory('')
     setSelectedSubcategory('')
     setBancoEmisor('')
-    setCustomBanco('')
-    setUseCustomBanco(false)
     setCommissionType('NINGUNA')
     setCommissionValue('')
     setCommissionFixed('')
     setDiasAcreditacion('0')
     setActive(true)
-    setShowNewCategoryInput(false)
+    setShowNewCategory(false)
+    setShowNewOperator(false)
+    setShowNewBanco(false)
     setNewCategoryName('')
-    setNewCategoryIcon('')
-    setShowNewSubcategoryInput(false)
-    setNewSubcategoryName('')
+    setNewOperatorName('')
+    setNewBancoName('')
     setShowModal(true)
   }
 
@@ -141,61 +128,28 @@ export default function MediosPago() {
     const cat = subcat?.categorias_pago
     setSelectedCategory(cat?.id || '')
     setSelectedSubcategory(subcat?.id || '')
-    
-    if (method.banco_emisor && BANCOS_ARGENTINA.includes(method.banco_emisor)) {
-      setBancoEmisor(method.banco_emisor)
-      setUseCustomBanco(false)
-      setCustomBanco('')
-    } else if (method.banco_emisor) {
-      setBancoEmisor('OTRO')
-      setUseCustomBanco(true)
-      setCustomBanco(method.banco_emisor)
-    } else {
-      setBancoEmisor('')
-      setUseCustomBanco(false)
-      setCustomBanco('')
-    }
-    
+    setBancoEmisor(method.banco_emisor || '')
     setCommissionType(method.tipo_comision || 'NINGUNA')
     setCommissionValue(method.valor_comision?.toString() || '')
     setCommissionFixed(method.monto_fijo_comision?.toString() || '')
     setDiasAcreditacion((method.dias_acreditacion || 0).toString())
     setActive(method.activo !== false)
-    setShowNewCategoryInput(false)
-    setShowNewSubcategoryInput(false)
+    setShowNewCategory(false)
+    setShowNewOperator(false)
+    setShowNewBanco(false)
     setShowModal(true)
   }
 
   const handleSave = async (e) => {
     e.preventDefault()
     
-    let finalSubcategoryId = selectedSubcategory
-    
-    if (showNewSubcategoryInput && newSubcategoryName.trim()) {
-      const { data: newSubcat, error: subcatError } = await supabase
-        .from('subcategorias_pago')
-        .insert([{ categoria_id: selectedCategory, nombre: newSubcategoryName.trim() }])
-        .select()
-        .single()
-      
-      if (subcatError) {
-        alert('Error creando subcategoría: ' + subcatError.message)
-        return
-      }
-      finalSubcategoryId = newSubcat.id
-    }
-
-    if (!finalSubcategoryId) {
-      alert('Seleccioná o creá una subcategoría')
-      return
-    }
-
-    const finalBanco = useCustomBanco ? customBanco.trim() : bancoEmisor || null
+    if (!selectedCategory) return alert('Seleccioná un medio de pago')
+    if (!selectedSubcategory) return alert('Seleccioná un operador')
 
     try {
       const payload = {
-        banco_emisor: finalBanco,
-        subcategoria_id: finalSubcategoryId,
+        subcategoria_id: selectedSubcategory,
+        banco_emisor: bancoEmisor || null,
         tipo_comision: commissionType,
         valor_comision: commissionValue ? parseFloat(commissionValue) : 0,
         monto_fijo_comision: commissionFixed ? parseFloat(commissionFixed) : 0,
@@ -208,12 +162,14 @@ export default function MediosPago() {
           .from('medios_pago')
           .update(payload)
           .eq('id', editingMethod.id)
+        
         if (error) throw error
         alert('✅ Medio de pago actualizado')
       } else {
         const { error } = await supabase
           .from('medios_pago')
           .insert([{ local_id: activeLocalId, ...payload }])
+        
         if (error) throw error
         alert('✅ Medio de pago creado')
       }
@@ -231,6 +187,7 @@ export default function MediosPago() {
         .from('medios_pago')
         .update({ activo: !method.activo })
         .eq('id', method.id)
+      
       if (error) throw error
       loadData()
     } catch (err) {
@@ -272,13 +229,6 @@ export default function MediosPago() {
       </header>
 
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
-        {/* Debug info - quitar en producción */}
-        {debugInfo && (
-          <div style={{ padding: '0.5rem', backgroundColor: '#fef3c7', borderRadius: '6px', fontSize: '0.75rem', color: '#92400e', marginBottom: '1rem' }}>
-             {debugInfo}
-          </div>
-        )}
-
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <button 
             onClick={openCreateModal}
@@ -292,9 +242,6 @@ export default function MediosPago() {
           <div style={{ padding: '3rem', backgroundColor: '#f3f4f6', borderRadius: '10px', textAlign: 'center', color: '#6b7280' }}>
             <h3>No hay medios de pago configurados</h3>
             <p>Hacé clic en "+ Nuevo Medio de Pago" para agregar el primero.</p>
-            <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#9ca3af' }}>
-              Categorías disponibles: {categories.length} | Subcategorías: {subcategories.length}
-            </div>
           </div>
         ) : (
           groupedMethods.map(group => (
@@ -382,100 +329,155 @@ export default function MediosPago() {
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>{editingMethod ? 'Editar Medio de Pago' : 'Nuevo Medio de Pago'}</h2>
             <form onSubmit={handleSave}>
               
-              {/* CATEGORÍA */}
+              {/* 1. MEDIO DE PAGO (Categoría) */}
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Categoría *</label>
-                {!showNewCategoryInput ? (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select 
-                      value={selectedCategory} 
-                      onChange={e => { setSelectedCategory(e.target.value); setSelectedSubcategory(''); setBancoEmisor(''); setShowNewSubcategoryInput(false); }}
-                      required
-                      style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white' }}
-                    >
-                      <option value="">Seleccionar categoría...</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
-                      ))}
-                    </select>
-                    <button type="button" onClick={() => setShowNewCategoryInput(true)} style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}>+</button>
-                  </div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Medio de pago *</label>
+                {!showNewCategory ? (
+                  <select 
+                    value={selectedCategory} 
+                    onChange={e => {
+                      if (e.target.value === 'NEW') {
+                        setShowNewCategory(true)
+                        setSelectedCategory('')
+                      } else {
+                        setSelectedCategory(e.target.value)
+                        setSelectedSubcategory('')
+                      }
+                    }}
+                    required
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white' }}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                    ))}
+                    <option value="NEW">+ Nuevo medio de pago</option>
+                  </select>
                 ) : (
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Nombre..." required style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }} />
-                    <input type="text" value={newCategoryIcon} onChange={e => setNewCategoryIcon(e.target.value)} placeholder="Ícono" maxLength="2" style={{ width: '60px', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', textAlign: 'center' }} />
-                    <button type="button" onClick={async () => {
-                      if (!newCategoryName.trim()) return alert('El nombre es obligatorio')
-                      try {
-                        const { data, error } = await supabase.from('categorias_pago').insert([{ nombre: newCategoryName.trim(), icono: newCategoryIcon || '' }]).select().single()
-                        if (error) throw error
-                        setCategories([...categories, data])
-                        setSelectedCategory(data.id)
-                        setNewCategoryName('')
-                        setNewCategoryIcon('')
-                        setShowNewCategoryInput(false)
-                      } catch (err) { alert('Error: ' + err.message) }
-                    }} style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
-                    <button type="button" onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); setNewCategoryIcon(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✕</button>
+                    <input 
+                      type="text"
+                      value={newCategoryName}
+                      onChange={e => setNewCategoryName(e.target.value)}
+                      placeholder="Nombre (ej: Cripto)"
+                      required
+                      style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        if (!newCategoryName.trim()) return alert('Ingresá un nombre')
+                        try {
+                          const { data, error } = await supabase.from('categorias_pago').insert([{ 
+                            nombre: newCategoryName.trim(), 
+                            icono: '💳',
+                            orden: 99,
+                            activo: true
+                          }]).select().single()
+                          if (error) throw error
+                          setCategories([...categories, data])
+                          setSelectedCategory(data.id)
+                          setShowNewCategory(false)
+                          setNewCategoryName('')
+                        } catch (err) {
+                          alert('Error: ' + err.message)
+                        }
+                      }}
+                      style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      Guardar
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { setShowNewCategory(false); setNewCategoryName(''); }}
+                      style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* SUBCATEGORÍA */}
+              {/* 2. OPERADOR (Subcategoría) */}
               {selectedCategory && (
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Subcategoría *</label>
-                  {!showNewSubcategoryInput ? (
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select 
-                        value={selectedSubcategory} 
-                        onChange={e => {
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Operador *</label>
+                  {!showNewOperator ? (
+                    <select 
+                      value={selectedSubcategory} 
+                      onChange={e => {
+                        if (e.target.value === 'NEW') {
+                          setShowNewOperator(true)
+                          setSelectedSubcategory('')
+                        } else {
                           setSelectedSubcategory(e.target.value)
-                          setBancoEmisor('')
-                          setUseCustomBanco(false)
-                          setCustomBanco('')
-                        }}
-                        required
-                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white' }}
-                      >
-                        <option value="">Seleccionar subcategoría...</option>
-                        {filteredSubcategories.map(sub => (<option key={sub.id} value={sub.id}>{sub.nombre}</option>))}
-                      </select>
-                      <button type="button" onClick={() => setShowNewSubcategoryInput(true)} style={{ padding: '0.75rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.25rem' }}>+</button>
-                    </div>
+                        }
+                      }}
+                      required
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white' }}
+                    >
+                      <option value="">Seleccionar...</option>
+                      {filteredSubcategories.map(sub => (
+                        <option key={sub.id} value={sub.id}>{sub.nombre}</option>
+                      ))}
+                      <option value="NEW">+ Nuevo operador</option>
+                    </select>
                   ) : (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input type="text" value={newSubcategoryName} onChange={e => setNewSubcategoryName(e.target.value)} placeholder="Nombre..." required style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }} />
-                      <button type="button" onClick={async () => {
-                        if (!newSubcategoryName.trim()) return alert('El nombre es obligatorio')
-                        try {
-                          const { data, error } = await supabase.from('subcategorias_pago').insert([{ categoria_id: selectedCategory, nombre: newSubcategoryName.trim() }]).select().single()
-                          if (error) throw error
-                          setSubcategories([...subcategories, data])
-                          setSelectedSubcategory(data.id)
-                          setNewSubcategoryName('')
-                          setShowNewSubcategoryInput(false)
-                        } catch (err) { alert('Error: ' + err.message) }
-                      }} style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
-                      <button type="button" onClick={() => { setShowNewSubcategoryInput(false); setNewSubcategoryName(''); }} style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>✕</button>
+                      <input 
+                        type="text"
+                        value={newOperatorName}
+                        onChange={e => setNewOperatorName(e.target.value)}
+                        placeholder="Nombre (ej: Naranja X)"
+                        required
+                        style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          if (!newOperatorName.trim()) return alert('Ingresá un nombre')
+                          try {
+                            const { data, error } = await supabase.from('subcategorias_pago').insert([{ 
+                              categoria_id: selectedCategory,
+                              nombre: newOperatorName.trim(),
+                              activo: true
+                            }]).select().single()
+                            if (error) throw error
+                            setSubcategories([...subcategories, data])
+                            setSelectedSubcategory(data.id)
+                            setShowNewOperator(false)
+                            setNewOperatorName('')
+                          } catch (err) {
+                            alert('Error: ' + err.message)
+                          }
+                        }}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Guardar
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => { setShowNewOperator(false); setNewOperatorName(''); }}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        
+                      </button>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* BANCO EMISOR */}
+              {/* 3. BANCO EMISOR */}
               {selectedSubcategory && (
-                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>
-                     Banco Emisor
-                  </label>
-                  {!useCustomBanco ? (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Banco Emisor</label>
+                  {!showNewBanco ? (
                     <select 
                       value={bancoEmisor} 
                       onChange={e => {
-                        if (e.target.value === 'OTRO') {
-                          setUseCustomBanco(true)
-                          setBancoEmisor('OTRO')
+                        if (e.target.value === 'NEW') {
+                          setShowNewBanco(true)
+                          setBancoEmisor('')
                         } else {
                           setBancoEmisor(e.target.value)
                         }
@@ -486,87 +488,99 @@ export default function MediosPago() {
                       {BANCOS_ARGENTINA.map(banco => (
                         <option key={banco} value={banco}>{banco}</option>
                       ))}
-                      <option value="OTRO">Otro (especificar)...</option>
+                      <option value="NEW">+ Otro banco</option>
                     </select>
                   ) : (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input 
                         type="text"
-                        value={customBanco}
-                        onChange={e => setCustomBanco(e.target.value)}
-                        placeholder="Nombre del banco..."
+                        value={newBancoName}
+                        onChange={e => setNewBancoName(e.target.value)}
+                        placeholder="Nombre del banco"
                         required
                         style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem' }}
                       />
                       <button 
                         type="button"
-                        onClick={() => { setUseCustomBanco(false); setCustomBanco(''); setBancoEmisor(''); }}
+                        onClick={() => {
+                          setBancoEmisor(newBancoName)
+                          setShowNewBanco(false)
+                          setNewBancoName('')
+                        }}
+                        style={{ padding: '0.75rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Guardar
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => { setShowNewBanco(false); setNewBancoName(''); }}
                         style={{ padding: '0.75rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                       >
                         ✕
                       </button>
                     </div>
                   )}
-                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
-                    💡 Opcional para Efectivo. Obligatorio para tarjetas y transferencias.
-                  </div>
                 </div>
               )}
 
-              {/* COMISIÓN */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Tipo de Comisión</label>
-                <select value={commissionType} onChange={e => setCommissionType(e.target.value)} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white' }}>
-                  {Object.entries(TIPOS_COMISION).map(([value, label]) => (<option key={value} value={value}>{label}</option>))}
-                </select>
-              </div>
-
-              {commissionType !== 'NINGUNA' && (
+              {/* 4. COMISIÓN */}
+              {selectedSubcategory && (
                 <>
-                  {(commissionType === 'PORCENTAJE' || commissionType === 'MIXTO') && (
-                    <div style={{ marginBottom: '1rem' }}>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Porcentaje (%)</label>
-                      <input type="number" step="0.01" min="0" max="100" value={commissionValue} onChange={e => setCommissionValue(e.target.value)} placeholder="Ej: 2.5" style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
-                    </div>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Tipo de Comisión</label>
+                    <select value={commissionType} onChange={e => setCommissionType(e.target.value)} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white' }}>
+                      {Object.entries(TIPOS_COMISION).map(([value, label]) => (<option key={value} value={value}>{label}</option>))}
+                    </select>
+                  </div>
+
+                  {commissionType !== 'NINGUNA' && (
+                    <>
+                      {(commissionType === 'PORCENTAJE' || commissionType === 'MIXTO') && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Porcentaje (%)</label>
+                          <input type="number" step="0.01" min="0" max="100" value={commissionValue} onChange={e => setCommissionValue(e.target.value)} placeholder="Ej: 2.5" style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
+                        </div>
+                      )}
+                      {(commissionType === 'FIJO' || commissionType === 'MIXTO') && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Monto Fijo ($)</label>
+                          <input type="number" step="0.01" min="0" value={commissionFixed} onChange={e => setCommissionFixed(e.target.value)} placeholder="Ej: 10" style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
+                        </div>
+                      )}
+                    </>
                   )}
-                  {(commissionType === 'FIJO' || commissionType === 'MIXTO') && (
-                    <div style={{ marginBottom: '1rem' }}>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Monto Fijo ($)</label>
-                      <input type="number" step="0.01" min="0" value={commissionFixed} onChange={e => setCommissionFixed(e.target.value)} placeholder="Ej: 10" style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }} />
+
+                  {/* 5. SE ACREDITA EN */}
+                  <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0369a1' }}>
+                      ⏱️ Se acredita en
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max="60"
+                        value={diasAcreditacion} 
+                        onChange={e => setDiasAcreditacion(e.target.value)} 
+                        style={{ width: '80px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem', textAlign: 'center', fontWeight: '700' }} 
+                      />
+                      <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
+                        {diasAcreditacion === '0' ? 'días (Acreditación inmediata)' : 'días'}
+                      </span>
                     </div>
-                  )}
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
+                       Ejemplos: Efectivo = 0, Débito = 1-2, QR = 1, Crédito = 14-30, Transferencia = 1-3
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} style={{ width: '20px', height: '20px' }} />
+                      <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>Medio de pago activo</span>
+                    </label>
+                  </div>
                 </>
               )}
-
-              {/* DÍAS DE ACREDITACIÓN */}
-              <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', fontSize: '0.875rem', color: '#0369a1' }}>
-                  ⏱️ Se acredita en
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max="60"
-                    value={diasAcreditacion} 
-                    onChange={e => setDiasAcreditacion(e.target.value)} 
-                    style={{ width: '80px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem', textAlign: 'center', fontWeight: '700' }} 
-                  />
-                  <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
-                    {diasAcreditacion === '0' ? 'días (Acreditación inmediata)' : 'días'}
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
-                   Ejemplos: Efectivo = 0, Débito = 1-2, QR = 1, Crédito = 14-30, Transferencia = 1-3
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} style={{ width: '20px', height: '20px' }} />
-                  <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>Medio de pago activo</span>
-                </label>
-              </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" onClick={() => setShowModal(false)} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Cancelar</button>
