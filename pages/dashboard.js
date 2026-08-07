@@ -477,7 +477,7 @@ export default function CajaDelDia() {
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : '📤'}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '' : '📤'}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
@@ -667,7 +667,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? ' Cobro' : '💸 Gasto'}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -1009,8 +1009,13 @@ export default function CajaDelDia() {
                                   
                                   const comisionType = quickMethodHasCommission ? (quickMethodCommissionPct && quickMethodCommissionFixed ? 'MIXTO' : quickMethodCommissionPct ? 'PORCENTAJE' : 'FIJO') : 'NINGUNA'
                                   
+                                  // Obtener nombres para generar el nombre del medio de pago
+                                  const categoryName = categories.find(c => c.id === quickMethodCategory)?.nombre || ''
+                                  const operatorName = subcategories.find(s => s.id === quickMethodSubcategory)?.nombre || ''
+                                  
                                   const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
                                     local_id: activeLocalId,
+                                    nombre: `${categoryName} - ${operatorName}${quickMethodBanco ? ' (' + quickMethodBanco + ')' : ''}`,
                                     subcategoria_id: quickMethodSubcategory,
                                     banco_emisor: quickMethodBanco || null,
                                     tipo_comision: comisionType,
