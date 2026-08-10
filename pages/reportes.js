@@ -8,9 +8,7 @@ export default function Reportes() {
   const [businessName, setBusinessName] = useState('Mi Negocio')
   const [loading, setLoading] = useState(true)
   const [monthlySummary, setMonthlySummary] = useState(null)
-  const [weeklyProjection, setWeeklyProjection] = useState([])
   const [methodBreakdown, setMethodBreakdown] = useState([])
-  const [lastMonthComparison, setLastMonthComparison] = useState(null)
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
@@ -34,75 +32,91 @@ export default function Reportes() {
     try {
       setLoading(true)
       
-      console.log('🔍 activeLocalId usado:', activeLocalId)
-
+      // 1. Cargar nombre del local
       const { data: localData } = await supabase.from('locales').select('nombre').eq('id', activeLocalId).single()
       if (localData) setBusinessName(localData.nombre)
 
       const hoy = new Date()
       const hoyStr = hoy.toISOString().split('T')[0]
       
+      // Fechas del mes (UTC para evitar problemas de zona horaria)
       const primerDiaMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0)).toISOString()
       const ultimoDiaMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999)).toISOString()
-      
-      console.log('🔍 FILTROS DE FECHA:', { primerDiaMes, ultimoDiaMes })
 
-      // ✅ CONSULTA SIMPLIFICADA para descartar errores de relaciones anidadas
-      const { data: currentMonthTx, error: txError } = await supabase
+      // 2. Cargar MEDIOS DE PAGO (Query separada para evitar errores de join)
+      const { data: mediosData } = await supabase
+        .from('medios_pago')
+        .select('id, nombre, banco_emisor, tipo_comision, valor_comision')
+        .eq('local_id', activeLocalId)
+
+      // Creamos un "diccionario" para buscar medios de pago rápido por ID
+      const mediosMap = new Map()
+      if (mediosData) {
+        mediosData.forEach(m => mediosMap.set(m.id, m))
+      }
+
+      // 3. Cargar TRANSACCIONES (Query simple, sin joins anidados)
+      const { data: transacciones, error: txError } = await supabase
         .from('transacciones')
-        .select(`
-          id,
-          tipo,
-          monto,
-          comision_monto,
-          fecha_acreditacion_estimada,
-          creado_en,
-          medios_pago (
-            id,
-            nombre,
-            banco_emisor
-          )
-        `)
+        .select('*') // Traemos todo lo de la tabla transacciones
         .eq('local_id', activeLocalId)
         .gte('creado_en', primerDiaMes)
         .lte('creado_en', ultimoDiaMes)
-        .order('creado_en', { ascending: false })
 
       if (txError) {
-        console.error('❌ DETALLE DEL ERROR:', JSON.stringify(txError, null, 2))
-      } else {
-        console.log('✅ Transacciones encontradas:', currentMonthTx?.length || 0)
+        console.error('Error cargando transacciones:', txError)
+        return
       }
 
-      // Si hay datos, procesamos el resumen básico
-      if (currentMonthTx && currentMonthTx.length > 0) {
-        const totalFacturado = currentMonthTx
-          .filter(t => t.tipo === 'COBRO_RECIBIDO')
-          .reduce((sum, t) => sum + t.monto, 0)
+      if (transacciones && transacciones.length > 0) {
+        // --- CÁLCULOS CONTABLES ---
+        
+        let totalFacturado = 0
+        let totalComisiones = 0
+        let totalGastos = 0
+        let yaAcreditado = 0
+        let porAcreditar = 0
+        let cantVentas = 0
 
-        const totalComisiones = currentMonthTx
-          .filter(t => t.tipo === 'COBRO_RECIBIDO')
-          .reduce((sum, t) => sum + (t.comision_monto || 0), 0)
+        const methodsMap = {}
 
-        const totalGastos = currentMonthTx
-          .filter(t => t.tipo === 'GASTO_REGISTRADO')
-          .reduce((sum, t) => sum + t.monto, 0)
+        transacciones.forEach(t => {
+          const medio = mediosMap.get(t.medio_pago_id) || { nombre: 'Sin Medio', banco_emisor: '' }
+          const key = medio.banco_emisor ? `${medio.nombre} (${medio.banco_emisor})` : medio.nombre
 
-        const yaAcreditado = currentMonthTx
-          .filter(t => {
-            const isIncome = t.tipo === 'COBRO_RECIBIDO'
-            const accreditationDate = t.fecha_acreditacion_estimada || hoyStr
-            return isIncome && accreditationDate <= hoyStr
-          })
-          .reduce((sum, t) => sum + (t.monto - (t.comision_monto || 0)), 0)
+          // Inicializar medio si es la primera vez que lo vemos
+          if (!methodsMap[key]) {
+            methodsMap[key] = { nombre: key, facturado: 0, comisiones: 0, neto: 0, cantidad: 0, yaAcreditado: 0, porAcreditar: 0 }
+          }
 
-        const porAcreditar = currentMonthTx
-          .filter(t => {
-            const isIncome = t.tipo === 'COBRO_RECIBIDO'
-            const accreditationDate = t.fecha_acreditacion_estimada || hoyStr
-            return isIncome && accreditationDate > hoyStr
-          })
-          .reduce((sum, t) => sum + (t.monto - (t.comision_monto || 0)), 0)
+          if (t.tipo === 'COBRO_RECIBIDO') {
+            const monto = t.monto || 0
+            const comision = t.comision_monto || 0
+            const neto = monto - comision
+
+            totalFacturado += monto
+            totalComisiones += comision
+            cantVentas++
+
+            methodsMap[key].facturado += monto
+            methodsMap[key].comisiones += comision
+            methodsMap[key].neto += neto
+            methodsMap[key].cantidad++
+
+            // Lógica de acreditación
+            const fechaAcred = t.fecha_acreditacion_estimada || hoyStr
+            if (fechaAcred <= hoyStr) {
+              yaAcreditado += neto
+              methodsMap[key].yaAcreditado += neto
+            } else {
+              porAcreditar += neto
+              methodsMap[key].porAcreditar += neto
+            }
+
+          } else if (t.tipo === 'GASTO_REGISTRADO') {
+            totalGastos += (t.monto || 0)
+          }
+        })
 
         setMonthlySummary({
           totalFacturado,
@@ -110,38 +124,13 @@ export default function Reportes() {
           totalGastos,
           yaAcreditado,
           porAcreditar,
-          cantidadTransacciones: currentMonthTx.filter(t => t.tipo === 'COBRO_RECIBIDO').length
+          cantidadTransacciones: cantVentas
         })
 
-        // Desglose por medio de pago (simplificado)
-        const methodsMap = {}
-        currentMonthTx
-          .filter(t => t.tipo === 'COBRO_RECIBIDO')
-          .forEach(t => {
-            const method = t.medios_pago
-            const key = method ? (method.banco_emisor ? `${method.nombre} (${method.banco_emisor})` : method.nombre) : 'Desconocido'
-            
-            if (!methodsMap[key]) {
-              methodsMap[key] = { nombre: key, facturado: 0, comisiones: 0, neto: 0, cantidad: 0, yaAcreditado: 0, porAcreditar: 0 }
-            }
-            
-            methodsMap[key].facturado += t.monto
-            methodsMap[key].comisiones += (t.comision_monto || 0)
-            methodsMap[key].neto += (t.monto - (t.comision_monto || 0))
-            methodsMap[key].cantidad += 1
-            
-            const accreditationDate = t.fecha_acreditacion_estimada || hoyStr
-            if (accreditationDate <= hoyStr) {
-              methodsMap[key].yaAcreditado += (t.monto - (t.comision_monto || 0))
-            } else {
-              methodsMap[key].porAcreditar += (t.monto - (t.comision_monto || 0))
-            }
-          })
-        
         setMethodBreakdown(Object.values(methodsMap).sort((a, b) => b.neto - a.neto))
       }
     } catch (err) {
-      console.error('❌ Error general:', err)
+      console.error('Error general:', err)
     } finally {
       setLoading(false)
     }
@@ -153,7 +142,6 @@ export default function Reportes() {
   }
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
-  if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
   const hoy = new Date()
   const nombreMes = hoy.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
@@ -189,6 +177,19 @@ export default function Reportes() {
               </div>
             </div>
 
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Gastos del mes:</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#dc2626' }}>-${monthlySummary.totalGastos.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '2px solid #0f172a' }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>RESULTADO NETO:</span>
+                <span style={{ fontSize: '1rem', fontWeight: '800', color: (monthlySummary.totalFacturado - monthlySummary.totalComisiones - monthlySummary.totalGastos) >= 0 ? '#15803d' : '#b91c1c' }}>
+                  ${(monthlySummary.totalFacturado - monthlySummary.totalComisiones - monthlySummary.totalGastos).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
               <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '8px', border: '1px solid #16a34a' }}>
                 <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem' }}>✅ YA ACREDITADO</div>
@@ -202,7 +203,7 @@ export default function Reportes() {
           </div>
         ) : (
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a' }}>Cargando o sin datos...</h3>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a' }}>Sin datos este mes</h3>
           </div>
         )}
 
@@ -221,6 +222,22 @@ export default function Reportes() {
                     <div><div style={{ color: '#64748b' }}>Comisiones</div><div style={{ fontWeight: '600', color: '#dc2626' }}>-${method.comisiones.toFixed(2)}</div></div>
                     <div><div style={{ color: '#64748b' }}>Ventas</div><div style={{ fontWeight: '600' }}>{method.cantidad}</div></div>
                   </div>
+                  {(method.yaAcreditado > 0 || method.porAcreditar > 0) && (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.7rem' }}>
+                      {method.yaAcreditado > 0 && (
+                        <div style={{ flex: 1, backgroundColor: '#f0fdf4', padding: '0.25rem', borderRadius: '4px', textAlign: 'center' }}>
+                          <div style={{ color: '#166534', fontSize: '0.65rem' }}>Acreditado</div>
+                          <div style={{ fontWeight: '700', color: '#15803d' }}>${method.yaAcreditado.toFixed(2)}</div>
+                        </div>
+                      )}
+                      {method.porAcreditar > 0 && (
+                        <div style={{ flex: 1, backgroundColor: '#fffbeb', padding: '0.25rem', borderRadius: '4px', textAlign: 'center' }}>
+                          <div style={{ color: '#b45309', fontSize: '0.65rem' }}>En tránsito</div>
+                          <div style={{ fontWeight: '700', color: '#d97706' }}>${method.porAcreditar.toFixed(2)}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
