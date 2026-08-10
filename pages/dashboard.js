@@ -557,10 +557,17 @@ export default function CajaDelDia() {
                           <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
                         </div>
                       )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
-                        <div style={{ color: '#059669', fontWeight: '600' }}>Neto:</div>
-                        <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
-                      </div>
+                     {isIncome ? (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
+    <div style={{ color: '#059669', fontWeight: '600' }}>Neto:</div>
+    <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
+  </div>
+) : (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
+    <div style={{ color: '#b91c1c', fontWeight: '600' }}>Gasto:</div>
+    <div style={{ color: '#b91c1c', fontWeight: '700' }}>-${m.monto.toFixed(2)}</div>
+  </div>
+)}
                       {isInTransit && (
                         <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#fffbeb', borderRadius: '6px', border: '1px solid #fcd34d' }}>
                           <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>
