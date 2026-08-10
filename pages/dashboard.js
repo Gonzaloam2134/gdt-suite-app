@@ -50,7 +50,6 @@ export default function CajaDelDia() {
   const [quickMethodBanco, setQuickMethodBanco] = useState('')
   const [quickMethodHasCommission, setQuickMethodHasCommission] = useState(false)
   const [quickMethodCommissionPct, setQuickMethodCommissionPct] = useState('')
-  const [quickMethodCommissionFixed, setQuickMethodCommissionFixed] = useState('')
   const [quickMethodDiasAcreditacion, setQuickMethodDiasAcreditacion] = useState('0')
   
   const [showNewCategoryQuick, setShowNewCategoryQuick] = useState(false)
@@ -215,6 +214,35 @@ export default function CajaDelDia() {
     return acc
   }, { in: 0, commissions: 0, net: 0, out: 0 })
 
+  // Calcular disponible hoy vs en tránsito
+  const hoy = new Date().toISOString().split('T')[0]
+  
+  const availableToday = movements
+    .filter(m => {
+      const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
+      const commission = m.comision_monto || 0
+      const netAmount = m.monto - commission
+      const accreditationDate = m.fecha_acreditacion_estimada || hoy
+      return isIncome && accreditationDate <= hoy
+    })
+    .reduce((acc, curr) => {
+      const commission = curr.comision_monto || 0
+      return acc + (curr.monto - commission)
+    }, 0)
+
+  const inTransit = movements
+    .filter(m => {
+      const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
+      const commission = m.comision_monto || 0
+      const netAmount = m.monto - commission
+      const accreditationDate = m.fecha_acreditacion_estimada || hoy
+      return isIncome && accreditationDate > hoy
+    })
+    .reduce((acc, curr) => {
+      const commission = curr.comision_monto || 0
+      return acc + (curr.monto - commission)
+    }, 0)
+
   const currentBalance = (activeShift?.monto_inicial || 0) + totals.net - totals.out
 
   const handleOpenForm = (type) => {
@@ -243,7 +271,7 @@ export default function CajaDelDia() {
     e.preventDefault()
     if (!openingAmount || parseFloat(openingAmount) < 0) return alert('Ingresá un monto válido')
     if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) {
-      return alert('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
+      return alert('️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
     }
 
     try {
@@ -336,8 +364,19 @@ export default function CajaDelDia() {
       const method = paymentMethods.find(m => m.id === selectedMethod)
       const isIncome = formType === 'INCOME'
       const tipo = isIncome ? 'COBRO_RECIBIDO' : 'GASTO_REGISTRADO'
-      const commission = isIncome ? ((parseFloat(amount) * (method.valor_comision || 0)) / 100) + (method.monto_fijo_comision || 0) : 0
+      
+      // Calcular comisión solo si es PORCENTAJE
+      const commission = isIncome && method.tipo_comision === 'PORCENTAJE'
+        ? (parseFloat(amount) * (method.valor_comision || 0)) / 100
+        : 0
+      
       const finalConcept = showCustomConcept ? customConcept : selectedConcept
+
+      // Calcular fecha de acreditación estimada
+      const diasAcreditacion = method.dias_acreditacion || 0
+      const fechaAcreditacion = new Date()
+      fechaAcreditacion.setDate(fechaAcreditacion.getDate() + diasAcreditacion)
+      const fechaAcreditacionStr = fechaAcreditacion.toISOString().split('T')[0]
 
       const { error } = await supabase.from('transacciones').insert([{
         turno_id: activeShift.id,
@@ -352,7 +391,8 @@ export default function CajaDelDia() {
         estado_pago: 'ACREDITADO',
         descripcion: finalConcept || (isIncome ? 'Cobro' : 'Gasto'),
         categoria: finalConcept || (isIncome ? 'Ventas' : 'Gastos'),
-        creado_por: user.id
+        creado_por: user.id,
+        fecha_acreditacion_estimada: fechaAcreditacionStr
       }])
 
       if (error) throw error
@@ -407,6 +447,7 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
+            {/* TARJETAS PRINCIPALES */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
               <div style={{ backgroundColor: '#dbeafe', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.625rem', color: '#1e40af', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Apertura</div>
@@ -421,14 +462,28 @@ export default function CajaDelDia() {
                 <div style={{ fontSize: '1rem', fontWeight: '800', color: '#b91c1c' }}>-${totals.commissions.toFixed(2)}</div>
               </div>
               <div style={{ backgroundColor: '#0f172a', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Neto</div>
+                <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Neto Total</div>
                 <div style={{ fontSize: '1rem', fontWeight: '800', color: '#ffffff' }}>${totals.net.toFixed(2)}</div>
+              </div>
+            </div>
+
+            {/* DISPONIBLE HOY vs EN TRÁNSITO */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '10px', border: '2px solid #16a34a', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '700', marginBottom: '0.5rem', textTransform: 'uppercase' }}>✅ Disponible Hoy</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#15803d' }}>${availableToday.toFixed(2)}</div>
+                <div style={{ fontSize: '0.625rem', color: '#166534', marginTop: '0.25rem' }}>Efectivo + Acreditado</div>
+              </div>
+              <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '10px', border: '2px solid #d97706', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '700', marginBottom: '0.5rem', textTransform: 'uppercase' }}>⏳ En Tránsito</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#d97706' }}>${inTransit.toFixed(2)}</div>
+                <div style={{ fontSize: '0.625rem', color: '#b45309', marginTop: '0.25rem' }}>Por acreditar</div>
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <button onClick={() => handleOpenForm('INCOME')} style={{ padding: '1rem', backgroundColor: '#86efac', color: '#14532d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ fontSize: '1.5rem' }}></span> COBRO
+                <span style={{ fontSize: '1.5rem' }}>💰</span> COBRO
               </button>
               <button onClick={() => handleOpenForm('EXPENSE')} style={{ padding: '1rem', backgroundColor: '#fca5a5', color: '#7f1d1d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>💸</span> GASTO
@@ -455,11 +510,14 @@ export default function CajaDelDia() {
                   const cat = subcat?.categorias_pago
                   const commission = m.comision_monto || 0
                   const net = m.monto - commission
+                  const accreditationDate = m.fecha_acreditacion_estimada || hoy
+                  const isInTransit = isIncome && accreditationDate > hoy
+                  
                   return (
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '📥' : ''}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '' : '📤'}</div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
@@ -475,10 +533,15 @@ export default function CajaDelDia() {
                           <div style={{ color: '#dc2626', fontWeight: '600' }}>-${commission.toFixed(2)}</div>
                         </div>
                       )}
-                      {isIncome && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
-                          <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
-                          <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
+                        <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
+                        <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
+                      </div>
+                      {isInTransit && (
+                        <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#fffbeb', borderRadius: '6px', border: '1px solid #fcd34d' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>
+                            ⏳ Se acredita el: {new Date(accreditationDate).toLocaleDateString('es-AR')}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -609,7 +672,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
               <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
@@ -649,7 +712,7 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? ' Cobro' : '💸 Gasto'}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -802,7 +865,7 @@ export default function CajaDelDia() {
                               onClick={() => { setShowNewCategoryQuick(false); setNewCategoryQuickName(''); }}
                               style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
                             >
-                              ✕
+                              
                             </button>
                           </div>
                         )}
@@ -931,32 +994,27 @@ export default function CajaDelDia() {
                       {quickMethodBanco && (
                         <>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-                            <input type="checkbox" checked={quickMethodHasCommission} onChange={e => setQuickMethodHasCommission(e.target.checked)} />
-                            ¿Tiene comisión?
+                            <input 
+                              type="checkbox" 
+                              checked={quickMethodHasCommission} 
+                              onChange={e => setQuickMethodHasCommission(e.target.checked)} 
+                            />
+                            ¿Tiene comisión (%)?
                           </label>
 
                           {quickMethodHasCommission && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                              <div>
-                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.7rem', color: '#64748b' }}>%</label>
-                                <input 
-                                  type="number" step="0.01" min="0" max="100"
-                                  value={quickMethodCommissionPct} 
-                                  onChange={e => setQuickMethodCommissionPct(e.target.value)} 
-                                  placeholder="2.5"
-                                  style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.7rem', color: '#64748b' }}>Fija ($)</label>
-                                <input 
-                                  type="number" step="0.01" min="0"
-                                  value={quickMethodCommissionFixed} 
-                                  onChange={e => setQuickMethodCommissionFixed(e.target.value)} 
-                                  placeholder="10"
-                                  style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
-                                />
-                              </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.7rem', color: '#64748b' }}>Porcentaje (%)</label>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                min="0" 
+                                max="100"
+                                value={quickMethodCommissionPct} 
+                                onChange={e => setQuickMethodCommissionPct(e.target.value)} 
+                                placeholder="2.5"
+                                style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                              />
                             </div>
                           )}
 
@@ -985,7 +1043,6 @@ export default function CajaDelDia() {
                                 setQuickMethodBanco('')
                                 setQuickMethodHasCommission(false)
                                 setQuickMethodCommissionPct('')
-                                setQuickMethodCommissionFixed('')
                                 setQuickMethodDiasAcreditacion('0')
                                 setShowNewCategoryQuick(false)
                                 setShowNewOperatorQuick(false)
@@ -1006,7 +1063,8 @@ export default function CajaDelDia() {
                                 try {
                                   setCreating(true)
                                   
-                                  const comisionType = quickMethodHasCommission ? (quickMethodCommissionPct && quickMethodCommissionFixed ? 'MIXTO' : quickMethodCommissionPct ? 'PORCENTAJE' : 'FIJO') : 'NINGUNA'
+                                  const comisionType = quickMethodHasCommission ? 'PORCENTAJE' : 'NINGUNA'
+                                  const comisionValue = quickMethodHasCommission ? (parseFloat(quickMethodCommissionPct) || 0) : 0
                                   
                                   const categoryName = categories.find(c => c.id === quickMethodCategory)?.nombre || ''
                                   const operatorName = subcategories.find(s => s.id === quickMethodSubcategory)?.nombre || ''
@@ -1018,8 +1076,8 @@ export default function CajaDelDia() {
                                     subcategoria_id: quickMethodSubcategory,
                                     banco_emisor: quickMethodBanco || null,
                                     tipo_comision: comisionType,
-                                    valor_comision: quickMethodCommissionPct ? parseFloat(quickMethodCommissionPct) : 0,
-                                    monto_fijo_comision: quickMethodCommissionFixed ? parseFloat(quickMethodCommissionFixed) : 0,
+                                    valor_comision: comisionValue,
+                                    monto_fijo_comision: null,
                                     dias_acreditacion: parseInt(quickMethodDiasAcreditacion) || 0,
                                     activo: true
                                   }]).select(`*, subcategorias_pago(id, nombre, categorias_pago(id, nombre, icono))`).single()
@@ -1035,7 +1093,6 @@ export default function CajaDelDia() {
                                   setQuickMethodBanco('')
                                   setQuickMethodHasCommission(false)
                                   setQuickMethodCommissionPct('')
-                                  setQuickMethodCommissionFixed('')
                                   setQuickMethodDiasAcreditacion('0')
                                   setShowNewCategoryQuick(false)
                                   setShowNewOperatorQuick(false)
