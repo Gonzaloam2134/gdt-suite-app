@@ -27,8 +27,6 @@ export default function CajaDelDia() {
   const [closedShifts, setClosedShifts] = useState([])
   const [showOpenShift, setShowOpenShift] = useState(false)
   const [showCloseShift, setShowCloseShift] = useState(false)
-  const [expandedShiftId, setExpandedShiftId] = useState(null)
-  const [shiftMovements, setShiftMovements] = useState({})
   
   const [amount, setAmount] = useState('')
   const [selectedConcept, setSelectedConcept] = useState('')
@@ -120,7 +118,7 @@ export default function CajaDelDia() {
         const lastClosed = closedData[0]
         const { data: lastTx } = await supabase
           .from('transacciones')
-          .select('monto, comision_monto, tipo')
+          .select('monto, comision_monto, tipo, medio_pago_id')
           .eq('turno_id', lastClosed.id)
         
         let calculatedBalance = lastClosed.monto_inicial || 0
@@ -171,79 +169,49 @@ export default function CajaDelDia() {
     }
   }
 
-  const loadShiftMovements = async (shiftId) => {
-    if (shiftMovements[shiftId]) return
-    const { data } = await supabase.from('transacciones').select('*').eq('turno_id', shiftId).order('creado_en', { ascending: false })
-    if (data) setShiftMovements(prev => ({ ...prev, [shiftId]: data }))
-  }
-
-  const toggleShiftExpand = async (shiftId) => {
-    if (expandedShiftId === shiftId) {
-      setExpandedShiftId(null)
-    } else {
-      setExpandedShiftId(shiftId)
-      await loadShiftMovements(shiftId)
-    }
-  }
-
-  const calculateShiftTotals = (movs) => {
-    return movs.reduce((acc, curr) => {
-      const isIncome = curr.tipo === 'COBRO_RECIBIDO' || curr.tipo === 'CAJA_ABIERTA'
-      const commission = curr.comision_monto || 0
-      if (isIncome) {
-        acc.in += curr.monto
-        acc.commissions += commission
-        acc.net += curr.monto - commission
-      } else {
-        acc.out += curr.monto
-      }
-      return acc
-    }, { in: 0, commissions: 0, net: 0, out: 0 })
-  }
-
-  const totals = movements.reduce((acc, curr) => {
-    const isIncome = curr.tipo === 'COBRO_RECIBIDO' || curr.tipo === 'CAJA_ABIERTA'
-    const commission = curr.comision_monto || 0
-    if (isIncome) {
-      acc.in += curr.monto
-      acc.commissions += commission
-      acc.net += curr.monto - commission
-    } else {
-      acc.out += curr.monto
-    }
-    return acc
-  }, { in: 0, commissions: 0, net: 0, out: 0 })
-
-  // Calcular disponible hoy vs en tránsito
+  // Calcular saldo por medio de pago
   const hoy = new Date().toISOString().split('T')[0]
   
-  const availableToday = movements
-    .filter(m => {
-      const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
-      const commission = m.comision_monto || 0
-      const netAmount = m.monto - commission
-      const accreditationDate = m.fecha_acreditacion_estimada || hoy
-      return isIncome && accreditationDate <= hoy
-    })
-    .reduce((acc, curr) => {
-      const commission = curr.comision_monto || 0
-      return acc + (curr.monto - commission)
-    }, 0)
+  const balanceByMethod = paymentMethods.map(method => {
+    const methodMovements = movements.filter(m => m.medio_pago_id === method.id)
+    
+    const income = methodMovements
+      .filter(m => m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA')
+      .reduce((sum, m) => sum + (m.monto - (m.comision_monto || 0)), 0)
+    
+    const expenses = methodMovements
+      .filter(m => m.tipo === 'GASTO_REGISTRADO')
+      .reduce((sum, m) => sum + m.monto, 0)
+    
+    const available = methodMovements
+      .filter(m => {
+        const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
+        const accreditationDate = m.fecha_acreditacion_estimada || hoy
+        return isIncome && accreditationDate <= hoy
+      })
+      .reduce((sum, m) => sum + (m.monto - (m.comision_monto || 0)), 0)
+    
+    const inTransit = methodMovements
+      .filter(m => {
+        const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
+        const accreditationDate = m.fecha_acreditacion_estimada || hoy
+        return isIncome && accreditationDate > hoy
+      })
+      .reduce((sum, m) => sum + (m.monto - (m.comision_monto || 0)), 0)
+    
+    return {
+      method,
+      total: income - expenses,
+      available,
+      inTransit,
+      income,
+      expenses
+    }
+  }).filter(b => b.total !== 0 || b.income > 0 || b.expenses > 0)
 
-  const inTransit = movements
-    .filter(m => {
-      const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
-      const commission = m.comision_monto || 0
-      const netAmount = m.monto - commission
-      const accreditationDate = m.fecha_acreditacion_estimada || hoy
-      return isIncome && accreditationDate > hoy
-    })
-    .reduce((acc, curr) => {
-      const commission = curr.comision_monto || 0
-      return acc + (curr.monto - commission)
-    }, 0)
-
-  const currentBalance = (activeShift?.monto_inicial || 0) + totals.net - totals.out
+  const totalAvailable = balanceByMethod.reduce((sum, b) => sum + b.available, 0)
+  const totalInTransit = balanceByMethod.reduce((sum, b) => sum + b.inTransit, 0)
+  const totalBalance = balanceByMethod.reduce((sum, b) => sum + b.total, 0)
 
   const handleOpenForm = (type) => {
     setFormType(type)
@@ -365,14 +333,12 @@ export default function CajaDelDia() {
       const isIncome = formType === 'INCOME'
       const tipo = isIncome ? 'COBRO_RECIBIDO' : 'GASTO_REGISTRADO'
       
-      // Calcular comisión solo si es PORCENTAJE
       const commission = isIncome && method.tipo_comision === 'PORCENTAJE'
         ? (parseFloat(amount) * (method.valor_comision || 0)) / 100
         : 0
       
       const finalConcept = showCustomConcept ? customConcept : selectedConcept
 
-      // Calcular fecha de acreditación estimada
       const diasAcreditacion = method.dias_acreditacion || 0
       const fechaAcreditacion = new Date()
       fechaAcreditacion.setDate(fechaAcreditacion.getDate() + diasAcreditacion)
@@ -392,7 +358,7 @@ export default function CajaDelDia() {
         descripcion: finalConcept || (isIncome ? 'Cobro' : 'Gasto'),
         categoria: finalConcept || (isIncome ? 'Ventas' : 'Gastos'),
         creado_por: user.id,
-        fecha_acreditacion_estimada: fechaAcreditacionStr
+        fecha_acreditacion_estimada: isIncome ? fechaAcreditacionStr : hoy
       }])
 
       if (error) throw error
@@ -447,40 +413,55 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
-            {/* TARJETAS PRINCIPALES */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
-              <div style={{ backgroundColor: '#dbeafe', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.625rem', color: '#1e40af', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Apertura</div>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#1d4ed8' }}>${(activeShift?.monto_inicial || 0).toFixed(2)}</div>
+            {/* RESUMEN SIMPLE */}
+            <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+              <h2 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}>💰 Resumen de Caja</h2>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '8px', border: '2px solid #16a34a' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem' }}>✅ DISPONIBLE HOY</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#15803d' }}>${totalAvailable.toFixed(2)}</div>
+                </div>
+                <div style={{ backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '8px', border: '2px solid #d97706' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: '700', marginBottom: '0.25rem' }}> EN TRÁNSITO</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#d97706' }}>${totalInTransit.toFixed(2)}</div>
+                </div>
               </div>
-              <div style={{ backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Bruto</div>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#15803d' }}>${totals.in.toFixed(2)}</div>
-              </div>
-              <div style={{ backgroundColor: '#fee2e2', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.625rem', color: '#991b1b', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Comisiones</div>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#b91c1c' }}>-${totals.commissions.toFixed(2)}</div>
-              </div>
-              <div style={{ backgroundColor: '#0f172a', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '700', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Neto Total</div>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#ffffff' }}>${totals.net.toFixed(2)}</div>
-              </div>
+
+              {balanceByMethod.length > 0 && (
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.5rem' }}>Desglose por medio de pago:</div>
+                  {balanceByMethod.map(({ method, total, available, inTransit }) => {
+                    const subcat = method.subcategorias_pago
+                    const cat = subcat?.categorias_pago
+                    return (
+                      <div key={method.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #f1f5f9' }}>
+                        <div>
+                          <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0f172a' }}>
+                            {cat?.icono || ''} {method.nombre || subcat?.nombre}
+                          </div>
+                          {method.banco_emisor && (
+                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{method.banco_emisor}</div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.875rem', fontWeight: '700', color: total >= 0 ? '#15803d' : '#b91c1c' }}>
+                            ${total.toFixed(2)}
+                          </div>
+                          {inTransit > 0 && (
+                            <div style={{ fontSize: '0.65rem', color: '#d97706' }}>
+                              (${inTransit.toFixed(2)} en tránsito)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* DISPONIBLE HOY vs EN TRÁNSITO */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '10px', border: '2px solid #16a34a', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '700', marginBottom: '0.5rem', textTransform: 'uppercase' }}>✅ Disponible Hoy</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#15803d' }}>${availableToday.toFixed(2)}</div>
-                <div style={{ fontSize: '0.625rem', color: '#166534', marginTop: '0.25rem' }}>Efectivo + Acreditado</div>
-              </div>
-              <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '10px', border: '2px solid #d97706', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '700', marginBottom: '0.5rem', textTransform: 'uppercase' }}>⏳ En Tránsito</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#d97706' }}>${inTransit.toFixed(2)}</div>
-                <div style={{ fontSize: '0.625rem', color: '#b45309', marginTop: '0.25rem' }}>Por acreditar</div>
-              </div>
-            </div>
-
+            {/* BOTONES DE ACCIÓN */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <button onClick={() => handleOpenForm('INCOME')} style={{ padding: '1rem', backgroundColor: '#86efac', color: '#14532d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>💰</span> COBRO
@@ -496,9 +477,10 @@ export default function CajaDelDia() {
           </>
         )}
 
+        {/* MOVIMIENTOS */}
         {activeShift && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>Movimientos del Turno Actual</h3>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>Movimientos del Turno</h3>
             {movements.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Sin movimientos en este turno</div>
             ) : (
@@ -517,14 +499,20 @@ export default function CajaDelDia() {
                     <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{isIncome ? '' : '📤'}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+                            {isIncome ? '📥' : '📤'}
+                          </div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              {new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}
+                            </div>
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>{isIncome ? '+' : '-'}${m.monto.toFixed(2)}</div>
+                          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
+                            {isIncome ? '+' : '-'}${m.monto.toFixed(2)}
+                          </div>
                         </div>
                       </div>
                       {isIncome && commission > 0 && (
@@ -534,7 +522,7 @@ export default function CajaDelDia() {
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
-                        <div style={{ color: '#059669', fontWeight: '600' }}>Neto a caja:</div>
+                        <div style={{ color: '#059669', fontWeight: '600' }}>Neto:</div>
                         <div style={{ color: '#059669', fontWeight: '700' }}>+${net.toFixed(2)}</div>
                       </div>
                       {isInTransit && (
@@ -551,83 +539,9 @@ export default function CajaDelDia() {
             )}
           </>
         )}
-
-        {closedShifts.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>Cierres Anteriores</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {closedShifts.map(shift => {
-                const shiftMovs = shiftMovements[shift.id] || []
-                const shiftTotals = calculateShiftTotals(shiftMovs)
-                const finalBalance = (shift.monto_inicial || 0) + shiftTotals.net - shiftTotals.out
-                const isExpanded = expandedShiftId === shift.id
-                
-                return (
-                  <div key={shift.id} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div onClick={() => toggleShiftExpand(shift.id)} style={{ padding: '0.75rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>{new Date(shift.cerrado_en).toLocaleDateString('es-AR')} - {new Date(shift.cerrado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{shiftMovs.length} movimientos • Saldo: ${finalBalance.toFixed(2)}</div>
-                      </div>
-                      <div style={{ fontSize: '1.25rem', color: '#64748b' }}>{isExpanded ? '▼' : '▶'}</div>
-                    </div>
-                    {isExpanded && (
-                      <div style={{ padding: '0.75rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                          <div style={{ backgroundColor: '#dcfce7', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.625rem', color: '#166534', fontWeight: '700' }}>BRUTO</div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#15803d' }}>${shiftTotals.in.toFixed(2)}</div>
-                          </div>
-                          <div style={{ backgroundColor: '#fee2e2', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.625rem', color: '#991b1b', fontWeight: '700' }}>COMIS</div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#b91c1c' }}>-${shiftTotals.commissions.toFixed(2)}</div>
-                          </div>
-                          <div style={{ backgroundColor: '#0f172a', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: '700' }}>NETO</div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '800', color: '#ffffff' }}>${shiftTotals.net.toFixed(2)}</div>
-                          </div>
-                        </div>
-                        {shiftMovs.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.75rem' }}>Cargando movimientos...</div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {shiftMovs.map(m => {
-                              const isIncome = m.tipo === 'COBRO_RECIBIDO' || m.tipo === 'CAJA_ABIERTA'
-                              const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
-                              const subcat = method?.subcategorias_pago
-                              const cat = subcat?.categorias_pago
-                              const commission = m.comision_monto || 0
-                              const net = m.monto - commission
-                              return (
-                                <div key={m.id} style={{ backgroundColor: 'white', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                      <div style={{ fontWeight: '600', color: '#0f172a' }}>{m.descripcion}</div>
-                                      <div style={{ fontSize: '0.625rem', color: '#64748b' }}>{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}</div>
-                                    </div>
-                                    <div style={{ fontWeight: '700', color: isIncome ? '#15803d' : '#b91c1c' }}>{isIncome ? '+' : '-'}${m.monto.toFixed(2)}</div>
-                                  </div>
-                                  {isIncome && commission > 0 && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', paddingTop: '0.25rem', borderTop: '1px dashed #e2e8f0' }}>
-                                      <span style={{ color: '#64748b' }}>Comisión: -${commission.toFixed(2)}</span>
-                                      <span style={{ color: '#059669', fontWeight: '600' }}>Neto: +${net.toFixed(2)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
       </div>
 
+      {/* MODALES (Abrir/Cerrar Caja y Formulario) - igual que antes */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -640,7 +554,7 @@ export default function CajaDelDia() {
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Monto inicial en caja</label>
                 {lastShiftBalance > 0 && (
                   <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.875rem', color: '#1e40af' }}>
-                    💡 <strong>Sugerencia:</strong> El último cierre fue de <strong>${lastShiftBalance.toFixed(2)}</strong>.
+                     <strong>Sugerencia:</strong> El último cierre fue de <strong>${lastShiftBalance.toFixed(2)}</strong>.
                   </div>
                 )}
                 <input 
@@ -650,7 +564,7 @@ export default function CajaDelDia() {
                 />
                 {isAmountModified && (
                   <div style={{ marginTop: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>⚠️ Motivo de la diferencia (Obligatorio)</label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>️ Motivo de la diferencia (Obligatorio)</label>
                     <textarea 
                       value={differenceReason} onChange={(e) => setDifferenceReason(e.target.value)}
                       placeholder="Ej: Saqué $2000 para pagar el flete, faltante de caja, etc."
@@ -672,33 +586,24 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
-              <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
+              <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}></button>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Monto inicial:</span>
-                <span style={{ fontWeight: '600' }}>${activeShift?.monto_inicial.toFixed(2)}</span>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                <strong>Resumen del turno:</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Entradas Brutas:</span>
-                <span style={{ fontWeight: '600', color: '#15803d' }}>+${totals.in.toFixed(2)}</span>
+                <span style={{ fontSize: '0.875rem' }}>Disponible hoy:</span>
+                <span style={{ fontWeight: '600', color: '#15803d' }}>${totalAvailable.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Comisiones:</span>
-                <span style={{ fontWeight: '600', color: '#dc2626' }}>-${totals.commissions.toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Entradas Netas:</span>
-                <span style={{ fontWeight: '600', color: '#059669' }}>+${totals.net.toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Salidas (Gastos):</span>
-                <span style={{ fontWeight: '600', color: '#b91c1c' }}>-${totals.out.toFixed(2)}</span>
+                <span style={{ fontSize: '0.875rem' }}>En tránsito:</span>
+                <span style={{ fontWeight: '600', color: '#d97706' }}>${totalInTransit.toFixed(2)}</span>
               </div>
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '700' }}>Saldo final real:</span>
-                <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>${currentBalance.toFixed(2)}</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: '700' }}>Total:</span>
+                <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>${totalBalance.toFixed(2)}</span>
               </div>
             </div>
             <button onClick={handleCloseShift} disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
@@ -712,7 +617,9 @@ export default function CajaDelDia() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>{formType === 'INCOME' ? ' Cobro' : '💸 Gasto'}</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
+                {formType === 'INCOME' ? '💰 Cobro' : ' Gasto'}
+              </h2>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
@@ -865,7 +772,7 @@ export default function CajaDelDia() {
                               onClick={() => { setShowNewCategoryQuick(false); setNewCategoryQuickName(''); }}
                               style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
                             >
-                              
+                              ✕
                             </button>
                           </div>
                         )}
