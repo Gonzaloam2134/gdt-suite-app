@@ -40,20 +40,13 @@ export default function Reportes() {
       const hoy = new Date()
       const hoyStr = hoy.toISOString().split('T')[0]
       
-      // ✅ CORRECCIÓN: Usar Date.UTC para evitar problemas de zona horaria
       const primerDiaMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0)).toISOString()
       const ultimoDiaMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999)).toISOString()
       
       const primerDiaMesAnterior = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth() - 1, 1, 0, 0, 0, 0)).toISOString()
       const ultimoDiaMesAnterior = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), 0, 23, 59, 59, 999)).toISOString()
 
-      console.log('🔍 FILTROS DE FECHA (UTC):', { 
-        primerDiaMes, 
-        ultimoDiaMes, 
-        activeLocalId 
-      })
-
-      // Transacciones del mes actual
+      // Transacciones del mes actual (✅ SIN cuenta_bancaria para evitar error)
       const { data: currentMonthTx, error: txError } = await supabase
         .from('transacciones')
         .select(`
@@ -62,7 +55,6 @@ export default function Reportes() {
             id,
             nombre,
             dias_acreditacion,
-            cuenta_bancaria,
             banco_emisor,
             tipo_comision,
             valor_comision,
@@ -416,7 +408,6 @@ export default function Reportes() {
           </div>
         )}
 
-        {/* MENSAJE SI NO HAY DATOS */}
         {!monthlySummary && !loading && (
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
