@@ -40,15 +40,18 @@ export default function Reportes() {
       const hoy = new Date()
       const hoyStr = hoy.toISOString().split('T')[0]
       
-      // Fechas del mes actual en formato ISO completo
-      const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0).toISOString()
-      const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+      // ✅ CORRECCIÓN: Usar Date.UTC para evitar problemas de zona horaria
+      const primerDiaMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0)).toISOString()
+      const ultimoDiaMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999)).toISOString()
       
-      // Fechas del mes anterior
-      const primerDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1, 0, 0, 0, 0).toISOString()
-      const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0, 23, 59, 59, 999).toISOString()
+      const primerDiaMesAnterior = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth() - 1, 1, 0, 0, 0, 0)).toISOString()
+      const ultimoDiaMesAnterior = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), 0, 23, 59, 59, 999)).toISOString()
 
-      console.log('Filtros de fecha:', { primerDiaMes, ultimoDiaMes, activeLocalId })
+      console.log('🔍 FILTROS DE FECHA (UTC):', { 
+        primerDiaMes, 
+        ultimoDiaMes, 
+        activeLocalId 
+      })
 
       // Transacciones del mes actual
       const { data: currentMonthTx, error: txError } = await supabase
@@ -76,10 +79,10 @@ export default function Reportes() {
         .order('creado_en', { ascending: false })
 
       if (txError) {
-        console.error('Error en query de transacciones:', txError)
+        console.error('❌ Error en query de transacciones:', txError)
       }
 
-      console.log('Transacciones encontradas:', currentMonthTx?.length || 0)
+      console.log('✅ Transacciones encontradas:', currentMonthTx?.length || 0)
 
       // Transacciones del mes anterior
       const { data: lastMonthTx } = await supabase
@@ -133,11 +136,11 @@ export default function Reportes() {
 
         // Proyección semanal
         const semanas = []
-        const diasEnMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate()
+        const diasEnMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth() + 1, 0)).getUTCDate()
         
         for (let semana = 1; semana <= Math.ceil(diasEnMes / 7); semana++) {
-          const inicioSemana = new Date(hoy.getFullYear(), hoy.getMonth(), (semana - 1) * 7 + 1).toISOString().split('T')[0]
-          const finSemana = new Date(hoy.getFullYear(), hoy.getMonth(), Math.min(semana * 7, diasEnMes)).toISOString().split('T')[0]
+          const inicioSemana = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), (semana - 1) * 7 + 1)).toISOString().split('T')[0]
+          const finSemana = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), Math.min(semana * 7, diasEnMes))).toISOString().split('T')[0]
           
           const ingresosSemana = currentMonthTx
             .filter(t => {
@@ -152,7 +155,7 @@ export default function Reportes() {
             inicio: inicioSemana,
             fin: finSemana,
             total: ingresosSemana,
-            esSemanaActual: hoy >= new Date(inicioSemana) && hoy <= new Date(finSemana)
+            esSemanaActual: hoy >= new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), (semana - 1) * 7 + 1)) && hoy <= new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), Math.min(semana * 7, diasEnMes)))
           })
         }
         
@@ -222,7 +225,7 @@ export default function Reportes() {
         }
       }
     } catch (err) {
-      console.error('Error cargando reportes:', err)
+      console.error('❌ Error general cargando reportes:', err)
     } finally {
       setLoading(false)
     }
@@ -307,7 +310,7 @@ export default function Reportes() {
         {/* PROYECCIÓN SEMANAL */}
         {weeklyProjection.length > 0 && (
           <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
-            <h2 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}> Proyección de Cobros por Semana</h2>
+            <h2 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}>📅 Proyección de Cobros por Semana</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {weeklyProjection.map(semana => (
@@ -323,7 +326,7 @@ export default function Reportes() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>
-                        {semana.esSemanaActual ? '' : ''} Semana {semana.semana}
+                        {semana.esSemanaActual ? '📍 ' : ''}Semana {semana.semana}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                         {new Date(semana.inicio).toLocaleDateString('es-AR')} - {new Date(semana.fin).toLocaleDateString('es-AR')}
