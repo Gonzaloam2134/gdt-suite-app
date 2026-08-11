@@ -1,62 +1,1151 @@
-import { useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import BottomNav from '../components/BottomNav'
+import { formatCurrency } from '../lib/format'
+import toast from 'react-hot-toast'
 
-export default function ExportModal({ onClose, onExport, loading }) {
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+const CONCEPTOS_INGRESO = ['Venta del día', 'Venta mostrador', 'Delivery', 'Servicios', 'Otros ingresos']
+const CONCEPTOS_GASTO = ['Proveedor', 'Luz', 'Gas', 'Agua', 'Internet', 'Alquiler', 'Sueldos', 'Impuestos', 'Insumos', 'Otros gastos']
 
-  const handleSubmit = () => {
-    if (!startDate || !endDate) {
-      alert('⚠️ Seleccioná fecha de inicio y fin')
-      return
-    }
-    onExport(startDate, endDate)
+const ALICUOTAS_IVA = [
+  { value: 21, label: '21% (General)' },
+  { value: 10.5, label: '10.5% (Reducida)' },
+  { value: 0, label: '0% (Exento / Monotributo)' }
+]
+
+const BANCOS_ARGENTINA = [
+  'Galicia', 'Santander Río', 'BBVA', 'Macro', 'Nación', 'ICBC',
+  'Brubank', 'Supervielle', 'HSBC', 'Citibank', 'Patagonia',
+  'Provincia', 'Ciudad', 'Comafi', 'Hipotecario', 'Itaú',
+  'BMA', 'Credicoop', 'Industrial', 'BICA'
+]
+
+export default function CajaDelDia() {
+  const [user, setUser] = useState(null)
+  const [businessName, setBusinessName] = useState('Mi Negocio')
+  const [movements, setMovements] = useState([])
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [categories, setCategories] = useState([])
+  const [subcategories, setSubcategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [formType, setFormType] = useState('INCOME')
+  const [activeShift, setActiveShift] = useState(null)
+  const [closedShifts, setClosedShifts] = useState([])
+  const [showOpenShift, setShowOpenShift] = useState(false)
+  const [showCloseShift, setShowCloseShift] = useState(false)
+  
+  const [amount, setAmount] = useState('')
+  const [selectedConcept, setSelectedConcept] = useState('')
+  const [customConcept, setCustomConcept] = useState('')
+  const [showCustomConcept, setShowCustomConcept] = useState(false)
+  const [selectedMethod, setSelectedMethod] = useState('')
+  const [selectedAliquot, setSelectedAliquot] = useState(21)
+  
+  const [openingAmount, setOpeningAmount] = useState('')
+  const [lastShiftBalance, setLastShiftBalance] = useState(0)
+  const [differenceReason, setDifferenceReason] = useState('')
+  const [isAmountModified, setIsAmountModified] = useState(false)
+  
+  const [creating, setCreating] = useState(false)
+
+  const [showQuickAddMethod, setShowQuickAddMethod] = useState(false)
+  const [quickMethodCategory, setQuickMethodCategory] = useState('')
+  const [quickMethodSubcategory, setQuickMethodSubcategory] = useState('')
+  const [quickMethodBanco, setQuickMethodBanco] = useState('')
+  const [quickMethodHasCommission, setQuickMethodHasCommission] = useState(false)
+  const [quickMethodCommissionPct, setQuickMethodCommissionPct] = useState('')
+  const [quickMethodDiasAcreditacion, setQuickMethodDiasAcreditacion] = useState('0')
+  
+  const [showNewCategoryQuick, setShowNewCategoryQuick] = useState(false)
+  const [showNewOperatorQuick, setShowNewOperatorQuick] = useState(false)
+  const [showNewBancoQuick, setShowNewBancoQuick] = useState(false)
+  const [newCategoryQuickName, setNewCategoryQuickName] = useState('')
+  const [newOperatorQuickName, setNewOperatorQuickName] = useState('')
+  const [newBancoQuickName, setNewBancoQuickName] = useState('')
+
+  const [expandedAccreditation, setExpandedAccreditation] = useState(null)
+  
+  const router = useRouter()
+  const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        router.push('/')
+      } else {
+        setUser(session.user)
+        if (activeLocalId) {
+          loadData(session.user.id)
+        } else {
+          router.push('/locales')
+        }
+      }
+    })
+  }, [router, activeLocalId])
+
+  const loadData = async (userId) => {
+    try {
+      setLoading(true)
+      const { data: localData } = await supabase.from('locales').select('nombre').eq('id', activeLocalId).single()
+      if (localData) setBusinessName(localData.nombre)
+
+      const { data: shiftData } = await supabase.from('turnos').select('*').eq('local_id', activeLocalId).eq('estado', 'ABIERTO').order('abierto_en', { ascending: false }).limit(1).single()
+      setActiveShift(shiftData || null)
+
+      if (shiftData) {
+        const { data: txData } = await supabase.from('transacciones').select('*').eq('turno_id', shiftData.id).order('creado_en', { ascending: false }).limit(100)
+        setMovements(txData || [])
+      } else { setMovements([]) }
+
+      const { data: closedData } = await supabase.from('turnos').select('*').eq('local_id', activeLocalId).eq('estado', 'CERRADO').order('cerrado_en', { ascending: false }).limit(10)
+      setClosedShifts(closedData || [])
+
+      if (closedData && closedData.length > 0) {
+        const lastClosed = closedData[0]
+        const { data: lastTx } = await supabase.from('transacciones').select('monto, comision_monto, tipo, medio_pago_id').eq('turno_id', lastClosed.id)
+        let calculatedBalance = lastClosed.monto_inicial || 0
+        if (lastTx) {
+          lastTx.forEach(tx => {
+            const isIncome = tx.tipo === 'COBRO_RECIBIDO' || tx.tipo === 'CAJA_ABIERTA'
+            if (isIncome) calculatedBalance += (tx.monto - (tx.comision_monto || 0))
+            else calculatedBalance -= tx.monto
+          })
+        }
+        setLastShiftBalance(calculatedBalance)
+        setOpeningAmount(calculatedBalance.toFixed(2))
+        setIsAmountModified(false)
+        setDifferenceReason('')
+      } else { setLastShiftBalance(0); setOpeningAmount('') }
+      
+      const { data: pmData } = await supabase.from('medios_pago').select(`*, subcategorias_pago (id, nombre, categorias_pago (id, nombre, icono))`).eq('local_id', activeLocalId).eq('activo', true).order('creado_en', { ascending: false })
+      setPaymentMethods(pmData || [])
+
+      const { data: catData } = await supabase.from('categorias_pago').select('*').eq('activo', true).order('orden', { ascending: true })
+      const { data: subcatData } = await supabase.from('subcategorias_pago').select('*').eq('activo', true).order('nombre', { ascending: true })
+      setCategories(catData || [])
+      setSubcategories(subcatData || [])
+    } catch (err) { console.error('Error cargando datos:', err) } finally { setLoading(false) }
   }
 
+  const hoy = new Date()
+  const hoyStr = hoy.toISOString().split('T')[0]
+  
+  const balanceByMethod = paymentMethods.map(method => {
+    const methodMovements = movements.filter(m => m.medio_pago_id === method.id)
+    const income = methodMovements.filter(m => m.tipo === 'COBRO_RECIBIDO').reduce((sum, m) => sum + m.monto, 0)
+    const commissions = methodMovements.filter(m => m.tipo === 'COBRO_RECIBIDO').reduce((sum, m) => sum + (m.comision_monto || 0), 0)
+    const expenses = methodMovements.filter(m => m.tipo === 'GASTO_REGISTRADO').reduce((sum, m) => sum + m.monto, 0)
+    const available = methodMovements.filter(m => m.tipo === 'COBRO_RECIBIDO' && (m.fecha_acreditacion_estimada || hoyStr) <= hoyStr).reduce((sum, m) => sum + (m.monto - (m.comision_monto || 0)), 0)
+    const inTransit = methodMovements.filter(m => m.tipo === 'COBRO_RECIBIDO' && (m.fecha_acreditacion_estimada || hoyStr) > hoyStr).reduce((sum, m) => sum + (m.monto - (m.comision_monto || 0)), 0)
+    return { method, income, commissions, expenses, netBalance: income - commissions - expenses, available, inTransit }
+  }).filter(b => b.income > 0 || b.expenses > 0 || b.netBalance !== 0)
+
+  const totalIncome = balanceByMethod.reduce((sum, b) => sum + b.income, 0)
+  const totalCommissions = balanceByMethod.reduce((sum, b) => sum + b.commissions, 0)
+  const totalExpenses = balanceByMethod.reduce((sum, b) => sum + b.expenses, 0)
+  const totalAvailable = balanceByMethod.reduce((sum, b) => sum + b.available, 0)
+  const totalInTransit = balanceByMethod.reduce((sum, b) => sum + b.inTransit, 0)
+  const totalNet = totalIncome - totalCommissions - totalExpenses
+
+  const totalIVACobrado = movements.filter(m => m.tipo === 'COBRO_RECIBIDO').reduce((sum, m) => sum + (m.monto_iva || 0), 0)
+
+  const acreditacionesHoy = movements.filter(m => {
+    if (m.tipo !== 'COBRO_RECIBIDO') return false
+    const accreditationDate = m.fecha_acreditacion_estimada
+    if (!accreditationDate) return false
+    const createdDate = m.creado_en ? new Date(m.creado_en).toISOString().split('T')[0] : hoyStr
+    return accreditationDate === hoyStr && createdDate < hoyStr
+  }).map(m => ({ ...m, method: paymentMethods.find(pm => pm.id === m.medio_pago_id), net: m.monto - (m.comision_monto || 0) }))
+
+  const acreditacionesAgrupadas = {}
+  acreditacionesHoy.forEach(acc => {
+    const key = acc.medio_pago_id || 'unknown'
+    if (!acreditacionesAgrupadas[key]) {
+      const methodName = acc.method ? (acc.method.banco_emisor ? `${acc.method.nombre} (${acc.method.banco_emisor})` : acc.method.nombre) : 'Medio desconocido'
+      acreditacionesAgrupadas[key] = { method: acc.method, methodName, total: 0, transacciones: [] }
+    }
+    acreditacionesAgrupadas[key].total += acc.net
+    acreditacionesAgrupadas[key].transacciones.push(acc)
+  })
+  const totalAcreditacionesHoy = Object.values(acreditacionesAgrupadas).reduce((sum, g) => sum + g.total, 0)
+
+  const handleOpenForm = (type) => {
+    setFormType(type)
+    setAmount('')
+    setSelectedConcept('')
+    setCustomConcept('')
+    setShowCustomConcept(false)
+    setSelectedMethod('')
+    setSelectedAliquot(21)
+    setShowForm(true)
+    setShowQuickAddMethod(false)
+  }
+
+  const handleOpeningAmountChange = (e) => {
+    const newVal = e.target.value
+    setOpeningAmount(newVal)
+    if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) { setIsAmountModified(true) } 
+    else { setIsAmountModified(false); setDifferenceReason('') }
+  }
+
+  const handleOpenShift = async (e) => {
+    e.preventDefault()
+    if (!openingAmount || parseFloat(openingAmount) < 0) {
+      toast.error('Ingresá un monto válido')
+      return
+    }
+    if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) {
+      toast.error('⚠️ Explicá el motivo de la diferencia')
+      return
+    }
+    try {
+      setCreating(true)
+      let { data: businesses } = await supabase.from('negocios').select('id').eq('local_id', activeLocalId).limit(1)
+      let bizId
+      if (businesses && businesses.length > 0) {
+        bizId = businesses[0].id
+      } else {
+        const { data: newBiz, error: bizError } = await supabase.from('negocios').insert([{ local_id: activeLocalId, nombre: 'Principal', razon_social: 'Negocio Principal', cuit: '00-00000000-0' }]).select('id').single()
+        if (bizError) throw bizError
+        bizId = newBiz.id
+      }
+
+      let { data: branches } = await supabase.from('sucursales').select('id').eq('negocio_id', bizId).limit(1)
+      let branchId
+      if (branches && branches.length > 0) {
+        branchId = branches[0].id
+      } else {
+        const { data: newBranch, error: branchError } = await supabase.from('sucursales').insert([{ negocio_id: bizId, nombre: 'Sucursal Principal', codigo: 'SUC-01' }]).select('id').single()
+        if (branchError) throw branchError
+        branchId = newBranch.id
+      }
+
+      let { data: cashPoints } = await supabase.from('cajas').select('id').eq('sucursal_id', branchId).limit(1)
+      let cashPointId
+      if (cashPoints && cashPoints.length > 0) {
+        cashPointId = cashPoints[0].id
+      } else {
+        const { data: newCP, error: cpError } = await supabase.from('cajas').insert([{ sucursal_id: branchId, nombre: 'Caja Principal', codigo: 'CAJA-01' }]).select('id').single()
+        if (cpError) throw cpError
+        cashPointId = newCP.id
+      }
+
+      const { data: shift, error } = await supabase
+        .from('turnos')
+        .insert([{
+          local_id: activeLocalId,
+          negocio_id: bizId,
+          sucursal_id: branchId,
+          caja_id: cashPointId,
+          abierto_por: user.id,
+          estado: 'ABIERTO',
+          monto_inicial: parseFloat(openingAmount),
+          motivo_diferencia_apertura: isAmountModified ? differenceReason : null
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+      
+      toast.success('🔓 Caja abierta correctamente')
+      setShowOpenShift(false)
+      setOpeningAmount('')
+      setDifferenceReason('')
+      setIsAmountModified(false)
+      loadData(user.id)
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleCloseShift = async () => {
+    if (!activeShift) return
+    try {
+      setCreating(true)
+      const { error } = await supabase.from('turnos').update({ estado: 'CERRADO', cerrado_en: new Date().toISOString(), cerrado_por: user.id }).eq('id', activeShift.id)
+      if (error) throw error
+      
+      toast.success('🔒 Caja cerrada correctamente')
+      setShowCloseShift(false)
+      setActiveShift(null)
+      setMovements([])
+      loadData(user.id)
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!amount || amount <= 0) {
+      toast.error('Ingresá un monto válido')
+      return
+    }
+    if (!selectedMethod) {
+      toast.error('Seleccioná un medio de pago')
+      return
+    }
+    if (!activeShift) {
+      toast.error('Primero abrí la caja')
+      return
+    }
+
+    try {
+      setCreating(true)
+      const method = paymentMethods.find(m => m.id === selectedMethod)
+      const isIncome = formType === 'INCOME'
+      const tipo = isIncome ? 'COBRO_RECIBIDO' : 'GASTO_REGISTRADO'
+      
+      const commission = isIncome && method.tipo_comision === 'PORCENTAJE' ? (parseFloat(amount) * (method.valor_comision || 0)) / 100 : 0
+      const finalConcept = showCustomConcept ? customConcept : selectedConcept
+
+      let montoNeto = parseFloat(amount)
+      let montoIva = 0
+      if (isIncome && selectedAliquot > 0) {
+        montoNeto = parseFloat(amount) / (1 + (selectedAliquot / 100))
+        montoIva = parseFloat(amount) - montoNeto
+      }
+
+      const diasAcreditacion = method.dias_acreditacion || 0
+      const fechaAcreditacion = new Date()
+      fechaAcreditacion.setDate(fechaAcreditacion.getDate() + diasAcreditacion)
+      const fechaAcreditacionStr = fechaAcreditacion.toISOString().split('T')[0]
+
+      const { error } = await supabase.from('transacciones').insert([{
+        turno_id: activeShift.id,
+        local_id: activeLocalId,
+        negocio_id: activeShift.negocio_id,
+        sucursal_id: activeShift.sucursal_id,
+        caja_id: activeShift.caja_id,
+        tipo,
+        monto: parseFloat(amount),
+        comision_monto: commission,
+        medio_pago_id: method.id,
+        estado_pago: 'ACREDITADO',
+        descripcion: finalConcept || (isIncome ? 'Cobro' : 'Gasto'),
+        categoria: finalConcept || (isIncome ? 'Ventas' : 'Gastos'),
+        creado_por: user.id,
+        fecha_acreditacion_estimada: isIncome ? fechaAcreditacionStr : hoyStr,
+        alicuota_iva: isIncome ? selectedAliquot : 0,
+        monto_iva: isIncome ? montoIva : 0,
+        monto_neto: isIncome ? montoNeto : parseFloat(amount)
+      }])
+
+      if (error) throw error
+      toast.success(`${isIncome ? '💰 Cobro' : ' Gasto'} registrado correctamente`)
+      setShowForm(false)
+      loadData(user.id)
+    } catch (err) { 
+      toast.error('Error: ' + err.message)
+    } finally { 
+      setCreating(false)
+    }
+  }
+
+  const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
+
+  if (loading) return <div className="p-8 text-center text-sm">Cargando...</div>
+
+  const conceptosList = formType === 'INCOME' ? CONCEPTOS_INGRESO : CONCEPTOS_GASTO
+  const filteredSubcategories = subcategories.filter(s => s.categoria_id === quickMethodCategory)
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-md rounded-xl p-6">
-        <h2 className="text-xl font-bold mb-4">📊 Exportar a Excel</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Seleccioná el período a exportar:
-        </p>
-
-        <div className="mb-4">
-          <label className="block mb-2 font-semibold text-sm">Desde:</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="w-full p-3 border border-gray-200 rounded-lg text-base box-border"
-          />
+    <main className="p-0 font-sans bg-slate-100 min-h-screen pb-[70px]">
+      {/* HEADER */}
+      <header className="bg-white p-4 border-b border-gray-200 sticky top-0 z-10">
+        <div className="flex justify-between items-center max-w-2xl mx-auto">
+          <div>
+            <h1 className="m-0 text-lg text-gray-900 font-bold">{businessName}</h1>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {activeShift ? `Turno activo • ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}
+            </p>
+          </div>
+          <div className="flex gap-1">
+            <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Reportes</button>
+            <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
+          </div>
         </div>
+      </header>
 
-        <div className="mb-6">
-          <label className="block mb-2 font-semibold text-sm">Hasta:</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="w-full p-3 border border-gray-200 rounded-lg text-base box-border"
-          />
-        </div>
+      <div className="max-w-2xl mx-auto p-4">
+        {!activeShift ? (
+          /* CAJA CERRADA */
+          <div className="text-center p-8 bg-white rounded-xl border-2 border-dashed border-gray-300 mb-4">
+            <div className="text-5xl mb-2">🔒</div>
+            <h3 className="m-0 mb-2 text-gray-900 text-base">Caja Cerrada</h3>
+            <p className="m-0 mb-4 text-gray-500 text-sm">Abrí la caja para empezar a operar</p>
+            <button 
+              onClick={() => setShowOpenShift(true)}
+              className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer"
+            >
+              Abrir Caja
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* RESUMEN DEL TURNO */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
+              <h2 className="m-0 mb-3 text-base text-gray-900 font-bold">📊 Resumen del Turno</h2>
+              
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-green-50 p-3 rounded-lg border-2 border-green-600">
+                  <div className="text-xs text-green-800 font-bold mb-1">✅ DISPONIBLE HOY</div>
+                  <div className="text-xl font-extrabold text-green-700">{formatCurrency(totalAvailable)}</div>
+                  {totalAcreditacionesHoy > 0 && (
+                    <div className="text-xs text-green-700 mt-1">
+                      (+{formatCurrency(totalAcreditacionesHoy)} acreditan hoy)
+                    </div>
+                  )}
+                </div>
+                <div className="bg-amber-50 p-3 rounded-lg border-2 border-amber-600">
+                  <div className="text-xs text-amber-700 font-bold mb-1">⏳ EN TRÁNSITO</div>
+                  <div className="text-xl font-extrabold text-amber-600">{formatCurrency(totalInTransit)}</div>
+                </div>
+              </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="flex-1 p-3 bg-gray-100 border border-gray-200 rounded-lg font-semibold cursor-pointer disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex-1 p-3 bg-emerald-500 text-white border-none rounded-lg font-bold cursor-pointer disabled:opacity-50"
-          >
-            {loading ? 'Exportando...' : 'Exportar'}
-          </button>
-        </div>
+              {totalIVACobrado > 0 && (
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                  <div className="text-xs text-blue-800 font-bold">🏛️ IVA RECAUDADO (Débito Fiscal)</div>
+                  <div className="text-lg font-extrabold text-blue-700">{formatCurrency(totalIVACobrado)}</div>
+                  <div className="text-xs text-gray-500">Listo para declaración jurada</div>
+                </div>
+              )}
+
+              <div className="border-t border-gray-200 pt-3 mb-3">
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Total Cobrado:</span>
+                  <span className="text-sm font-bold text-green-700">{formatCurrency(totalIncome)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Comisiones:</span>
+                  <span className="text-sm font-bold text-red-600">-{formatCurrency(totalCommissions)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Gastos:</span>
+                  <span className="text-sm font-bold text-red-600">-{formatCurrency(totalExpenses)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t-2 border-gray-900">
+                  <span className="text-sm font-bold text-gray-900">SALDO NETO:</span>
+                  <span className={`text-base font-extrabold ${totalNet >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(totalNet)}</span>
+                </div>
+              </div>
+
+              {balanceByMethod.length > 0 && (
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="text-xs text-gray-500 font-semibold mb-2">Desglose por medio de pago:</div>
+                  {balanceByMethod.map(({ method, income, commissions, expenses, netBalance, inTransit }) => {
+                    const subcat = method.subcategorias_pago
+                    const cat = subcat?.categorias_pago
+                    return (
+                      <div key={method.id} className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {cat?.icono || ''} {method.nombre || subcat?.nombre}
+                          </div>
+                          {method.banco_emisor && (
+                            <div className="text-xs text-gray-500">{method.banco_emisor}</div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-bold ${netBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            {formatCurrency(netBalance)}
+                          </div>
+                          {inTransit > 0 && (
+                            <div className="text-xs text-amber-600">
+                              ({formatCurrency(inTransit)} en tránsito)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ACREDITACIONES DEL DÍA */}
+            {Object.keys(acreditacionesAgrupadas).length > 0 && (
+              <div className="bg-green-50 p-4 rounded-xl border-2 border-green-600 mb-4">
+                <h2 className="m-0 mb-3 text-base text-green-800 font-bold">
+                  📥 Acreditaciones de hoy
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {Object.entries(acreditacionesAgrupadas).map(([methodId, group]) => {
+                    const isExpanded = expandedAccreditation === methodId
+                    return (
+                      <div key={methodId} className="bg-white rounded-lg border border-green-200 overflow-hidden">
+                        <div 
+                          onClick={() => setExpandedAccreditation(isExpanded ? null : methodId)}
+                          className="p-3 cursor-pointer flex justify-between items-center"
+                        >
+                          <div>
+                            <div className="font-bold text-sm text-gray-900">
+                              {group.methodName}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {group.transacciones.length} venta{group.transacciones.length > 1 ? 's' : ''} anterior{group.transacciones.length > 1 ? 'es' : ''}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-base font-extrabold text-green-700">
+                              {formatCurrency(group.total)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {isExpanded ? '▼ Ocultar' : '▶ Ver detalle'}
+                            </div>
+                          </div>
+                        </div>
+                        {isExpanded && (
+                          <div className="p-3 border-t border-gray-200 bg-gray-50">
+                            {group.transacciones.map(t => {
+                              const createdDate = new Date(t.creado_en)
+                              return (
+                                <div key={t.id} className="p-2 mb-2 bg-white rounded-md border border-gray-200 text-xs">
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-gray-500">
+                                       {createdDate.toLocaleDateString('es-AR')} {createdDate.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
+                                    </span>
+                                    <span className="font-bold text-green-700">
+                                      {formatCurrency(t.net)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-500">
+                                      {t.descripcion} • {formatCurrency(t.monto)} bruto
+                                    </span>
+                                    {t.comision_monto > 0 && (
+                                      <span className="text-red-600">
+                                        -{formatCurrency(t.comision_monto)} comisión
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* BOTONES COBRO / GASTO */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button onClick={() => handleOpenForm('INCOME')} className="p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1">
+                <span className="text-2xl">💰</span> COBRO
+              </button>
+              <button onClick={() => handleOpenForm('EXPENSE')} className="p-4 bg-red-200 text-red-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1">
+                <span className="text-2xl">💸</span> GASTO
+              </button>
+            </div>
+
+            <button onClick={() => setShowCloseShift(true)} className="w-full p-3 bg-gray-100 text-gray-500 border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer mb-4">
+              Cerrar Caja
+            </button>
+          </>
+        )}
+
+        {/* MOVIMIENTOS */}
+        {activeShift && (
+          <>
+            <h3 className="text-sm font-bold text-slate-700 mb-3">Movimientos del Turno</h3>
+            {movements.length === 0 ? (
+              <div className="text-center p-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300 text-sm mb-6">Sin movimientos en este turno</div>
+            ) : (
+              <div className="flex flex-col gap-2 mb-6">
+                {movements.map(m => {
+                  const isIncome = m.tipo === 'COBRO_RECIBIDO'
+                  const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
+                  const subcat = method?.subcategorias_pago
+                  const cat = subcat?.categorias_pago
+                  const commission = m.comision_monto || 0
+                  const net = m.monto - commission
+                  const accreditationDate = m.fecha_acreditacion_estimada || hoyStr
+                  const isInTransit = isIncome && accreditationDate > hoyStr
+                  
+                  return (
+                    <div key={m.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
+                            {isIncome ? '📥' : '📤'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm">{m.descripcion}</div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-bold text-sm ${isIncome ? 'text-green-700' : 'text-red-700'}`}>
+                            {isIncome ? '+' : '-'}{formatCurrency(m.monto)}
+                          </div>
+                        </div>
+                      </div>
+                      {isIncome ? (
+                        <>
+                          {commission > 0 && (
+                            <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 text-xs">
+                              <div className="text-gray-500">Comisión:</div>
+                              <div className="text-red-600 font-semibold">-{formatCurrency(commission)}</div>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center pt-1 text-xs">
+                            <div className="text-green-700 font-semibold">Neto:</div>
+                            <div className="text-green-700 font-bold">{formatCurrency(net)}</div>
+                          </div>
+                          {isInTransit && (
+                            <div className="mt-2 p-2 bg-amber-50 rounded-md border border-amber-300">
+                              <div className="text-xs text-amber-700 font-semibold">
+                                ⏳ Se acredita el: {new Date(accreditationDate + 'T12:00:00').toLocaleDateString('es-AR')}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex justify-between items-center pt-1 text-xs">
+                          <div className="text-red-700 font-semibold">Gasto:</div>
+                          <div className="text-red-700 font-bold">-{formatCurrency(m.monto)}</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+
+      {/* MODAL APERTURA */}
+      {showOpenShift && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold text-gray-900">🔓 Abrir Caja</h2>
+              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
+            </div>
+            <form onSubmit={handleOpenShift}>
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">Monto inicial en caja</label>
+                {lastShiftBalance > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3 text-sm text-blue-800">
+                    💡 <strong>Sugerencia:</strong> El último cierre fue de <strong>{formatCurrency(lastShiftBalance)}</strong>.
+                  </div>
+                )}
+                <input 
+                  type="number" step="0.01" min="0" value={openingAmount} onChange={handleOpeningAmountChange} 
+                  placeholder="0.00" required autoFocus
+                  className={`w-full p-3 text-2xl font-bold border-2 rounded-lg box-border text-right ${isAmountModified ? 'border-amber-500 bg-amber-50' : 'border-gray-200 bg-white'}`}
+                />
+                {isAmountModified && (
+                  <div className="mt-4">
+                    <label className="block mb-2 font-bold text-amber-700 text-sm">⚠️ Motivo de la diferencia (Obligatorio)</label>
+                    <textarea 
+                      value={differenceReason} onChange={(e) => setDifferenceReason(e.target.value)}
+                      placeholder="Ej: Saqué $2000 para pagar el flete, faltante de caja, etc."
+                      required rows="3"
+                      className="w-full p-3 text-base border-2 border-amber-500 rounded-lg box-border resize-vertical"
+                    />
+                  </div>
+                )}
+              </div>
+              <button type="submit" disabled={creating} className="w-full p-4 bg-blue-500 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50">
+                {creating ? 'Abriendo...' : 'Confirmar Apertura'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CIERRE */}
+      {showCloseShift && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold text-gray-900">🔒 Cerrar Caja</h2>
+              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <div className="text-sm text-gray-500 mb-2">
+                <strong>Resumen del turno:</strong>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm">Disponible hoy:</span>
+                <span className="font-semibold text-green-700">{formatCurrency(totalAvailable)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm">En tránsito:</span>
+                <span className="font-semibold text-amber-600">{formatCurrency(totalInTransit)}</span>
+              </div>
+              <div className="border-t border-gray-200 pt-2 flex justify-between">
+                <span className="text-sm font-bold">Saldo neto:</span>
+                <span className="font-bold text-lg">{formatCurrency(totalNet)}</span>
+              </div>
+            </div>
+            <button onClick={handleCloseShift} disabled={creating} className="w-full p-4 bg-red-600 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50">
+              {creating ? 'Cerrando...' : 'Confirmar Cierre'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL COBRO/GASTO */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold" style={{ color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
+                {formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}
+              </h2>
+              <button onClick={() => { toast.success('Operación cancelada'); setShowForm(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">¿Cuánto?</label>
+                <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" required autoFocus className="w-full p-3 text-2xl font-bold border-2 border-gray-200 rounded-lg box-border text-right" />
+              </div>
+
+              {formType === 'INCOME' && (
+                <div className="mb-4">
+                  <label className="block mb-2 font-semibold text-gray-700 text-sm">Alicuota de IVA</label>
+                  <div className="flex gap-2">
+                    {ALICUOTAS_IVA.map(alic => (
+                      <button
+                        key={alic.value}
+                        type="button"
+                        onClick={() => setSelectedAliquot(alic.value)}
+                        className={`flex-1 p-2 border rounded-md text-sm cursor-pointer ${selectedAliquot === alic.value ? 'border-2 border-green-600 bg-green-50 font-bold' : 'border border-gray-200 bg-white font-medium'}`}
+                      >
+                        {alic.label}
+                      </button>
+                    ))}
+                  </div>
+                  {amount > 0 && selectedAliquot > 0 && (
+                    <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded-md">
+                      Desglose: Neto {formatCurrency(parseFloat(amount) / (1 + (selectedAliquot/100)))} + IVA {formatCurrency(parseFloat(amount) - (parseFloat(amount) / (1 + (selectedAliquot/100))))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">Concepto (opcional)</label>
+                {!showCustomConcept ? (
+                  <>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {conceptosList.map(concepto => (
+                        <button key={concepto} type="button" onClick={() => setSelectedConcept(concepto)} className={`px-3 py-2 rounded-md text-xs cursor-pointer ${selectedConcept === concepto ? (formType === 'INCOME' ? 'bg-green-100 border-2 border-green-600 font-bold' : 'bg-red-100 border-2 border-red-600 font-bold') : 'bg-gray-100 border border-gray-200 font-medium'} text-gray-900`}>{concepto}</button>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setShowCustomConcept(true)} className="text-xs text-blue-500 bg-none border-none cursor-pointer p-0">+ Escribir otro concepto</button>
+                  </>
+                ) : (
+                  <>
+                    <input type="text" value={customConcept} onChange={e => setCustomConcept(e.target.value)} placeholder="Escribí el concepto..." className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border" />
+                    <button type="button" onClick={() => { setShowCustomConcept(false); setCustomConcept('') }} className="text-xs text-blue-500 bg-none border-none cursor-pointer pt-2">← Volver a la lista</button>
+                  </>
+                )}
+              </div>
+
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="font-semibold text-gray-700 text-sm">Medio de pago *</label>
+                  {!showQuickAddMethod && paymentMethods.length > 0 && (
+                    <button 
+                      type="button"
+                      onClick={() => setShowQuickAddMethod(true)}
+                      className="text-xs text-blue-500 bg-none border-none cursor-pointer font-semibold"
+                    >
+                      + Nuevo
+                    </button>
+                  )}
+                </div>
+
+                {!showQuickAddMethod ? (
+                  paymentMethods.length === 0 ? (
+                    <div className="p-4 bg-amber-100 rounded-md text-amber-900 text-sm text-center">
+                      <div className="mb-2">No hay medios de pago configurados</div>
+                      <button type="button" onClick={() => setShowQuickAddMethod(true)} className="text-amber-900 font-bold underline bg-none border-none cursor-pointer">+ Crear medio de pago</button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {paymentMethods.map(method => {
+                        const subcat = method.subcategorias_pago
+                        const cat = subcat?.categorias_pago
+                        const isSelected = selectedMethod === method.id
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setSelectedMethod(method.id)}
+                            className={`p-4 rounded-lg cursor-pointer text-left flex flex-col gap-1 ${isSelected ? (formType === 'INCOME' ? 'border-[3px] border-green-600 bg-green-50' : 'border-[3px] border-red-600 bg-red-50') : 'border-2 border-gray-200 bg-white'}`}
+                          >
+                            <div className="font-bold text-sm text-gray-900">
+                              {cat?.icono || ''} {method.nombre || subcat?.nombre || 'Medio'}
+                            </div>
+                            {method.banco_emisor && (
+                              <div className="text-xs text-gray-500">{method.banco_emisor}</div>
+                            )}
+                            {isSelected && (
+                              <div className={`text-xs font-bold mt-1 ${formType === 'INCOME' ? 'text-green-700' : 'text-red-600'}`}>
+                                ✓ Seleccionado
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="m-0 mb-4 text-sm font-bold text-gray-900">Nuevo medio de pago</h4>
+                    <div className="flex flex-col gap-3">
+                      
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-500">Medio de pago *</label>
+                        {!showNewCategoryQuick ? (
+                          <select 
+                            value={quickMethodCategory} 
+                            onChange={e => {
+                              if (e.target.value === 'NEW') {
+                                setShowNewCategoryQuick(true)
+                                setQuickMethodCategory('')
+                              } else {
+                                setQuickMethodCategory(e.target.value)
+                                setQuickMethodSubcategory('')
+                              }
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm bg-white"
+                          >
+                            <option value="">Seleccionar...</option>
+                            {categories.map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                            ))}
+                            <option value="NEW">+ Nuevo medio de pago</option>
+                          </select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              value={newCategoryQuickName}
+                              onChange={e => setNewCategoryQuickName(e.target.value)}
+                              placeholder="Nombre (ej: Cripto)"
+                              className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
+                            />
+                            <button 
+                              type="button"
+                              onClick={async () => {
+                                if (!newCategoryQuickName.trim()) {
+                                  toast.error('Ingresá un nombre')
+                                  return
+                                }
+                                try {
+                                  const { data, error } = await supabase.from('categorias_pago').insert([{ 
+                                    nombre: newCategoryQuickName.trim(), 
+                                    icono: '💳',
+                                    orden: 99,
+                                    activo: true
+                                  }]).select().single()
+                                  if (error) throw error
+                                  setCategories([...categories, data])
+                                  setQuickMethodCategory(data.id)
+                                  setShowNewCategoryQuick(false)
+                                  setNewCategoryQuickName('')
+                                } catch (err) {
+                                  toast.error('Error: ' + err.message)
+                                }
+                              }}
+                              className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm"
+                            >
+                              Guardar
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => { setShowNewCategoryQuick(false); setNewCategoryQuickName(''); }}
+                              className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {quickMethodCategory && (
+                        <div>
+                          <label className="block mb-1 text-xs font-semibold text-gray-500">Operador</label>
+                          {!showNewOperatorQuick ? (
+                            <select 
+                              value={quickMethodSubcategory} 
+                              onChange={e => {
+                                if (e.target.value === 'NEW') {
+                                  setShowNewOperatorQuick(true)
+                                  setQuickMethodSubcategory('')
+                                } else {
+                                  setQuickMethodSubcategory(e.target.value)
+                                }
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="">Seleccionar...</option>
+                              {filteredSubcategories.map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.nombre}</option>
+                              ))}
+                              <option value="NEW">+ Nuevo operador</option>
+                            </select>
+                          ) : (
+                            <div className="flex gap-2">
+                              <input 
+                                type="text"
+                                value={newOperatorQuickName}
+                                onChange={e => setNewOperatorQuickName(e.target.value)}
+                                placeholder="Nombre (ej: Naranja X)"
+                                className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
+                              />
+                              <button 
+                                type="button"
+                                onClick={async () => {
+                                  if (!newOperatorQuickName.trim()) {
+                                    toast.error('Ingresá un nombre')
+                                    return
+                                  }
+                                  try {
+                                    const { data, error } = await supabase.from('subcategorias_pago').insert([{ 
+                                      categoria_id: quickMethodCategory,
+                                      nombre: newOperatorQuickName.trim(),
+                                      activo: true
+                                    }]).select().single()
+                                    if (error) throw error
+                                    setSubcategories([...subcategories, data])
+                                    setQuickMethodSubcategory(data.id)
+                                    setShowNewOperatorQuick(false)
+                                    setNewOperatorQuickName('')
+                                  } catch (err) {
+                                    toast.error('Error: ' + err.message)
+                                  }
+                                }}
+                                className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm"
+                              >
+                                Guardar
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => { setShowNewOperatorQuick(false); setNewOperatorQuickName(''); }}
+                                className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {quickMethodSubcategory && (
+                        <div>
+                          <label className="block mb-1 text-xs font-semibold text-gray-500">Banco Emisor</label>
+                          {!showNewBancoQuick ? (
+                            <select 
+                              value={quickMethodBanco} 
+                              onChange={e => {
+                                if (e.target.value === 'NEW') {
+                                  setShowNewBancoQuick(true)
+                                  setQuickMethodBanco('')
+                                } else {
+                                  setQuickMethodBanco(e.target.value)
+                                }
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="">Seleccionar banco...</option>
+                              {BANCOS_ARGENTINA.map(banco => (
+                                <option key={banco} value={banco}>{banco}</option>
+                              ))}
+                              <option value="NEW">+ Otro banco</option>
+                            </select>
+                          ) : (
+                            <div className="flex gap-2">
+                              <input 
+                                type="text"
+                                value={newBancoQuickName}
+                                onChange={e => setNewBancoQuickName(e.target.value)}
+                                placeholder="Nombre del banco"
+                                className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setQuickMethodBanco(newBancoQuickName)
+                                  setShowNewBancoQuick(false)
+                                  setNewBancoQuickName('')
+                                }}
+                                className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm"
+                              >
+                                Guardar
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName(''); }}
+                                className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {quickMethodBanco && (
+                        <>
+                          <label className="flex items-center gap-2 text-sm">
+                            <input 
+                              type="checkbox" 
+                              checked={quickMethodHasCommission} 
+                              onChange={e => setQuickMethodHasCommission(e.target.checked)} 
+                            />
+                            ¿Tiene comisión (%)?
+                          </label>
+
+                          {quickMethodHasCommission && (
+                            <div>
+                              <label className="block mb-1 text-xs text-gray-500">Porcentaje (%)</label>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                min="0" 
+                                max="100"
+                                value={quickMethodCommissionPct} 
+                                onChange={e => setQuickMethodCommissionPct(e.target.value)} 
+                                placeholder="2.5"
+                                className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                              />
+                            </div>
+                          )}
+
+                          <div className="mt-2">
+                            <label className="block mb-1 text-xs font-semibold text-gray-500">Se acredita en</label>
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="number" 
+                                min="0" 
+                                max="60"
+                                value={quickMethodDiasAcreditacion} 
+                                onChange={e => setQuickMethodDiasAcreditacion(e.target.value)} 
+                                className="w-20 p-2 border border-gray-300 rounded-md text-sm text-center"
+                              />
+                              <span className="text-xs text-gray-500">días</span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 mt-3">
+                            <button 
+                              type="button" 
+                              onClick={() => { 
+                                setShowQuickAddMethod(false)
+                                setQuickMethodCategory('')
+                                setQuickMethodSubcategory('')
+                                setQuickMethodBanco('')
+                                setQuickMethodHasCommission(false)
+                                setQuickMethodCommissionPct('')
+                                setQuickMethodDiasAcreditacion('0')
+                                setShowNewCategoryQuick(false)
+                                setShowNewOperatorQuick(false)
+                                setShowNewBancoQuick(false)
+                                setNewCategoryQuickName('')
+                                setNewOperatorQuickName('')
+                                setNewBancoQuickName('')
+                              }}
+                              className="flex-1 p-2 bg-gray-100 border border-gray-300 rounded-md text-sm cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={async () => {
+                                if (!quickMethodCategory) {
+                                  toast.error('Seleccioná un medio de pago')
+                                  return
+                                }
+                                if (!quickMethodSubcategory) {
+                                  toast.error('Seleccioná un operador')
+                                  return
+                                }
+                                try {
+                                  setCreating(true)
+                                  
+                                  const comisionType = quickMethodHasCommission ? 'PORCENTAJE' : 'NINGUNA'
+                                  const comisionValue = quickMethodHasCommission ? (parseFloat(quickMethodCommissionPct) || 0) : 0
+                                  
+                                  const categoryName = categories.find(c => c.id === quickMethodCategory)?.nombre || ''
+                                  const operatorName = subcategories.find(s => s.id === quickMethodSubcategory)?.nombre || ''
+                                  const generatedName = `${categoryName} - ${operatorName}${quickMethodBanco ? ' (' + quickMethodBanco + ')' : ''}`
+                                  
+                                  const { data: newMethod, error: methodErr } = await supabase.from('medios_pago').insert([{
+                                    local_id: activeLocalId,
+                                    nombre: generatedName,
+                                    subcategoria_id: quickMethodSubcategory,
+                                    banco_emisor: quickMethodBanco || null,
+                                    tipo_comision: comisionType,
+                                    valor_comision: comisionValue,
+                                    monto_fijo_comision: 0,
+                                    dias_acreditacion: parseInt(quickMethodDiasAcreditacion) || 0,
+                                    activo: true
+                                  }]).select(`*, subcategorias_pago(id, nombre, categorias_pago(id, nombre, icono))`).single()
+
+                                  if (methodErr) throw methodErr
+
+                                  setPaymentMethods([...paymentMethods, newMethod])
+                                  setSelectedMethod(newMethod.id)
+                                  setShowQuickAddMethod(false)
+                                  
+                                  setQuickMethodCategory('')
+                                  setQuickMethodSubcategory('')
+                                  setQuickMethodBanco('')
+                                  setQuickMethodHasCommission(false)
+                                  setQuickMethodCommissionPct('')
+                                  setQuickMethodDiasAcreditacion('0')
+                                  setShowNewCategoryQuick(false)
+                                  setShowNewOperatorQuick(false)
+                                  setShowNewBancoQuick(false)
+                                  setNewCategoryQuickName('')
+                                  setNewOperatorQuickName('')
+                                  setNewBancoQuickName('')
+                                } catch (err) {
+                                  toast.error('Error al crear medio de pago: ' + err.message)
+                                } finally {
+                                  setCreating(false)
+                                }
+                              }}
+                              className="flex-1 p-2 bg-emerald-500 text-white border-none rounded-md text-sm font-semibold cursor-pointer"
+                            >
+                              Guardar y usar
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button type="submit" disabled={creating || !selectedMethod} className={`w-full p-4 border-none rounded-lg text-base font-bold cursor-pointer ${formType === 'INCOME' ? 'bg-green-600' : 'bg-red-600'} text-white ${(!selectedMethod || creating) ? 'opacity-50' : ''}`}>
+                {creating ? 'Guardando...' : !selectedMethod ? 'Seleccioná un medio de pago' : 'Confirmar'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <BottomNav activeTab="caja" />
+    </main>
   )
 }

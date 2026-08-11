@@ -36,11 +36,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main.js",
       "static/chunks/pages/locales.js"
-    ],
-    "/reportes": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/reportes.js"
     ]
   },
   "ampFirstPages": []

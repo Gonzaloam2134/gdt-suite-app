@@ -2,8 +2,7 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/dashboard": "pages/dashboard.js",
-  "/reportes": "pages/reportes.js",
+  "/": "pages/index.js",
   "/locales": "pages/locales.js",
-  "/": "pages/index.js"
+  "/dashboard": "pages/dashboard.js"
 }

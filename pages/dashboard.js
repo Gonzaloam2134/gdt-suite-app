@@ -47,7 +47,6 @@ export default function CajaDelDia() {
   const [lastShiftBalance, setLastShiftBalance] = useState(0)
   const [differenceReason, setDifferenceReason] = useState('')
   const [isAmountModified, setIsAmountModified] = useState(false)
-  
   const [creating, setCreating] = useState(false)
 
   const [showQuickAddMethod, setShowQuickAddMethod] = useState(false)
@@ -232,7 +231,7 @@ export default function CajaDelDia() {
         cashPointId = newCP.id
       }
 
-      const { data: shift, error } = await supabase
+      const { error } = await supabase
         .from('turnos')
         .insert([{
           local_id: activeLocalId,
@@ -338,7 +337,7 @@ export default function CajaDelDia() {
       }])
 
       if (error) throw error
-      toast.success(`${isIncome ? '💰 Cobro' : ' Gasto'} registrado correctamente`)
+      toast.success(`${isIncome ? '💰 Cobro' : '💸 Gasto'} registrado correctamente`)
       setShowForm(false)
       loadData(user.id)
     } catch (err) { 
@@ -350,112 +349,113 @@ export default function CajaDelDia() {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', fontSize: '14px' }}>Cargando...</div>
+  if (loading) return <div className="p-8 text-center text-sm">Cargando...</div>
 
   const conceptosList = formType === 'INCOME' ? CONCEPTOS_INGRESO : CONCEPTOS_GASTO
   const filteredSubcategories = subcategories.filter(s => s.categoria_id === quickMethodCategory)
 
   return (
-    <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '70px' }}>
-      <header style={{ backgroundColor: '#ffffff', padding: '1rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '600px', margin: '0 auto' }}>
+    <main className="p-0 font-sans bg-slate-100 min-h-screen pb-[70px]">
+      {/* HEADER */}
+      <header className="bg-white p-4 border-b border-gray-200 sticky top-0 z-10">
+        <div className="flex justify-between items-center max-w-2xl mx-auto">
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.125rem', color: '#0f172a', fontWeight: '700' }}>{businessName}</h1>
-            <p style={{ margin: '0.125rem 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+            <h1 className="m-0 text-lg text-gray-900 font-bold">{businessName}</h1>
+            <p className="mt-0.5 text-xs text-gray-500">
               {activeShift ? `Turno activo • ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            <button onClick={() => router.push('/reportes')} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Reportes</button>
-            <button onClick={handleSignOut} style={{ padding: '6px 10px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem' }}>Salir</button>
+          <div className="flex gap-1">
+            <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Reportes</button>
+            <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
           </div>
         </div>
       </header>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
+      <div className="max-w-2xl mx-auto p-4">
         {!activeShift ? (
-          <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #cbd5e1', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔒</div>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1rem' }}>Caja Cerrada</h3>
-            <p style={{ margin: '0 0 1rem 0', color: '#64748b', fontSize: '0.875rem' }}>Abrí la caja para empezar a operar</p>
+          <div className="text-center p-8 bg-white rounded-xl border-2 border-dashed border-gray-300 mb-4">
+            <div className="text-5xl mb-2">🔒</div>
+            <h3 className="m-0 mb-2 text-gray-900 text-base">Caja Cerrada</h3>
+            <p className="m-0 mb-4 text-gray-500 text-sm">Abrí la caja para empezar a operar</p>
             <button 
               onClick={() => setShowOpenShift(true)}
-              style={{ padding: '0.75rem 1.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer' }}
+              className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer"
             >
               Abrir Caja
             </button>
           </div>
         ) : (
           <>
-            {/* RESUMEN CONTABLE */}
-            <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
-              <h2 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}> Resumen del Turno</h2>
+            {/* RESUMEN DEL TURNO */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
+              <h2 className="m-0 mb-3 text-base text-gray-900 font-bold">📊 Resumen del Turno</h2>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-                <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '8px', border: '2px solid #16a34a' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', marginBottom: '0.25rem' }}>✅ DISPONIBLE HOY</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#15803d' }}>{formatCurrency(totalAvailable)}</div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-green-50 p-3 rounded-lg border-2 border-green-600">
+                  <div className="text-xs text-green-800 font-bold mb-1">✅ DISPONIBLE HOY</div>
+                  <div className="text-xl font-extrabold text-green-700">{formatCurrency(totalAvailable)}</div>
                   {totalAcreditacionesHoy > 0 && (
-                    <div style={{ fontSize: '0.65rem', color: '#16a34a', marginTop: '0.25rem' }}>
+                    <div className="text-xs text-green-700 mt-1">
                       (+{formatCurrency(totalAcreditacionesHoy)} acreditan hoy)
                     </div>
                   )}
                 </div>
-                <div style={{ backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '8px', border: '2px solid #d97706' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: '700', marginBottom: '0.25rem' }}>⏳ EN TRÁNSITO</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#d97706' }}>{formatCurrency(totalInTransit)}</div>
+                <div className="bg-amber-50 p-3 rounded-lg border-2 border-amber-600">
+                  <div className="text-xs text-amber-700 font-bold mb-1">⏳ EN TRÁNSITO</div>
+                  <div className="text-xl font-extrabold text-amber-600">{formatCurrency(totalInTransit)}</div>
                 </div>
               </div>
 
               {totalIVACobrado > 0 && (
-                <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#1e40af', fontWeight: '700' }}>🏛️ IVA RECAUDADO (Débito Fiscal)</div>
-                  <div style={{ fontSize: '1.125rem', fontWeight: '800', color: '#1d4ed8' }}>{formatCurrency(totalIVACobrado)}</div>
-                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Listo para declaración jurada</div>
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                  <div className="text-xs text-blue-800 font-bold">🏛️ IVA RECAUDADO (Débito Fiscal)</div>
+                  <div className="text-lg font-extrabold text-blue-700">{formatCurrency(totalIVACobrado)}</div>
+                  <div className="text-xs text-gray-500">Listo para declaración jurada</div>
                 </div>
               )}
 
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Total Cobrado:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#15803d' }}>{formatCurrency(totalIncome)}</span>
+              <div className="border-t border-gray-200 pt-3 mb-3">
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Total Cobrado:</span>
+                  <span className="text-sm font-bold text-green-700">{formatCurrency(totalIncome)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Comisiones:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#dc2626' }}>-{formatCurrency(totalCommissions)}</span>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Comisiones:</span>
+                  <span className="text-sm font-bold text-red-600">-{formatCurrency(totalCommissions)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Gastos:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#dc2626' }}>-{formatCurrency(totalExpenses)}</span>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Gastos:</span>
+                  <span className="text-sm font-bold text-red-600">-{formatCurrency(totalExpenses)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '2px solid #0f172a' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>SALDO NETO:</span>
-                  <span style={{ fontSize: '1rem', fontWeight: '800', color: totalNet >= 0 ? '#15803d' : '#b91c1c' }}>{formatCurrency(totalNet)}</span>
+                <div className="flex justify-between pt-2 border-t-2 border-gray-900">
+                  <span className="text-sm font-bold text-gray-900">SALDO NETO:</span>
+                  <span className={`text-base font-extrabold ${totalNet >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(totalNet)}</span>
                 </div>
               </div>
 
               {balanceByMethod.length > 0 && (
-                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.5rem' }}>Desglose por medio de pago:</div>
-                  {balanceByMethod.map(({ method, income, commissions, expenses, netBalance, inTransit }) => {
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="text-xs text-gray-500 font-semibold mb-2">Desglose por medio de pago:</div>
+                  {balanceByMethod.map(({ method, netBalance, inTransit }) => {
                     const subcat = method.subcategorias_pago
                     const cat = subcat?.categorias_pago
                     return (
-                      <div key={method.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <div key={method.id} className="flex justify-between items-center py-2 border-b border-gray-100">
                         <div>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0f172a' }}>
+                          <div className="text-sm font-semibold text-gray-900">
                             {cat?.icono || ''} {method.nombre || subcat?.nombre}
                           </div>
                           {method.banco_emisor && (
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{method.banco_emisor}</div>
+                            <div className="text-xs text-gray-500">{method.banco_emisor}</div>
                           )}
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '700', color: netBalance >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <div className="text-right">
+                          <div className={`text-sm font-bold ${netBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                             {formatCurrency(netBalance)}
                           </div>
                           {inTransit > 0 && (
-                            <div style={{ fontSize: '0.65rem', color: '#d97706' }}>
+                            <div className="text-xs text-amber-600">
                               ({formatCurrency(inTransit)} en tránsito)
                             </div>
                           )}
@@ -469,69 +469,46 @@ export default function CajaDelDia() {
 
             {/* ACREDITACIONES DEL DÍA */}
             {Object.keys(acreditacionesAgrupadas).length > 0 && (
-              <div style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '10px', border: '2px solid #16a34a', marginBottom: '1rem' }}>
-                <h2 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#166534', fontWeight: '700' }}>
-                  📥 Acreditaciones de hoy
-                </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="bg-green-50 p-4 rounded-xl border-2 border-green-600 mb-4">
+                <h2 className="m-0 mb-3 text-base text-green-800 font-bold">📥 Acreditaciones de hoy</h2>
+                <div className="flex flex-col gap-2">
                   {Object.entries(acreditacionesAgrupadas).map(([methodId, group]) => {
                     const isExpanded = expandedAccreditation === methodId
                     return (
-                      <div key={methodId} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #bbf7d0', overflow: 'hidden' }}>
+                      <div key={methodId} className="bg-white rounded-lg border border-green-200 overflow-hidden">
                         <div 
                           onClick={() => setExpandedAccreditation(isExpanded ? null : methodId)}
-                          style={{ 
-                            padding: '0.75rem', 
-                            cursor: 'pointer', 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center' 
-                          }}
+                          className="p-3 cursor-pointer flex justify-between items-center"
                         >
                           <div>
-                            <div style={{ fontWeight: '700', fontSize: '0.875rem', color: '#0f172a' }}>
-                              {group.methodName}
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                            <div className="font-bold text-sm text-gray-900">{group.methodName}</div>
+                            <div className="text-xs text-gray-500">
                               {group.transacciones.length} venta{group.transacciones.length > 1 ? 's' : ''} anterior{group.transacciones.length > 1 ? 'es' : ''}
                             </div>
                           </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '1rem', fontWeight: '800', color: '#15803d' }}>
-                              {formatCurrency(group.total)}
-                            </div>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
-                              {isExpanded ? '▼ Ocultar' : '▶ Ver detalle'}
-                            </div>
+                          <div className="text-right">
+                            <div className="text-base font-extrabold text-green-700">{formatCurrency(group.total)}</div>
+                            <div className="text-xs text-gray-500">{isExpanded ? '▼ Ocultar' : '▶ Ver detalle'}</div>
                           </div>
                         </div>
                         {isExpanded && (
-                          <div style={{ padding: '0.75rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#fafafa' }}>
+                          <div className="p-3 border-t border-gray-200 bg-gray-50">
                             {group.transacciones.map(t => {
                               const createdDate = new Date(t.creado_en)
                               return (
-                                <div key={t.id} style={{ 
-                                  padding: '0.5rem', 
-                                  marginBottom: '0.5rem', 
-                                  backgroundColor: 'white', 
-                                  borderRadius: '6px', 
-                                  border: '1px solid #e2e8f0',
-                                  fontSize: '0.75rem'
-                                }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                    <span style={{ color: '#64748b' }}>
+                                <div key={t.id} className="p-2 mb-2 bg-white rounded-md border border-gray-200 text-xs">
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-gray-500">
                                        {createdDate.toLocaleDateString('es-AR')} {createdDate.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
                                     </span>
-                                    <span style={{ fontWeight: '700', color: '#15803d' }}>
-                                      {formatCurrency(t.net)}
-                                    </span>
+                                    <span className="font-bold text-green-700">{formatCurrency(t.net)}</span>
                                   </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                                    <span style={{ color: '#64748b' }}>
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-500">
                                       {t.descripcion} • {formatCurrency(t.monto)} bruto
                                     </span>
                                     {t.comision_monto > 0 && (
-                                      <span style={{ color: '#dc2626' }}>
+                                      <span className="text-red-600">
                                         -{formatCurrency(t.comision_monto)} comisión
                                       </span>
                                     )}
@@ -548,28 +525,30 @@ export default function CajaDelDia() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-              <button onClick={() => handleOpenForm('INCOME')} style={{ padding: '1rem', backgroundColor: '#86efac', color: '#14532d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>💰</span> COBRO
+            {/* BOTONES COBRO / GASTO */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button onClick={() => handleOpenForm('INCOME')} className="p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1">
+                <span className="text-2xl">💰</span> COBRO
               </button>
-              <button onClick={() => handleOpenForm('EXPENSE')} style={{ padding: '1rem', backgroundColor: '#fca5a5', color: '#7f1d1d', border: 'none', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '700', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>💸</span> GASTO
+              <button onClick={() => handleOpenForm('EXPENSE')} className="p-4 bg-red-200 text-red-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1">
+                <span className="text-2xl">💸</span> GASTO
               </button>
             </div>
 
-            <button onClick={() => setShowCloseShift(true)} style={{ width: '100%', padding: '0.75rem', backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', marginBottom: '1rem' }}>
+            <button onClick={() => setShowCloseShift(true)} className="w-full p-3 bg-gray-100 text-gray-500 border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer mb-4">
               Cerrar Caja
             </button>
           </>
         )}
 
+        {/* MOVIMIENTOS */}
         {activeShift && (
           <>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#334155', marginBottom: '0.75rem' }}>Movimientos del Turno</h3>
+            <h3 className="text-sm font-bold text-slate-700 mb-3">Movimientos del Turno</h3>
             {movements.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Sin movimientos en este turno</div>
+              <div className="text-center p-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300 text-sm mb-6">Sin movimientos en este turno</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <div className="flex flex-col gap-2 mb-6">
                 {movements.map(m => {
                   const isIncome = m.tipo === 'COBRO_RECIBIDO'
                   const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
@@ -581,21 +560,21 @@ export default function CajaDelDia() {
                   const isInTransit = isIncome && accreditationDate > hoyStr
                   
                   return (
-                    <div key={m.id} style={{ backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                            {isIncome ? '' : '📤'}
+                    <div key={m.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
+                            {isIncome ? '📥' : '📤'}
                           </div>
                           <div>
-                            <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            <div className="font-semibold text-gray-900 text-sm">{m.descripcion}</div>
+                            <div className="text-xs text-gray-500">
                               {new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} • {cat?.icono || ''} {subcat?.nombre || 'Efectivo'}
                             </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: isIncome ? '#15803d' : '#b91c1c' }}>
+                        <div className="text-right">
+                          <div className={`font-bold text-sm ${isIncome ? 'text-green-700' : 'text-red-700'}`}>
                             {isIncome ? '+' : '-'}{formatCurrency(m.monto)}
                           </div>
                         </div>
@@ -603,27 +582,27 @@ export default function CajaDelDia() {
                       {isIncome ? (
                         <>
                           {commission > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.75rem' }}>
-                              <div style={{ color: '#64748b' }}>Comisión:</div>
-                              <div style={{ color: '#dc2626', fontWeight: '600' }}>-{formatCurrency(commission)}</div>
+                            <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 text-xs">
+                              <div className="text-gray-500">Comisión:</div>
+                              <div className="text-red-600 font-semibold">-{formatCurrency(commission)}</div>
                             </div>
                           )}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
-                            <div style={{ color: '#059669', fontWeight: '600' }}>Neto:</div>
-                            <div style={{ color: '#059669', fontWeight: '700' }}>{formatCurrency(net)}</div>
+                          <div className="flex justify-between items-center pt-1 text-xs">
+                            <div className="text-green-700 font-semibold">Neto:</div>
+                            <div className="text-green-700 font-bold">{formatCurrency(net)}</div>
                           </div>
                           {isInTransit && (
-                            <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#fffbeb', borderRadius: '6px', border: '1px solid #fcd34d' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>
+                            <div className="mt-2 p-2 bg-amber-50 rounded-md border border-amber-300">
+                              <div className="text-xs text-amber-700 font-semibold">
                                 ⏳ Se acredita el: {new Date(accreditationDate + 'T12:00:00').toLocaleDateString('es-AR')}
                               </div>
                             </div>
                           )}
                         </>
                       ) : (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', fontSize: '0.75rem' }}>
-                          <div style={{ color: '#b91c1c', fontWeight: '600' }}>Gasto:</div>
-                          <div style={{ color: '#b91c1c', fontWeight: '700' }}>-{formatCurrency(m.monto)}</div>
+                        <div className="flex justify-between items-center pt-1 text-xs">
+                          <div className="text-red-700 font-semibold">Gasto:</div>
+                          <div className="text-red-700 font-bold">-{formatCurrency(m.monto)}</div>
                         </div>
                       )}
                     </div>
@@ -635,40 +614,40 @@ export default function CajaDelDia() {
         )}
       </div>
 
-      {/* MODAL APERTURA DE CAJA */}
+      {/* MODAL APERTURA */}
       {showOpenShift && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Abrir Caja</h2>
-              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold text-gray-900"> Abrir Caja</h2>
+              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500"></button>
             </div>
             <form onSubmit={handleOpenShift}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Monto inicial en caja</label>
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">Monto inicial en caja</label>
                 {lastShiftBalance > 0 && (
-                  <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '0.875rem', color: '#1e40af' }}>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3 text-sm text-blue-800">
                     💡 <strong>Sugerencia:</strong> El último cierre fue de <strong>{formatCurrency(lastShiftBalance)}</strong>.
                   </div>
                 )}
                 <input 
                   type="number" step="0.01" min="0" value={openingAmount} onChange={handleOpeningAmountChange} 
                   placeholder="0.00" required autoFocus
-                  style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: isAmountModified ? '2px solid #f59e0b' : '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right', backgroundColor: isAmountModified ? '#fffbeb' : 'white' }}
+                  className={`w-full p-3 text-2xl font-bold border-2 rounded-lg box-border text-right ${isAmountModified ? 'border-amber-500 bg-amber-50' : 'border-gray-200 bg-white'}`}
                 />
                 {isAmountModified && (
-                  <div style={{ marginTop: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#b45309', fontSize: '0.875rem' }}>⚠️ Motivo de la diferencia (Obligatorio)</label>
+                  <div className="mt-4">
+                    <label className="block mb-2 font-bold text-amber-700 text-sm">⚠️ Motivo de la diferencia (Obligatorio)</label>
                     <textarea 
                       value={differenceReason} onChange={(e) => setDifferenceReason(e.target.value)}
                       placeholder="Ej: Saqué $2000 para pagar el flete, faltante de caja, etc."
                       required rows="3"
-                      style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #f59e0b', borderRadius: '8px', boxSizing: 'border-box', resize: 'vertical' }}
+                      className="w-full p-3 text-base border-2 border-amber-500 rounded-lg box-border resize-vertical"
                     />
                   </div>
                 )}
               </div>
-              <button type="submit" disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
+              <button type="submit" disabled={creating} className="w-full p-4 bg-blue-500 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50">
                 {creating ? 'Abriendo...' : 'Confirmar Apertura'}
               </button>
             </form>
@@ -676,32 +655,30 @@ export default function CajaDelDia() {
         </div>
       )}
 
-      {/* MODAL CIERRE DE CAJA */}
+      {/* MODAL CIERRE */}
       {showCloseShift && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
-              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold text-gray-900">🔒 Cerrar Caja</h2>
+              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
             </div>
-            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
-                <strong>Resumen del turno:</strong>
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <div className="text-sm text-gray-500 mb-2"><strong>Resumen del turno:</strong></div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm">Disponible hoy:</span>
+                <span className="font-semibold text-green-700">{formatCurrency(totalAvailable)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem' }}>Disponible hoy:</span>
-                <span style={{ fontWeight: '600', color: '#15803d' }}>{formatCurrency(totalAvailable)}</span>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm">En tránsito:</span>
+                <span className="font-semibold text-amber-600">{formatCurrency(totalInTransit)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem' }}>En tránsito:</span>
-                <span style={{ fontWeight: '600', color: '#d97706' }}>{formatCurrency(totalInTransit)}</span>
-              </div>
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '700' }}>Saldo neto:</span>
-                <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>{formatCurrency(totalNet)}</span>
+              <div className="border-t border-gray-200 pt-2 flex justify-between">
+                <span className="text-sm font-bold">Saldo neto:</span>
+                <span className="font-bold text-lg">{formatCurrency(totalNet)}</span>
               </div>
             </div>
-            <button onClick={handleCloseShift} disabled={creating} style={{ width: '100%', padding: '1rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer' }}>
+            <button onClick={handleCloseShift} disabled={creating} className="w-full p-4 bg-red-600 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50">
               {creating ? 'Cerrando...' : 'Confirmar Cierre'}
             </button>
           </div>
@@ -710,94 +687,79 @@ export default function CajaDelDia() {
 
       {/* MODAL COBRO/GASTO */}
       {showForm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold" style={{ color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
                 {formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}
               </h2>
-              <button onClick={() => { toast.success('Operación cancelada'); setShowForm(false); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <button onClick={() => { toast.success('Operación cancelada'); setShowForm(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
             </div>
 
             <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>¿Cuánto?</label>
-                <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" required autoFocus style={{ width: '100%', padding: '0.75rem', fontSize: '1.5rem', fontWeight: '700', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', textAlign: 'right' }} />
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">¿Cuánto?</label>
+                <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" required autoFocus className="w-full p-3 text-2xl font-bold border-2 border-gray-200 rounded-lg box-border text-right" />
               </div>
 
               {formType === 'INCOME' && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Alicuota de IVA</label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="mb-4">
+                  <label className="block mb-2 font-semibold text-gray-700 text-sm">Alicuota de IVA</label>
+                  <div className="flex gap-2">
                     {ALICUOTAS_IVA.map(alic => (
                       <button
                         key={alic.value}
                         type="button"
                         onClick={() => setSelectedAliquot(alic.value)}
-                        style={{
-                          flex: 1,
-                          padding: '0.5rem',
-                          border: selectedAliquot === alic.value ? '2px solid #16a34a' : '1px solid #e2e8f0',
-                          borderRadius: '6px',
-                          backgroundColor: selectedAliquot === alic.value ? '#f0fdf4' : 'white',
-                          fontWeight: selectedAliquot === alic.value ? '700' : '500',
-                          fontSize: '0.875rem',
-                          cursor: 'pointer'
-                        }}
+                        className={`flex-1 p-2 border rounded-md text-sm cursor-pointer ${selectedAliquot === alic.value ? 'border-2 border-green-600 bg-green-50 font-bold' : 'border border-gray-200 bg-white font-medium'}`}
                       >
                         {alic.label}
                       </button>
                     ))}
                   </div>
                   {amount > 0 && selectedAliquot > 0 && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '6px' }}>
+                    <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded-md">
                       Desglose: Neto {formatCurrency(parseFloat(amount) / (1 + (selectedAliquot/100)))} + IVA {formatCurrency(parseFloat(amount) - (parseFloat(amount) / (1 + (selectedAliquot/100))))}
                     </div>
                   )}
                 </div>
               )}
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Concepto (opcional)</label>
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">Concepto (opcional)</label>
                 {!showCustomConcept ? (
                   <>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div className="flex flex-wrap gap-2 mb-2">
                       {conceptosList.map(concepto => (
-                        <button key={concepto} type="button" onClick={() => setSelectedConcept(concepto)} style={{ padding: '0.5rem 0.75rem', backgroundColor: selectedConcept === concepto ? (formType === 'INCOME' ? '#dcfce7' : '#fee2e2') : '#f1f5f9', border: selectedConcept === concepto ? `2px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.75rem', fontWeight: selectedConcept === concepto ? '700' : '500', color: '#0f172a', cursor: 'pointer' }}>{concepto}</button>
+                        <button key={concepto} type="button" onClick={() => setSelectedConcept(concepto)} className={`px-3 py-2 rounded-md text-xs cursor-pointer ${selectedConcept === concepto ? (formType === 'INCOME' ? 'bg-green-100 border-2 border-green-600 font-bold' : 'bg-red-100 border-2 border-red-600 font-bold') : 'bg-gray-100 border border-gray-200 font-medium'} text-gray-900`}>{concepto}</button>
                       ))}
                     </div>
-                    <button type="button" onClick={() => setShowCustomConcept(true)} style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>+ Escribir otro concepto</button>
+                    <button type="button" onClick={() => setShowCustomConcept(true)} className="text-xs text-blue-500 bg-none border-none cursor-pointer p-0">+ Escribir otro concepto</button>
                   </>
                 ) : (
                   <>
-                    <input type="text" value={customConcept} onChange={e => setCustomConcept(e.target.value)} placeholder="Escribí el concepto..." style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '2px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box' }} />
-                    <button type="button" onClick={() => { setShowCustomConcept(false); setCustomConcept('') }} style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0 0 0' }}>← Volver a la lista</button>
+                    <input type="text" value={customConcept} onChange={e => setCustomConcept(e.target.value)} placeholder="Escribí el concepto..." className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border" />
+                    <button type="button" onClick={() => { setShowCustomConcept(false); setCustomConcept('') }} className="text-xs text-blue-500 bg-none border-none cursor-pointer pt-2">← Volver a la lista</button>
                   </>
                 )}
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <label style={{ fontWeight: '600', color: '#334155', fontSize: '0.875rem' }}>Medio de pago *</label>
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="font-semibold text-gray-700 text-sm">Medio de pago *</label>
                   {!showQuickAddMethod && paymentMethods.length > 0 && (
-                    <button 
-                      type="button"
-                      onClick={() => setShowQuickAddMethod(true)}
-                      style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-                    >
-                      + Nuevo
-                    </button>
+                    <button type="button" onClick={() => setShowQuickAddMethod(true)} className="text-xs text-blue-500 bg-none border-none cursor-pointer font-semibold">+ Nuevo</button>
                   )}
                 </div>
 
                 {!showQuickAddMethod ? (
                   paymentMethods.length === 0 ? (
-                    <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '6px', color: '#92400e', fontSize: '0.875rem', textAlign: 'center' }}>
-                      <div style={{ marginBottom: '0.5rem' }}>No hay medios de pago configurados</div>
-                      <button type="button" onClick={() => setShowQuickAddMethod(true)} style={{ color: '#92400e', fontWeight: 'bold', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>+ Crear medio de pago</button>
+                    <div className="p-4 bg-amber-100 rounded-md text-amber-900 text-sm text-center">
+                      <div className="mb-2">No hay medios de pago configurados</div>
+                      <button type="button" onClick={() => setShowQuickAddMethod(true)} className="text-amber-900 font-bold underline bg-none border-none cursor-pointer">+ Crear medio de pago</button>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                    <div className="grid grid-cols-2 gap-2">
                       {paymentMethods.map(method => {
                         const subcat = method.subcategorias_pago
                         const cat = subcat?.categorias_pago
@@ -807,26 +769,16 @@ export default function CajaDelDia() {
                             key={method.id}
                             type="button"
                             onClick={() => setSelectedMethod(method.id)}
-                            style={{
-                              padding: '1rem',
-                              border: isSelected ? `3px solid ${formType === 'INCOME' ? '#16a34a' : '#dc2626'}` : '2px solid #e2e8f0',
-                              borderRadius: '10px',
-                              cursor: 'pointer',
-                              backgroundColor: isSelected ? (formType === 'INCOME' ? '#f0fdf4' : '#fef2f2') : 'white',
-                              textAlign: 'left',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.25rem'
-                            }}
+                            className={`p-4 rounded-lg cursor-pointer text-left flex flex-col gap-1 ${isSelected ? (formType === 'INCOME' ? 'border-[3px] border-green-600 bg-green-50' : 'border-[3px] border-red-600 bg-red-50') : 'border-2 border-gray-200 bg-white'}`}
                           >
-                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a' }}>
+                            <div className="font-bold text-sm text-gray-900">
                               {cat?.icono || ''} {method.nombre || subcat?.nombre || 'Medio'}
                             </div>
                             {method.banco_emisor && (
-                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{method.banco_emisor}</div>
+                              <div className="text-xs text-gray-500">{method.banco_emisor}</div>
                             )}
                             {isSelected && (
-                              <div style={{ fontSize: '0.7rem', color: formType === 'INCOME' ? '#16a34a' : '#dc2626', fontWeight: '700', marginTop: '0.25rem' }}>
+                              <div className={`text-xs font-bold mt-1 ${formType === 'INCOME' ? 'text-green-700' : 'text-red-600'}`}>
                                 ✓ Seleccionado
                               </div>
                             )}
@@ -836,12 +788,12 @@ export default function CajaDelDia() {
                     </div>
                   )
                 ) : (
-                  <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', fontWeight: '700', color: '#0f172a' }}>Nuevo medio de pago</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="m-0 mb-4 text-sm font-bold text-gray-900">Nuevo medio de pago</h4>
+                    <div className="flex flex-col gap-3">
                       
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Medio de pago *</label>
+                        <label className="block mb-1 text-xs font-semibold text-gray-500">Medio de pago *</label>
                         {!showNewCategoryQuick ? (
                           <select 
                             value={quickMethodCategory} 
@@ -854,7 +806,7 @@ export default function CajaDelDia() {
                                 setQuickMethodSubcategory('')
                               }
                             }}
-                            style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm bg-white"
                           >
                             <option value="">Seleccionar...</option>
                             {categories.map(cat => (
@@ -863,13 +815,13 @@ export default function CajaDelDia() {
                             <option value="NEW">+ Nuevo medio de pago</option>
                           </select>
                         ) : (
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div className="flex gap-2">
                             <input 
                               type="text"
                               value={newCategoryQuickName}
                               onChange={e => setNewCategoryQuickName(e.target.value)}
                               placeholder="Nombre (ej: Cripto)"
-                              style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                              className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
                             />
                             <button 
                               type="button"
@@ -894,14 +846,14 @@ export default function CajaDelDia() {
                                   toast.error('Error: ' + err.message)
                                 }
                               }}
-                              style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                              className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm"
                             >
                               Guardar
                             </button>
                             <button 
                               type="button"
                               onClick={() => { setShowNewCategoryQuick(false); setNewCategoryQuickName(''); }}
-                              style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                              className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"
                             >
                               ✕
                             </button>
@@ -911,7 +863,7 @@ export default function CajaDelDia() {
 
                       {quickMethodCategory && (
                         <div>
-                          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Operador</label>
+                          <label className="block mb-1 text-xs font-semibold text-gray-500">Operador</label>
                           {!showNewOperatorQuick ? (
                             <select 
                               value={quickMethodSubcategory} 
@@ -923,7 +875,7 @@ export default function CajaDelDia() {
                                   setQuickMethodSubcategory(e.target.value)
                                 }
                               }}
-                              style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm bg-white"
                             >
                               <option value="">Seleccionar...</option>
                               {filteredSubcategories.map(sub => (
@@ -932,13 +884,13 @@ export default function CajaDelDia() {
                               <option value="NEW">+ Nuevo operador</option>
                             </select>
                           ) : (
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <div className="flex gap-2">
                               <input 
                                 type="text"
                                 value={newOperatorQuickName}
                                 onChange={e => setNewOperatorQuickName(e.target.value)}
                                 placeholder="Nombre (ej: Naranja X)"
-                                style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                                className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
                               />
                               <button 
                                 type="button"
@@ -962,14 +914,14 @@ export default function CajaDelDia() {
                                     toast.error('Error: ' + err.message)
                                   }
                                 }}
-                                style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                                className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm"
                               >
                                 Guardar
                               </button>
                               <button 
                                 type="button"
                                 onClick={() => { setShowNewOperatorQuick(false); setNewOperatorQuickName(''); }}
-                                style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                                className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"
                               >
                                 ✕
                               </button>
@@ -980,7 +932,7 @@ export default function CajaDelDia() {
 
                       {quickMethodSubcategory && (
                         <div>
-                          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Banco Emisor</label>
+                          <label className="block mb-1 text-xs font-semibold text-gray-500">Banco Emisor</label>
                           {!showNewBancoQuick ? (
                             <select 
                               value={quickMethodBanco} 
@@ -992,7 +944,7 @@ export default function CajaDelDia() {
                                   setQuickMethodBanco(e.target.value)
                                 }
                               }}
-                              style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: 'white' }}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm bg-white"
                             >
                               <option value="">Seleccionar banco...</option>
                               {BANCOS_ARGENTINA.map(banco => (
@@ -1001,13 +953,13 @@ export default function CajaDelDia() {
                               <option value="NEW">+ Otro banco</option>
                             </select>
                           ) : (
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <div className="flex gap-2">
                               <input 
                                 type="text"
                                 value={newBancoQuickName}
                                 onChange={e => setNewBancoQuickName(e.target.value)}
                                 placeholder="Nombre del banco"
-                                style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                                className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
                               />
                               <button 
                                 type="button"
@@ -1016,14 +968,14 @@ export default function CajaDelDia() {
                                   setShowNewBancoQuick(false)
                                   setNewBancoQuickName('')
                                 }}
-                                style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                                className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm"
                               >
                                 Guardar
                               </button>
                               <button 
                                 type="button"
                                 onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName(''); }}
-                                style={{ padding: '0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                                className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"
                               >
                                 ✕
                               </button>
@@ -1034,7 +986,7 @@ export default function CajaDelDia() {
                       
                       {quickMethodBanco && (
                         <>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+                          <label className="flex items-center gap-2 text-sm">
                             <input 
                               type="checkbox" 
                               checked={quickMethodHasCommission} 
@@ -1045,7 +997,7 @@ export default function CajaDelDia() {
 
                           {quickMethodHasCommission && (
                             <div>
-                              <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.7rem', color: '#64748b' }}>Porcentaje (%)</label>
+                              <label className="block mb-1 text-xs text-gray-500">Porcentaje (%)</label>
                               <input 
                                 type="number" 
                                 step="0.01" 
@@ -1054,27 +1006,27 @@ export default function CajaDelDia() {
                                 value={quickMethodCommissionPct} 
                                 onChange={e => setQuickMethodCommissionPct(e.target.value)} 
                                 placeholder="2.5"
-                                style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }} 
+                                className="w-full p-2 border border-gray-300 rounded-md text-sm"
                               />
                             </div>
                           )}
 
-                          <div style={{ marginTop: '0.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Se acredita en</label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div className="mt-2">
+                            <label className="block mb-1 text-xs font-semibold text-gray-500">Se acredita en</label>
+                            <div className="flex items-center gap-2">
                               <input 
                                 type="number" 
                                 min="0" 
                                 max="60"
                                 value={quickMethodDiasAcreditacion} 
                                 onChange={e => setQuickMethodDiasAcreditacion(e.target.value)} 
-                                style={{ width: '80px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center' }} 
+                                className="w-20 p-2 border border-gray-300 rounded-md text-sm text-center"
                               />
-                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>días</span>
+                              <span className="text-xs text-gray-500">días</span>
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                          <div className="flex gap-2 mt-3">
                             <button 
                               type="button" 
                               onClick={() => { 
@@ -1092,7 +1044,7 @@ export default function CajaDelDia() {
                                 setNewOperatorQuickName('')
                                 setNewBancoQuickName('')
                               }}
-                              style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer' }}
+                              className="flex-1 p-2 bg-gray-100 border border-gray-300 rounded-md text-sm cursor-pointer"
                             >
                               Cancelar
                             </button>
@@ -1153,7 +1105,7 @@ export default function CajaDelDia() {
                                   setCreating(false)
                                 }
                               }}
-                              style={{ flex: 1, padding: '0.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer' }}
+                              className="flex-1 p-2 bg-emerald-500 text-white border-none rounded-md text-sm font-semibold cursor-pointer"
                             >
                               Guardar y usar
                             </button>
@@ -1165,7 +1117,7 @@ export default function CajaDelDia() {
                 )}
               </div>
 
-              <button type="submit" disabled={creating || !selectedMethod} style={{ width: '100%', padding: '1rem', backgroundColor: formType === 'INCOME' ? '#16a34a' : '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer', opacity: (!selectedMethod || creating) ? 0.5 : 1 }}>
+              <button type="submit" disabled={creating || !selectedMethod} className={`w-full p-4 border-none rounded-lg text-base font-bold cursor-pointer ${formType === 'INCOME' ? 'bg-green-600' : 'bg-red-600'} text-white ${(!selectedMethod || creating) ? 'opacity-50' : ''}`}>
                 {creating ? 'Guardando...' : !selectedMethod ? 'Seleccioná un medio de pago' : 'Confirmar'}
               </button>
             </form>
