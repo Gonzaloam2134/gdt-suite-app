@@ -3,6 +3,6 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/": "pages/index.js",
-  "/locales": "pages/locales.js",
-  "/dashboard": "pages/dashboard.js"
+  "/dashboard": "pages/dashboard.js",
+  "/locales": "pages/locales.js"
 }

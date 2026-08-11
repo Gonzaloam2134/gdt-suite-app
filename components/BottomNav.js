@@ -5,49 +5,33 @@ export default function BottomNav({ activeTab }) {
 
   const tabs = [
     { id: 'caja', label: 'Caja', icon: '💰', path: '/dashboard' },
-    { id: 'equipo', label: 'Equipo', icon: '👥', path: '/equipo' },
     { id: 'reportes', label: 'Reportes', icon: '📊', path: '/reportes' },
-    { id: 'config', label: 'Ajustes', icon: '⚙️', path: '/configuracion' }
+    { id: 'locales', label: 'Locales', icon: '🏪', path: '/locales' },
   ]
 
   return (
-    <nav style={{
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: '#ffffff',
-      borderTop: '1px solid #e2e8f0',
-      display: 'flex',
-      justifyContent: 'space-around',
-      padding: '0.5rem 0',
-      zIndex: 40
-    }}>
-      {tabs.map(tab => {
-        const isActive = activeTab === tab.id || router.pathname === tab.path
-        return (
-          <button
-            key={tab.id}
-            onClick={() => router.push(tab.path)}
-            style={{
-              background: 'none',
-              border: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.25rem',
-              cursor: 'pointer',
-              color: isActive ? '#2563eb' : '#64748b',
-              fontWeight: isActive ? '700' : '500',
-              fontSize: '0.7rem',
-              padding: '0.25rem 0.5rem'
-            }}
-          >
-            <span style={{ fontSize: '1.25rem' }}>{tab.icon}</span>
-            {tab.label}
-          </button>
-        )
-      })}
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+      <div className="max-w-2xl mx-auto flex justify-around">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => router.push(tab.path)}
+              className={`flex-1 py-3 flex flex-col items-center gap-1 cursor-pointer border-none bg-transparent transition-colors ${
+                isActive 
+                  ? 'text-blue-600 bg-blue-50' 
+                  : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="text-xl">{tab.icon}</span>
+              <span className={`text-xs ${isActive ? 'font-bold' : 'font-medium'}`}>
+                {tab.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </nav>
   )
 }

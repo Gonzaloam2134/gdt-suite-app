@@ -1,20 +1,18 @@
 import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import toast from 'react-hot-toast'
 
 export default function Locales() {
   const [user, setUser] = useState(null)
   const [locales, setLocales] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [editingLocal, setEditingLocal] = useState(null)
-  
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [currency, setCurrency] = useState('ARS')
-  const [timezone, setTimezone] = useState('America/Argentina/Buenos_Aires')
-  const [saving, setSaving] = useState(false)
-  
+  const [showCreate, setShowCreate] = useState(false)
+  const [newLocalName, setNewLocalName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [rubro, setRubro] = useState('')
+  const [condicionFiscal, setCondicionFiscal] = useState('')
+
   const router = useRouter()
 
   useEffect(() => {
@@ -26,17 +24,11 @@ export default function Locales() {
         loadLocales()
       }
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) router.push('/')
-      else setUser(session.user)
-    })
-
-    return () => subscription.unsubscribe()
   }, [router])
 
   const loadLocales = async () => {
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('locales')
         .select('*')
@@ -45,92 +37,51 @@ export default function Locales() {
       if (error) throw error
       setLocales(data || [])
     } catch (err) {
-      console.error('Error cargando locales:', err)
+      toast.error('Error al cargar locales: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const openCreateModal = () => {
-    setEditingLocal(null)
-    setName('')
-    setDescription('')
-    setCurrency('ARS')
-    setTimezone('America/Argentina/Buenos_Aires')
-    setShowModal(true)
-  }
-
-  const openEditModal = (local) => {
-    setEditingLocal(local)
-    setName(local.nombre || '')
-    setDescription(local.descripcion || '')
-    setCurrency(local.moneda || 'ARS')
-    setTimezone(local.zona_horaria || 'America/Argentina/Buenos_Aires')
-    setShowModal(true)
-  }
-
-  const handleSave = async (e) => {
+  const handleCreateLocal = async (e) => {
     e.preventDefault()
-    if (!name.trim()) return alert('El nombre es obligatorio')
-
-    setSaving(true)
-    try {
-      const slug = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now().toString().slice(-4)
-      
-      if (editingLocal) {
-        // MODO EDICIÓN
-        const { error } = await supabase
-          .from('locales')
-          .update({ nombre: name, descripcion: description, moneda: currency, zona_horaria: timezone })
-          .eq('id', editingLocal.id)
-        
-        if (error) throw error
-        alert('✅ Local actualizado')
-      } else {
-        // MODO CREACIÓN
-        const { data, error } = await supabase
-          .from('locales')
-          .insert([{ nombre: name, descripcion: description, moneda: currency, zona_horaria: timezone, slug }])
-          .select()
-          .single()
-        
-        if (error) throw error
-        
-        alert('✅ Local creado. Redirigiendo al dashboard...')
-        
-        // REDIRECCIÓN AUTOMÁTICA AL DASHBOARD
-        localStorage.setItem('activeLocalId', data.id)
-        router.push('/dashboard')
-        return
-      }
-      
-      setShowModal(false)
-      loadLocales()
-    } catch (err) {
-      alert(`Error: ${err.message}`)
-    } finally {
-      setSaving(false)
+    if (!newLocalName.trim()) {
+      toast.error('Ingresá un nombre para el local')
+      return
     }
-  }
-
-  const handleDelete = async (id, name) => {
-    if (!confirm(`¿Estás seguro de eliminar "${name}"? Esta acción no se puede deshacer.`)) return
 
     try {
-      const { error } = await supabase
+      setCreating(true)
+      const { data, error } = await supabase
         .from('locales')
-        .delete()
-        .eq('id', id)
-      
+        .insert([{
+          nombre: newLocalName.trim(),
+          rubro: rubro || null,
+          condicion_fiscal: condicionFiscal || null,
+          creado_por: user.id,
+          activo: true
+        }])
+        .select()
+        .single()
+
       if (error) throw error
-      loadLocales()
+
+      toast.success('🏪 Local creado correctamente')
+      setLocales([data, ...locales])
+      setNewLocalName('')
+      setRubro('')
+      setCondicionFiscal('')
+      setShowCreate(false)
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      toast.error('Error al crear local: ' + err.message)
+    } finally {
+      setCreating(false)
     }
   }
 
-  const enterLocal = (localId) => {
+  const handleSelectLocal = (localId) => {
     localStorage.setItem('activeLocalId', localId)
+    toast.success('Local seleccionado')
     router.push('/dashboard')
   }
 
@@ -139,159 +90,168 @@ export default function Locales() {
     router.push('/')
   }
 
-  if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-100">
+        <div className="text-center">
+          <div className="text-4xl mb-2"></div>
+          <p className="text-gray-600 text-sm">Cargando locales...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#1f2937', color: 'white', borderRadius: '8px' }}>
-        <div>
-          <h1 style={{ margin: 0 }}> Mis Locales</h1>
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.8 }}>
-            Seleccioná o gestioná tus espacios de trabajo
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={openCreateModal}
-            style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            + Nuevo Local
-          </button>
-          <button 
+    <main className="min-h-screen bg-slate-100 pb-20">
+      {/* HEADER */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="m-0 text-lg font-bold text-gray-900">🏪 Mis Locales</h1>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {locales.length} {locales.length === 1 ? 'local registrado' : 'locales registrados'}
+            </p>
+          </div>
+          <button
             onClick={handleSignOut}
-            style={{ padding: '10px 20px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer"
           >
             Salir
           </button>
         </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto p-4">
+        {/* LISTA DE LOCALES */}
+        {locales.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
+            <div className="text-5xl mb-3">🏪</div>
+            <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin locales registrados</h3>
+            <p className="m-0 mb-4 text-gray-500 text-sm">
+              Creá tu primer local para empezar a operar
+            </p>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer"
+            >
+              + Crear mi primer local
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {locales.map(local => (
+              <div
+                key={local.id}
+                className="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center cursor-pointer hover:border-blue-300 transition-colors"
+                onClick={() => handleSelectLocal(local.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-2xl">
+                    🏪
+                  </div>
+                  <div>
+                    <h3 className="m-0 text-base font-bold text-gray-900">{local.nombre}</h3>
+                    <div className="flex gap-2 mt-1">
+                      {local.rubro && (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                          {local.rubro}
+                        </span>
+                      )}
+                      {local.condicion_fiscal && (
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                          {local.condicion_fiscal}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-blue-500 text-xl">→</div>
+              </div>
+            ))}
+
+            {/* BOTÓN CREAR NUEVO */}
+            <button
+              onClick={() => setShowCreate(true)}
+              className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-semibold cursor-pointer hover:border-blue-400 hover:text-blue-500 transition-colors"
+            >
+              + Agregar otro local
+            </button>
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando locales...</div>
-      ) : locales.length === 0 ? (
-        <div style={{ padding: '4rem', backgroundColor: '#f3f4f6', borderRadius: '8px', textAlign: 'center', color: '#6b7280' }}>
-          <h3>No tenés locales todavía</h3>
-          <p>Creá tu primer espacio de trabajo para empezar a operar.</p>
-          <button 
-            onClick={openCreateModal}
-            style={{ marginTop: '1rem', padding: '12px 24px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' }}
-          >
-            Crear mi primer Local
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-          {locales.map(local => (
-            <div key={local.id} style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: '#111827' }}>{local.nombre}</h3>
-                <p style={{ margin: '0 0 1rem 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
-                  {local.descripcion || 'Sin descripción'}
-                </p>
-                <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#9ca3af', marginBottom: '1rem' }}>
-                  <span>💰 {local.moneda || 'ARS'}</span>
-                  <span> {local.zona_horaria ? local.zona_horaria.split('/')[1] : 'Default'}</span>
-                </div>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #f3f4f6', paddingTop: '1rem' }}>
-                <button 
-                  onClick={() => enterLocal(local.id)}
-                  style={{ flex: 1, padding: '10px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  Entrar
-                </button>
-                <button 
-                  onClick={() => openEditModal(local)}
-                  style={{ padding: '10px 15px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}
-                  title="Editar"
-                >
-                  ✏️
-                </button>
-                <button 
-                  onClick={() => handleDelete(local.id, local.nombre)}
-                  style={{ padding: '10px 15px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
-                  title="Eliminar"
-                >
-                  🗑️
-                </button>
-              </div>
+      {/* MODAL CREAR LOCAL */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="m-0 text-xl font-bold text-gray-900">🏪 Nuevo Local</h2>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="bg-none border-none text-xl cursor-pointer text-gray-500"
+              >
+                ✕
+              </button>
             </div>
-          ))}
-        </div>
-      )}
 
-      {showModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', width: '100%', maxWidth: '500px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-            <h2 style={{ marginTop: 0 }}>{editingLocal ? 'Editar Local' : 'Crear Nuevo Local'}</h2>
-            <form onSubmit={handleSave}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>Nombre *</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  required 
-                  placeholder="Ej: Mi Empresa S.A."
-                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
-              
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>Descripción</label>
-                <textarea 
-                  value={description} 
-                  onChange={e => setDescription(e.target.value)} 
-                  rows="3"
-                  placeholder="Breve descripción del negocio..."
-                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box', resize: 'vertical' }}
+            <form onSubmit={handleCreateLocal}>
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">
+                  Nombre del local *
+                </label>
+                <input
+                  type="text"
+                  value={newLocalName}
+                  onChange={e => setNewLocalName(e.target.value)}
+                  placeholder="Ej: Local Centro, Sucursal Norte..."
+                  required
+                  autoFocus
+                  className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>Moneda</label>
-                  <select 
-                    value={currency} 
-                    onChange={e => setCurrency(e.target.value)}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                  >
-                    <option value="ARS">🇦🇷 ARS (Peso Argentino)</option>
-                    <option value="USD">🇺 USD (Dólar)</option>
-                    <option value="EUR">🇪🇺 EUR (Euro)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>Zona Horaria</label>
-                  <select 
-                    value={timezone} 
-                    onChange={e => setTimezone(e.target.value)}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                  >
-                    <option value="America/Argentina/Buenos_Aires">Buenos Aires (GMT-3)</option>
-                    <option value="America/Mexico_City">Ciudad de México (GMT-6)</option>
-                    <option value="America/Bogota">Bogotá (GMT-5)</option>
-                  </select>
-                </div>
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">
+                  Rubro (opcional)
+                </label>
+                <select
+                  value={rubro}
+                  onChange={e => setRubro(e.target.value)}
+                  className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border bg-white"
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="Gastronomía">Gastronomía</option>
+                  <option value="Retail">Retail</option>
+                  <option value="Servicios">Servicios</option>
+                  <option value="Salud">Salud</option>
+                  <option value="Educación">Educación</option>
+                  <option value="Otro">Otro</option>
+                </select>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowModal(false)}
-                  style={{ padding: '10px 20px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}
+              <div className="mb-6">
+                <label className="block mb-2 font-semibold text-gray-700 text-sm">
+                  Condición fiscal (opcional)
+                </label>
+                <select
+                  value={condicionFiscal}
+                  onChange={e => setCondicionFiscal(e.target.value)}
+                  className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border bg-white"
                 >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={saving}
-                  style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  {saving ? 'Guardando...' : 'Guardar'}
-                </button>
+                  <option value="">Seleccionar...</option>
+                  <option value="Monotributo">Monotributo</option>
+                  <option value="Responsable Inscripto">Responsable Inscripto</option>
+                  <option value="Exento">Exento</option>
+                </select>
               </div>
+
+              <button
+                type="submit"
+                disabled={creating}
+                className="w-full p-4 bg-blue-500 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50"
+              >
+                {creating ? 'Creando...' : 'Crear Local'}
+              </button>
             </form>
           </div>
         </div>

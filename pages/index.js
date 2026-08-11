@@ -1,128 +1,157 @@
 import { supabase } from '../lib/supabaseClient'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/router'
+import toast from 'react-hot-toast'
 
-export default function Home() {
-  const router = useRouter()
-  const [user, setUser] = useState(null)
+export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [businessName, setBusinessName] = useState('')
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        router.push('/locales')
-      }
-      setUser(session?.user ?? null)
-    })
+  const router = useRouter()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        router.push('/locales')
-      }
-      setUser(session?.user ?? null)
-    })
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  if (!email || !password) {
+    toast.error('Completá email y contraseña')
+    return
+  }
 
-    return () => subscription.unsubscribe()
-  }, [router])
-
-  const handleSignUp = async (e) => {
-    e.preventDefault()
+  try {
     setLoading(true)
-    try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
+
+    if (isSignUp) {
+      if (!businessName.trim()) {
+        toast.error('Ingresá el nombre de tu negocio')
+        return
+      }
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
         password,
-        options: { data: { full_name: 'Nuevo Usuario' } }
+        options: {
+          data: { business_name: businessName.trim() }
+        }
       })
-      
-      if (error) {
-        alert(`Error: ${error.message || JSON.stringify(error)}`)
-      } else {
-        alert('✅ Cuenta creada. Redirigiendo...')
-        router.push('/locales')
-      }
-    } catch (err) {
-      alert(`Error inesperado: ${err.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleSignIn = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      
-      if (error) {
-        alert(`Error: ${error.message || JSON.stringify(error)}`)
-      }
-    } catch (err) {
-      alert(`Error inesperado: ${err.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (authError) throw authError
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
+      if (authData.user) {
+        const { error: localError } = await supabase
+          .from('locales')
+          .insert([{
+            nombre: businessName.trim(),
+            creado_por: authData.user.id,
+            activo: true
+          }])
+
+        if (localError) throw localError
+
+        toast.success('✅ Cuenta creada. Revisá tu email para confirmar.')
+        setIsSignUp(false)
+        setEmail('')
+        setPassword('')
+        setBusinessName('')
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      toast.success('👋 Bienvenido de vuelta')
+      
+      // ✅ REDIRECCIÓN DESPUÉS DEL LOGIN
+      router.push('/locales')
+    }
+  } catch (err) {
+    toast.error(err.message || 'Error en la operación')
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>🚀 GDT Suite</h1>
-      
-      {user ? (
-        <div style={{ padding: '20px', backgroundColor: '#d1fae5', borderRadius: '8px', textAlign: 'center' }}>
-          <h2>✅ Sesión iniciada</h2>
-          <p><strong>Email:</strong> {user.email}</p>
-          <p>Redirigiendo a tus locales...</p>
-          <button onClick={handleSignOut} style={{ padding: '10px 20px', cursor: 'pointer', marginTop: '10px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px' }}>
-            Cerrar Sesión
+    <main className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl">
+        {/* LOGO */}
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-2">💼</div>
+          <h1 className="m-0 text-2xl font-extrabold text-gray-900">GDT Suite</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Gestión contable para tu negocio
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {isSignUp && (
+            <div className="mb-4">
+              <label className="block mb-2 font-semibold text-gray-700 text-sm">
+                Nombre del negocio *
+              </label>
+              <input
+                type="text"
+                value={businessName}
+                onChange={e => setBusinessName(e.target.value)}
+                placeholder="Ej: Mi Negocio SRL"
+                required
+                className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
+              />
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="block mb-2 font-semibold text-gray-700 text-sm">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              required
+              className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block mb-2 font-semibold text-gray-700 text-sm">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={6}
+              className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full p-4 bg-blue-500 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50 hover:bg-blue-600 transition-colors"
+          >
+            {loading
+              ? 'Procesando...'
+              : isSignUp
+              ? 'Crear cuenta'
+              : 'Ingresar'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-sm text-blue-600 bg-none border-none cursor-pointer font-medium hover:underline"
+          >
+            {isSignUp
+              ? '¿Ya tenés cuenta? Ingresá'
+              : '¿No tenés cuenta? Creá una'}
           </button>
         </div>
-      ) : (
-        <div style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
-          <h3 style={{ textAlign: 'center', marginBottom: '1rem' }}>Iniciar Sesión / Registrarse</h3>
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              required 
-              style={{ padding: '12px', fontSize: '16px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-            />
-            <input 
-              type="password" 
-              placeholder="Contraseña (mínimo 6 caracteres)" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              required 
-              minLength="6"
-              style={{ padding: '12px', fontSize: '16px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-            />
-            <button 
-              type="submit" 
-              onClick={handleSignIn} 
-              disabled={loading}
-              style={{ padding: '12px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-            >
-              {loading ? 'Procesando...' : 'Iniciar Sesión'}
-            </button>
-            <button 
-              type="button" 
-              onClick={handleSignUp} 
-              disabled={loading}
-              style={{ padding: '12px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-            >
-              {loading ? 'Procesando...' : 'Registrarse'}
-            </button>
-          </form>
-        </div>
-      )}
+      </div>
     </main>
   )
 }
