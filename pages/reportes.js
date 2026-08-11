@@ -507,7 +507,16 @@ export default function CajaDelDia() {
                   <span style={{ fontSize: '1rem', fontWeight: '800', color: totalNet >= 0 ? '#15803d' : '#b91c1c' }}>${totalNet.toFixed(2)}</span>
                 </div>
               </div>
-
+{/* NUEVO: IVA en Reportes */}
+<div style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '8px', border: '2px solid #3b82f6', marginTop: '1rem' }}>
+  <div style={{ fontSize: '0.7rem', color: '#1e40af', fontWeight: '700', marginBottom: '0.25rem' }}>️ IVA RECAUDADO</div>
+  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1d4ed8' }}>
+    ${movements.filter(t => t.tipo === 'COBRO_RECIBIDO').reduce((sum, t) => sum + (t.monto_iva || 0), 0).toFixed(2)}
+  </div>
+  <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem' }}>
+    Débito Fiscal (Para DDJJ)
+  </div>
+</div>
               {balanceByMethod.length > 0 && (
                 <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.5rem' }}>Desglose por medio de pago:</div>
