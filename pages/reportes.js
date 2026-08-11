@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 
 export default function Reportes() {
   const [user, setUser] = useState(null)
@@ -10,7 +10,6 @@ export default function Reportes() {
   const [loading, setLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   
-  // NUEVO: Fechas para exportación
   const [exportStartDate, setExportStartDate] = useState('')
   const [exportEndDate, setExportEndDate] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
@@ -20,7 +19,6 @@ export default function Reportes() {
   const [expensesBook, setExpensesBook] = useState([])
   const [methodSummary, setMethodSummary] = useState([])
   const [calendar, setCalendar] = useState([])
-  const [localData, setLocalData] = useState(null)
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
@@ -33,21 +31,13 @@ export default function Reportes() {
       if (!session?.user) { router.push('/') } 
       else {
         setUser(session.user)
-        if (activeLocalId) {
-          loadLocalData()
-          loadReportes(selectedMonth)
-        }
+        if (activeLocalId) loadReportes(selectedMonth)
         else router.push('/locales')
       }
     })
   }, [router, activeLocalId])
 
   useEffect(() => { if (user && activeLocalId) loadReportes(selectedMonth) }, [selectedMonth])
-
-  const loadLocalData = async () => {
-    const { data } = await supabase.from('locales').select('*').eq('id', activeLocalId).single()
-    if (data) setLocalData(data)
-  }
 
   const loadReportes = async (monthDate) => {
     try {
@@ -146,7 +136,6 @@ export default function Reportes() {
     } catch (err) { console.error('Error:', err) } finally { setLoading(false) }
   }
 
-  // NUEVA: Función de exportación a Excel
   const handleExportExcel = async () => {
     if (!exportStartDate || !exportEndDate) {
       alert('⚠️ Seleccioná fecha de inicio y fin')
@@ -158,7 +147,6 @@ export default function Reportes() {
       const start = new Date(exportStartDate + 'T00:00:00').toISOString()
       const end = new Date(exportEndDate + 'T23:59:59').toISOString()
 
-      // Cargar datos del período seleccionado
       const { data: mediosData } = await supabase.from('medios_pago').select('id, nombre, banco_emisor, dias_acreditacion, tipo_comision, valor_comision').eq('local_id', activeLocalId)
       const mediosMap = new Map()
       if (mediosData) mediosData.forEach(m => mediosMap.set(m.id, m))
@@ -171,7 +159,6 @@ export default function Reportes() {
         return
       }
 
-      // Procesar datos
       let totalFacturado = 0, totalNeto = 0, totalIVA = 0, totalComisiones = 0, totalGastos = 0, totalGastosNeto = 0, totalGastosIVA = 0
       const salesRows = [], expenseRows = [], methodsMap = {}, calendarMap = {}
 
@@ -237,11 +224,11 @@ export default function Reportes() {
       })
 
       const resultado = totalNeto - totalComisiones - totalGastos
-
-      // Crear workbook
       const wb = XLSX.utils.book_new()
 
-      // HOJA 1: Resumen Ejecutivo
+      // ============================================
+      // HOJA 1: RESUMEN EJECUTIVO
+      // ============================================
       const resumenData = [
         ['RESUMEN EJECUTIVO'],
         ['Período:', `${new Date(exportStartDate).toLocaleDateString('es-AR')} - ${new Date(exportEndDate).toLocaleDateString('es-AR')}`],
@@ -250,10 +237,10 @@ export default function Reportes() {
         ['Total Facturado (bruto)', totalFacturado],
         ['(-) IVA Débito Fiscal', -totalIVA],
         ['Neto Gravado', totalNeto],
-        ['(-) Comisiones', -totalComisiones],
+        ['(-) Comisiones de medios de pago', -totalComisiones],
         ['INGRESO NETO REAL', totalNeto - totalComisiones],
         ['(-) Gastos operativos', -totalGastos],
-        ['(-) IVA Crédito Fiscal', -totalGastosIVA],
+        ['(-) IVA Crédito Fiscal (compras)', -totalGastosIVA],
         ['RESULTADO DEL EJERCICIO', resultado],
         [],
         ['Ventas registradas', salesRows.length],
@@ -261,34 +248,193 @@ export default function Reportes() {
         ['IVA a pagar (neto)', totalIVA - totalGastosIVA]
       ]
       const wsResumen = XLSX.utils.aoa_to_sheet(resumenData)
+      
+      wsResumen['!cols'] = [{ wch: 35 }, { wch: 20 }]
+      
+      // Título
+      wsResumen['A1'].s = { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } }
+      wsResumen['B1'].s = { fill: { fgColor: { rgb: '1E293B' } } }
+      
+      // Info
+      wsResumen['A2'].s = { font: { bold: true, sz: 11 } }
+      wsResumen['A3'].s = { font: { italic: true, color: { rgb: '64748B' }, sz: 10 } }
+      
+      // Líneas de resumen
+      wsResumen['A5'].s = { font: { bold: true, sz: 11 } }
+      wsResumen['B5'].s = { font: { sz: 11 }, numFmt: '#,##0.00' }
+      
+      wsResumen['A6'].s = { font: { color: { rgb: 'DC2626' }, sz: 11 } }
+      wsResumen['B6'].s = { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' }
+      
+      wsResumen['A7'].s = { font: { bold: true, sz: 11 } }
+      wsResumen['B7'].s = { font: { bold: true, sz: 11 }, numFmt: '#,##0.00' }
+      
+      wsResumen['A8'].s = { font: { color: { rgb: 'DC2626' }, sz: 11 } }
+      wsResumen['B8'].s = { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' }
+      
+      // Ingreso Neto Real - destacado
+      wsResumen['A9'].s = { font: { bold: true, sz: 12 }, fill: { fgColor: { rgb: 'F0FDF4' } }, border: { bottom: { style: 'thin', color: { rgb: '15803D' } } } }
+      wsResumen['B9'].s = { font: { bold: true, sz: 12, color: { rgb: '15803D' } }, fill: { fgColor: { rgb: 'F0FDF4' } }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: '15803D' } } } }
+      
+      wsResumen['A10'].s = { font: { color: { rgb: 'DC2626' }, sz: 11 } }
+      wsResumen['B10'].s = { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' }
+      
+      wsResumen['A11'].s = { font: { color: { rgb: '2563EB' }, sz: 11 } }
+      wsResumen['B11'].s = { font: { color: { rgb: '2563EB' }, sz: 11 }, numFmt: '#,##0.00' }
+      
+      // Resultado - muy destacado
+      const resultadoColor = resultado >= 0 ? '15803D' : 'B91C1C'
+      const resultadoBg = resultado >= 0 ? 'F0FDF4' : 'FEF2F2'
+      wsResumen['A12'].s = { font: { bold: true, sz: 13 }, fill: { fgColor: { rgb: resultadoBg } }, border: { top: { style: 'double', color: { rgb: '0F172A' } }, bottom: { style: 'double', color: { rgb: '0F172A' } } } }
+      wsResumen['B12'].s = { font: { bold: true, sz: 13, color: { rgb: resultadoColor } }, fill: { fgColor: { rgb: resultadoBg } }, numFmt: '#,##0.00', border: { top: { style: 'double', color: { rgb: '0F172A' } }, bottom: { style: 'double', color: { rgb: '0F172A' } } } }
+      
+      // Stats
+      wsResumen['A14'].s = { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } }
+      wsResumen['B14'].s = { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } }
+      wsResumen['A15'].s = { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } }
+      wsResumen['B15'].s = { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } }
+      wsResumen['A16'].s = { font: { bold: true, sz: 10, color: { rgb: 'DC2626' } }, fill: { fgColor: { rgb: 'F1F5F9' } } }
+      wsResumen['B16'].s = { font: { bold: true, sz: 10, color: { rgb: 'DC2626' } }, fill: { fgColor: { rgb: 'F1F5F9' } }, numFmt: '#,##0.00' }
+      
       XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
 
-      // HOJA 2: Libro IVA Ventas
-      const wsVentas = XLSX.utils.json_to_sheet(salesRows)
+      // ============================================
+      // HOJA 2: LIBRO IVA VENTAS
+      // ============================================
+      const ventasHeaders = [
+        { v: 'Fecha', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Concepto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'IVA', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Comisión', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto Real', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const ventasData = [ventasHeaders]
+      salesRows.forEach(row => {
+        ventasData.push([
+          { v: row.fecha, s: { font: { sz: 10 } } },
+          { v: row.concepto, s: { font: { sz: 10 } } },
+          { v: row.medio, s: { font: { sz: 10, color: { rgb: '64748B' } } } },
+          { v: row.bruto, s: { font: { sz: 10, bold: true }, numFmt: '#,##0.00' } },
+          { v: row.neto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
+          { v: row.iva, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: row.comision, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: row.netoReal, s: { font: { sz: 10, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00' } }
+        ])
+      })
+      
+      // Fila de totales
+      ventasData.push([
+        { v: 'TOTALES', s: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: '', s: {} },
+        { v: '', s: {} },
+        { v: totalFacturado, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalNeto, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalIVA, s: { font: { bold: true, sz: 11, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalComisiones, s: { font: { bold: true, sz: 11, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalNeto - totalComisiones, s: { font: { bold: true, sz: 11, color: { rgb: '15803D' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } }
+      ])
+      
+      const wsVentas = XLSX.utils.aoa_to_sheet(ventasData)
+      wsVentas['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
       XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
 
-      // HOJA 3: Libro IVA Compras
-      const wsCompras = XLSX.utils.json_to_sheet(expenseRows)
+      // ============================================
+      // HOJA 3: LIBRO IVA COMPRAS
+      // ============================================
+      const comprasHeaders = [
+        { v: 'Fecha', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Concepto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'IVA (Crédito Fiscal)', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const comprasData = [comprasHeaders]
+      expenseRows.forEach(row => {
+        comprasData.push([
+          { v: row.fecha, s: { font: { sz: 10 } } },
+          { v: row.concepto, s: { font: { sz: 10 } } },
+          { v: row.medio, s: { font: { sz: 10, color: { rgb: '64748B' } } } },
+          { v: row.bruto, s: { font: { sz: 10, bold: true }, numFmt: '#,##0.00' } },
+          { v: row.neto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
+          { v: row.iva, s: { font: { sz: 10, color: { rgb: '2563EB' } }, numFmt: '#,##0.00' } }
+        ])
+      })
+      
+      comprasData.push([
+        { v: 'TOTALES', s: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: '', s: {} },
+        { v: '', s: {} },
+        { v: totalGastos, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalGastosNeto, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalGastosIVA, s: { font: { bold: true, sz: 11, color: { rgb: '2563EB' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } }
+      ])
+      
+      const wsCompras = XLSX.utils.aoa_to_sheet(comprasData)
+      wsCompras['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }]
       XLSX.utils.book_append_sheet(wb, wsCompras, 'Libro IVA Compras')
 
-      // HOJA 4: Medios de Pago
-      const mediosDataArray = Object.values(methodsMap).map(m => ({
-        Medio: m.nombre,
-        Cantidad: m.cantidad,
-        Bruto: m.bruto,
-        IVA: m.iva,
-        Comisiones: m.comisiones,
-        'Neto Real': m.neto - m.comisiones
-      }))
-      const wsMedios = XLSX.utils.json_to_sheet(mediosDataArray)
+      // ============================================
+      // HOJA 4: MEDIOS DE PAGO
+      // ============================================
+      const mediosHeaders = [
+        { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Cant. Operaciones', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'IVA', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Comisiones', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto Real', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const mediosDataArray = Object.values(methodsMap).sort((a, b) => b.neto - a.neto)
+      const mediosDataForSheet = [mediosHeaders]
+      mediosDataArray.forEach(m => {
+        mediosDataForSheet.push([
+          { v: m.nombre, s: { font: { sz: 10, bold: true } } },
+          { v: m.cantidad, s: { font: { sz: 10 }, alignment: { horizontal: 'center' } } },
+          { v: m.bruto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
+          { v: m.iva, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: m.comisiones, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: m.neto - m.comisiones, s: { font: { sz: 10, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00' } }
+        ])
+      })
+      
+      const wsMedios = XLSX.utils.aoa_to_sheet(mediosDataForSheet)
+      wsMedios['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
       XLSX.utils.book_append_sheet(wb, wsMedios, 'Medios de Pago')
 
-      // HOJA 5: Calendario
-      const calendarData = Object.values(calendarMap).sort((a, b) => a.fecha.localeCompare(b.fecha)).map(c => ({
-        Fecha: new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-AR'),
-        'Monto a Acreditar': c.total
-      }))
-      const wsCalendar = XLSX.utils.json_to_sheet(calendarData)
+      // ============================================
+      // HOJA 5: CALENDARIO DE ACREDITACIONES
+      // ============================================
+      const calendarHeaders = [
+        { v: 'Fecha de Acreditación', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Estado', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Monto a Acreditar', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const calendarSorted = Object.values(calendarMap).sort((a, b) => a.fecha.localeCompare(b.fecha))
+      const calendarDataForSheet = [calendarHeaders]
+      calendarSorted.forEach(c => {
+        const isPast = c.fecha < hoyStr
+        const isToday = c.fecha === hoyStr
+        const estado = isPast ? '✅ Acreditado' : isToday ? ' Hoy' : '⏳ Pendiente'
+        const estadoColor = isPast ? '15803D' : isToday ? '3B82F6' : 'D97706'
+        const rowBg = isToday ? 'F0FDF4' : undefined
+        
+        calendarDataForSheet.push([
+          { v: new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), s: { font: { sz: 10, bold: true }, fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } },
+          { v: estado, s: { font: { sz: 10, bold: true, color: { rgb: estadoColor } }, fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } },
+          { v: c.total, s: { font: { sz: 11, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00', fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } }
+        ])
+      })
+      
+      const wsCalendar = XLSX.utils.aoa_to_sheet(calendarDataForSheet)
+      wsCalendar['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }]
       XLSX.utils.book_append_sheet(wb, wsCalendar, 'Calendario')
 
       // Guardar archivo
@@ -319,7 +465,7 @@ export default function Reportes() {
       <header style={{ backgroundColor: '#1e293b', padding: '1rem', borderBottom: '3px solid #3b82f6' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.25rem', color: '#ffffff', fontWeight: '800' }}>📊 Reportes Contables</h1>
+            <h1 style={{ margin: 0, fontSize: '1.25rem', color: '#ffffff', fontWeight: '800' }}> Reportes Contables</h1>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>{businessName} • {nombreMes}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -330,7 +476,6 @@ export default function Reportes() {
       </header>
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem' }}>
-        {/* NAVEGACIÓN */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '1rem', backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <button onClick={() => { const d = new Date(selectedMonth); d.setMonth(d.getMonth() - 1); setSelectedMonth(d) }} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>← Mes anterior</button>
           <div style={{ textAlign: 'center' }}>
@@ -344,46 +489,154 @@ export default function Reportes() {
           <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '8px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a' }}>Sin datos para este mes</h3>
+            <p style={{ margin: 0, color: '#64748b' }}>No hay transacciones registradas en {nombreMes}.</p>
           </div>
         ) : (
           <>
-            {/* RESUMEN */}
             <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
               <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>📋 RESUMEN EJECUTIVO</div>
               <div style={{ padding: '1rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <tbody>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Total Facturado</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700' }}>${fmt(summary.totalFacturado)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Total Facturado (bruto)</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>${fmt(summary.totalFacturado)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) IVA Débito Fiscal</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalIVA)}</td></tr>
-                    <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}><td style={{ padding: '0.75rem', fontWeight: '700' }}>INGRESO NETO REAL</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', color: '#15803d' }}>${fmt(summary.totalNeto - summary.totalComisiones)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Gastos</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalGastos)}</td></tr>
-                    <tr style={{ backgroundColor: summary.resultado >= 0 ? '#f0fdf4' : '#fef2f2' }}><td style={{ padding: '0.75rem', fontWeight: '800' }}>RESULTADO</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', color: summary.resultado >= 0 ? '#15803d' : '#b91c1c' }}>${fmt(summary.resultado)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Neto Gravado</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>${fmt(summary.totalNeto)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Comisiones de medios de pago</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalComisiones)}</td></tr>
+                    <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}><td style={{ padding: '0.75rem', fontWeight: '700', color: '#0f172a' }}>INGRESO NETO REAL</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', fontSize: '1.125rem', color: '#15803d' }}>${fmt(summary.totalNeto - summary.totalComisiones)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Gastos operativos</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalGastos)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>    (-) IVA Crédito Fiscal (compras)</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#64748b' }}>-${fmt(summary.totalGastosIVA)}</td></tr>
+                    <tr style={{ backgroundColor: summary.resultado >= 0 ? '#f0fdf4' : '#fef2f2', borderBottom: '2px solid #0f172a' }}><td style={{ padding: '0.75rem', fontWeight: '800', color: '#0f172a', fontSize: '1rem' }}>RESULTADO DEL EJERCICIO</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', fontSize: '1.25rem', color: summary.resultado >= 0 ? '#15803d' : '#b91c1c' }}>${fmt(summary.resultado)}</td></tr>
                   </tbody>
                 </table>
+                <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', fontSize: '0.75rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ color: '#64748b' }}>Ventas registradas</div>
+                    <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '1.125rem' }}>{summary.cantVentas}</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ color: '#64748b' }}>Gastos registrados</div>
+                    <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '1.125rem' }}>{summary.cantGastos}</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ color: '#64748b' }}>IVA a pagar (neto)</div>
+                    <div style={{ fontWeight: '800', color: '#dc2626', fontSize: '1.125rem' }}>${fmt(summary.totalIVA - summary.totalGastosIVA)}</div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* LIBRO VENTAS */}
             {salesBook.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}> LIBRO IVA VENTAS</div>
+                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>📒 LIBRO IVA VENTAS (Débito Fiscal)</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#94a3b8' }}>{salesBook.length} registros</span>
+                </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                    <thead><tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Fecha</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Concepto</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Bruto</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>IVA</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Neto Real</th>
-                    </tr></thead>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Fecha</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Concepto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Medio</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Bruto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Neto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>IVA</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Comisión</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Neto Real</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {salesBook.map((row, i) => (
                         <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.5rem' }}>{row.fecha}</td>
-                          <td style={{ padding: '0.5rem' }}>{row.concepto}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(row.bruto)}</td>
+                          <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.fecha}</td>
+                          <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.concepto}</td>
+                          <td style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.7rem' }}>{row.medio}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>${fmt(row.bruto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(row.neto)}</td>
                           <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(row.iva)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(row.comision)}</td>
                           <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(row.netoReal)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #0f172a', fontWeight: '800' }}>
+                        <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right', color: '#0f172a' }}>TOTALES</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalFacturado)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalNeto)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#dc2626' }}>${fmt(summary.totalIVA)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#dc2626' }}>${fmt(summary.totalComisiones)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#15803d' }}>${fmt(summary.totalNeto - summary.totalComisiones)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {expensesBook.length > 0 && (
+              <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
+                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
+                  <span> LIBRO IVA COMPRAS (Crédito Fiscal)</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#94a3b8' }}>{expensesBook.length} registros</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Fecha</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Concepto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Medio</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Bruto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Neto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>IVA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expensesBook.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.fecha}</td>
+                          <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.concepto}</td>
+                          <td style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.7rem' }}>{row.medio}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>${fmt(row.bruto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(row.neto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2563eb' }}>${fmt(row.iva)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #0f172a', fontWeight: '800' }}>
+                        <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right', color: '#0f172a' }}>TOTALES</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalGastos)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalGastosNeto)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#2563eb' }}>${fmt(summary.totalGastosIVA)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {methodSummary.length > 0 && (
+              <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
+                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>💳 DESGLOSE POR MEDIO DE PAGO</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Medio</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Cant.</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Bruto</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>IVA</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Comisiones</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Neto Real</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {methodSummary.map((m, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.5rem', fontWeight: '600', color: '#0f172a' }}>{m.nombre}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>{m.cantidad}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(m.bruto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(m.iva)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(m.comisiones)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(m.neto - m.comisiones)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -392,27 +645,39 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* LIBRO COMPRAS */}
-            {expensesBook.length > 0 && (
+            {calendar.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>📕 LIBRO IVA COMPRAS</div>
+                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>📅 CALENDARIO DE ACREDITACIONES</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#94a3b8' }}>Cuándo entra la plata al banco</span>
+                </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                    <thead><tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Fecha</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Concepto</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Bruto</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>IVA</th>
-                    </tr></thead>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Fecha</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left', color: '#64748b', fontWeight: '700' }}>Estado</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'right', color: '#64748b', fontWeight: '700' }}>Monto a acreditar</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {expensesBook.map((row, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.5rem' }}>{row.fecha}</td>
-                          <td style={{ padding: '0.5rem' }}>{row.concepto}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(row.bruto)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2563eb' }}>${fmt(row.iva)}</td>
-                        </tr>
-                      ))}
+                      {calendar.map((day, i) => {
+                        const isPast = day.fecha < hoyStr
+                        const isToday = day.fecha === hoyStr
+                        return (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: isToday ? '#f0fdf4' : 'transparent' }}>
+                            <td style={{ padding: '0.5rem', fontWeight: '600', color: '#0f172a' }}>
+                              {new Date(day.fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                            </td>
+                            <td style={{ padding: '0.5rem' }}>
+                              {isPast ? <span style={{ color: '#10b981', fontWeight: '700' }}>✅ Acreditado</span> : 
+                               isToday ? <span style={{ color: '#3b82f6', fontWeight: '700' }}>📍 Hoy</span> : 
+                               <span style={{ color: '#d97706', fontWeight: '700' }}>⏳ Pendiente</span>}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(day.total)}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -422,7 +687,6 @@ export default function Reportes() {
         )}
       </div>
 
-      {/* MODAL DE EXPORTACIÓN */}
       {showExportModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '400px', borderRadius: '12px', padding: '1.5rem' }}>
@@ -435,7 +699,7 @@ export default function Reportes() {
                 type="date" 
                 value={exportStartDate} 
                 onChange={e => setExportStartDate(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '1rem' }}
+                style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '1rem', boxSizing: 'border-box' }}
               />
             </div>
             
@@ -445,7 +709,7 @@ export default function Reportes() {
                 type="date" 
                 value={exportEndDate} 
                 onChange={e => setExportEndDate(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '1rem' }}
+                style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '1rem', boxSizing: 'border-box' }}
               />
             </div>
 
