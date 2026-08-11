@@ -1,0 +1,15 @@
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/admin": "pages/admin.js",
+  "/configuracion": "pages/configuracion.js",
+  "/cuenta": "pages/cuenta.js",
+  "/dashboard": "pages/dashboard.js",
+  "/equipo": "pages/equipo.js",
+  "/": "pages/index.js",
+  "/locales": "pages/locales.js",
+  "/medios-pago": "pages/medios-pago.js",
+  "/payment-methods": "pages/payment-methods.js",
+  "/reportes": "pages/reportes.js",
+  "/_document": "pages/_document.js"
+}
