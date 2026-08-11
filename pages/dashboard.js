@@ -192,9 +192,14 @@ export default function CajaDelDia() {
 
   const handleOpenShift = async (e) => {
     e.preventDefault()
-    if (!openingAmount || parseFloat(openingAmount) < 0) return toast.error('Ingresá un monto válido')
-    if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) return toast.error('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
-
+    if (!openingAmount || parseFloat(openingAmount) < 0) {
+      toast.error('Ingresá un monto válido')
+      return
+    }
+    if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) {
+      toast.error('⚠️ Explicá el motivo de la diferencia')
+      return
+    }
     try {
       setCreating(true)
       let { data: businesses } = await supabase.from('negocios').select('id').eq('local_id', activeLocalId).limit(1)
@@ -251,7 +256,7 @@ export default function CajaDelDia() {
       setIsAmountModified(false)
       loadData(user.id)
     } catch (err) {
-      toast.error(`Error: ${err.message}`)
+      toast.error('Error: ' + err.message)
     } finally {
       setCreating(false)
     }
@@ -264,12 +269,13 @@ export default function CajaDelDia() {
       const { error } = await supabase.from('turnos').update({ estado: 'CERRADO', cerrado_en: new Date().toISOString(), cerrado_por: user.id }).eq('id', activeShift.id)
       if (error) throw error
       
+      toast.success('🔒 Caja cerrada correctamente')
       setShowCloseShift(false)
       setActiveShift(null)
       setMovements([])
       loadData(user.id)
     } catch (err) {
-      toast.error(`Error: ${err.message}`)
+      toast.error('Error: ' + err.message)
     } finally {
       setCreating(false)
     }
@@ -277,9 +283,18 @@ export default function CajaDelDia() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!amount || amount <= 0) return toast.error('Ingresá un monto válido')
-    if (!selectedMethod) return toast.error('Seleccioná un medio de pago')
-    if (!activeShift) return toast.error('Primero abrí la caja')
+    if (!amount || amount <= 0) {
+      toast.error('Ingresá un monto válido')
+      return
+    }
+    if (!selectedMethod) {
+      toast.error('Seleccioná un medio de pago')
+      return
+    }
+    if (!activeShift) {
+      toast.error('Primero abrí la caja')
+      return
+    }
 
     try {
       setCreating(true)
@@ -323,10 +338,14 @@ export default function CajaDelDia() {
       }])
 
       if (error) throw error
-      toast.success(`${isIncome ? '💰 Cobro' : '💸 Gasto'} registrado correctamente`)
+      toast.success(`${isIncome ? '💰 Cobro' : ' Gasto'} registrado correctamente`)
       setShowForm(false)
       loadData(user.id)
-    } catch (err) { toast.error(`Error: ${err.message}`) } finally { setCreating(false) }
+    } catch (err) { 
+      toast.error('Error: ' + err.message)
+    } finally { 
+      setCreating(false)
+    }
   }
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
@@ -370,7 +389,7 @@ export default function CajaDelDia() {
           <>
             {/* RESUMEN CONTABLE */}
             <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
-              <h2 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}>📊 Resumen del Turno</h2>
+              <h2 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: '700' }}> Resumen del Turno</h2>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '8px', border: '2px solid #16a34a' }}>
@@ -566,7 +585,7 @@ export default function CajaDelDia() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isIncome ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                            {isIncome ? '📥' : '📤'}
+                            {isIncome ? '' : '📤'}
                           </div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.875rem' }}>{m.descripcion}</div>
@@ -616,13 +635,13 @@ export default function CajaDelDia() {
         )}
       </div>
 
+      {/* MODAL APERTURA DE CAJA */}
       {showOpenShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔓 Abrir Caja</h2>
-              <button onClick={() => toast.success('🔓 Caja abierta correctamente')
-      setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Abrir Caja</h2>
+              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
             <form onSubmit={handleOpenShift}>
               <div style={{ marginBottom: '1rem' }}>
@@ -657,12 +676,13 @@ export default function CajaDelDia() {
         </div>
       )}
 
+      {/* MODAL CIERRE DE CAJA */}
       {showCloseShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔒 Cerrar Caja</h2>
-              <button onClick={() => setShowCloseShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}> Cerrar Caja</h2>
+              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
               <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
@@ -688,6 +708,7 @@ export default function CajaDelDia() {
         </div>
       )}
 
+      {/* MODAL COBRO/GASTO */}
       {showForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -695,8 +716,7 @@ export default function CajaDelDia() {
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
                 {formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}
               </h2>
-              <button onClick={() => toast.success(`${isIncome ? '💰 Cobro' : '💸 Gasto'} registrado correctamente`)
-      setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <button onClick={() => { toast.success('Operación cancelada'); setShowForm(false); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -854,7 +874,10 @@ export default function CajaDelDia() {
                             <button 
                               type="button"
                               onClick={async () => {
-                                if (!newCategoryQuickName.trim()) return toast.error('Ingresá un nombre')
+                                if (!newCategoryQuickName.trim()) {
+                                  toast.error('Ingresá un nombre')
+                                  return
+                                }
                                 try {
                                   const { data, error } = await supabase.from('categorias_pago').insert([{ 
                                     nombre: newCategoryQuickName.trim(), 
@@ -920,7 +943,10 @@ export default function CajaDelDia() {
                               <button 
                                 type="button"
                                 onClick={async () => {
-                                  if (!newOperatorQuickName.trim()) return toast.error('Ingresá un nombre')
+                                  if (!newOperatorQuickName.trim()) {
+                                    toast.error('Ingresá un nombre')
+                                    return
+                                  }
                                   try {
                                     const { data, error } = await supabase.from('subcategorias_pago').insert([{ 
                                       categoria_id: quickMethodCategory,
@@ -1073,8 +1099,14 @@ export default function CajaDelDia() {
                             <button 
                               type="button" 
                               onClick={async () => {
-                                if (!quickMethodCategory) return toast.error('Seleccioná un medio de pago')
-                                if (!quickMethodSubcategory) return toast.error('Seleccioná un operador')
+                                if (!quickMethodCategory) {
+                                  toast.error('Seleccioná un medio de pago')
+                                  return
+                                }
+                                if (!quickMethodSubcategory) {
+                                  toast.error('Seleccioná un operador')
+                                  return
+                                }
                                 try {
                                   setCreating(true)
                                   
