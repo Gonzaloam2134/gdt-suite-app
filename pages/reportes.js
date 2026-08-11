@@ -9,15 +9,18 @@ export default function Reportes() {
   const [loading, setLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   
-  // Datos del reporte
   const [summary, setSummary] = useState(null)
-  const [salesBook, setSalesBook] = useState([]) // Libro IVA Ventas
-  const [expensesBook, setExpensesBook] = useState([]) // Libro IVA Compras
+  const [salesBook, setSalesBook] = useState([])
+  const [expensesBook, setExpensesBook] = useState([])
   const [methodSummary, setMethodSummary] = useState([])
   const [calendar, setCalendar] = useState([])
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
+
+  // ✅ hoyStr definido a nivel de componente para que esté disponible en el render
+  const hoy = new Date()
+  const hoyStr = hoy.toISOString().split('T')[0]
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,8 +41,6 @@ export default function Reportes() {
       const { data: localData } = await supabase.from('locales').select('nombre').eq('id', activeLocalId).single()
       if (localData) setBusinessName(localData.nombre)
 
-      const hoy = new Date()
-      const hoyStr = hoy.toISOString().split('T')[0]
       const primerDiaMes = new Date(Date.UTC(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0)).toISOString()
       const ultimoDiaMes = new Date(Date.UTC(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999)).toISOString()
 
@@ -68,7 +69,6 @@ export default function Reportes() {
             totalIVA += iva
             totalComisiones += comision
 
-            // Libro IVA Ventas
             salesRows.push({
               fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
               concepto: t.descripcion || 'Venta',
@@ -80,7 +80,6 @@ export default function Reportes() {
               netoReal: neto - comision
             })
 
-            // Resumen por medio
             if (!methodsMap[key]) methodsMap[key] = { nombre: key, bruto: 0, neto: 0, iva: 0, comisiones: 0, cantidad: 0 }
             methodsMap[key].bruto += monto
             methodsMap[key].neto += neto
@@ -88,7 +87,6 @@ export default function Reportes() {
             methodsMap[key].comisiones += comision
             methodsMap[key].cantidad++
 
-            // Calendario
             let fechaAcred = t.fecha_acreditacion_estimada
             if (!fechaAcred) {
               const d = new Date(t.creado_en)
@@ -140,7 +138,6 @@ export default function Reportes() {
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
   if (!user) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
 
-  const hoy = new Date()
   const nombreMes = selectedMonth.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
   const isCurrentMonth = selectedMonth.getMonth() === hoy.getMonth() && selectedMonth.getFullYear() === hoy.getFullYear()
 
@@ -148,7 +145,6 @@ export default function Reportes() {
 
   return (
     <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', paddingBottom: '70px' }}>
-      {/* HEADER */}
       <header style={{ backgroundColor: '#1e293b', padding: '1rem', borderBottom: '3px solid #3b82f6' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -163,7 +159,6 @@ export default function Reportes() {
       </header>
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem' }}>
-        {/* NAVEGACIÓN DE MESES */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '1rem', backgroundColor: 'white', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <button onClick={() => { const d = new Date(selectedMonth); d.setMonth(d.getMonth() - 1); setSelectedMonth(d) }} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>← Mes anterior</button>
           <div style={{ textAlign: 'center' }}>
@@ -181,11 +176,9 @@ export default function Reportes() {
           </div>
         ) : (
           <>
-            {/* SECCIÓN 1: RESUMEN EJECUTIVO */}
+            {/* RESUMEN EJECUTIVO */}
             <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
-              <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>
-                📋 RESUMEN EJECUTIVO
-              </div>
+              <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>📋 RESUMEN EJECUTIVO</div>
               <div style={{ padding: '1rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <tbody>
@@ -240,7 +233,7 @@ export default function Reportes() {
               </div>
             </div>
 
-            {/* SECCIÓN 2: LIBRO IVA VENTAS */}
+            {/* LIBRO IVA VENTAS */}
             {salesBook.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
@@ -288,11 +281,11 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* SECCIÓN 3: LIBRO IVA COMPRAS */}
+            {/* LIBRO IVA COMPRAS */}
             {expensesBook.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span> LIBRO IVA COMPRAS (Crédito Fiscal)</span>
+                  <span>📕 LIBRO IVA COMPRAS (Crédito Fiscal)</span>
                   <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#94a3b8' }}>{expensesBook.length} registros</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
@@ -330,12 +323,10 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* SECCIÓN 4: DESGLOSE POR MEDIO DE PAGO */}
+            {/* DESGLOSE POR MEDIO DE PAGO */}
             {methodSummary.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>
-                  💳 DESGLOSE POR MEDIO DE PAGO
-                </div>
+                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem' }}>💳 DESGLOSE POR MEDIO DE PAGO</div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
                     <thead>
@@ -365,7 +356,7 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* SECCIÓN 5: CALENDARIO DE ACREDITACIONES */}
+            {/* CALENDARIO DE ACREDITACIONES */}
             {calendar.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
@@ -392,7 +383,7 @@ export default function Reportes() {
                             </td>
                             <td style={{ padding: '0.5rem' }}>
                               {isPast ? <span style={{ color: '#10b981', fontWeight: '700' }}>✅ Acreditado</span> : 
-                               isToday ? <span style={{ color: '#3b82f6', fontWeight: '700' }}> Hoy</span> : 
+                               isToday ? <span style={{ color: '#3b82f6', fontWeight: '700' }}>📍 Hoy</span> : 
                                <span style={{ color: '#d97706', fontWeight: '700' }}>⏳ Pendiente</span>}
                             </td>
                             <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(day.total)}</td>
