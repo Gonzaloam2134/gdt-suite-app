@@ -136,333 +136,290 @@ export default function Reportes() {
     } catch (err) { console.error('Error:', err) } finally { setLoading(false) }
   }
 
- const handleExportExcel = async () => {
-  if (!exportStartDate || !exportEndDate) {
-    alert('️ Seleccioná fecha de inicio y fin')
-    return
-  }
-
-  try {
-    setLoading(true)
-    const start = new Date(exportStartDate + 'T00:00:00').toISOString()
-    const end = new Date(exportEndDate + 'T23:59:59').toISOString()
-
-    const { data: mediosData } = await supabase.from('medios_pago').select('id, nombre, banco_emisor, dias_acreditacion, tipo_comision, valor_comision').eq('local_id', activeLocalId)
-    const mediosMap = new Map()
-    if (mediosData) mediosData.forEach(m => mediosMap.set(m.id, m))
-
-    const { data: transacciones } = await supabase.from('transacciones').select('*').eq('local_id', activeLocalId).gte('creado_en', start).lte('creado_en', end)
-
-    if (!transacciones || transacciones.length === 0) {
-      alert(' No hay datos en el período seleccionado')
-      setLoading(false)
+  const handleExportExcel = async () => {
+    if (!exportStartDate || !exportEndDate) {
+      alert('⚠️ Seleccioná fecha de inicio y fin')
       return
     }
 
-    let totalFacturado = 0, totalNeto = 0, totalIVA = 0, totalComisiones = 0, totalGastos = 0, totalGastosNeto = 0, totalGastosIVA = 0
-    const salesRows = [], expenseRows = [], methodsMap = {}, calendarMap = {}
+    try {
+      setLoading(true)
+      const start = new Date(exportStartDate + 'T00:00:00').toISOString()
+      const end = new Date(exportEndDate + 'T23:59:59').toISOString()
 
-    transacciones.forEach(t => {
-      const medio = mediosMap.get(t.medio_pago_id) || { nombre: 'Sin Medio', banco_emisor: '', dias_acreditacion: 0, tipo_comision: 'NINGUNA', valor_comision: 0 }
-      const key = medio.banco_emisor ? `${medio.nombre} (${medio.banco_emisor})` : medio.nombre
+      const { data: mediosData } = await supabase.from('medios_pago').select('id, nombre, banco_emisor, dias_acreditacion, tipo_comision, valor_comision').eq('local_id', activeLocalId)
+      const mediosMap = new Map()
+      if (mediosData) mediosData.forEach(m => mediosMap.set(m.id, m))
 
-      if (t.tipo === 'COBRO_RECIBIDO') {
-        const monto = t.monto || 0
-        const comision = medio.tipo_comision === 'PORCENTAJE' ? (monto * (medio.valor_comision || 0)) / 100 : 0
-        const iva = t.monto_iva || (monto - monto / 1.21)
-        const neto = t.monto_neto || (monto - iva)
+      const { data: transacciones } = await supabase.from('transacciones').select('*').eq('local_id', activeLocalId).gte('creado_en', start).lte('creado_en', end)
 
-        totalFacturado += monto
-        totalNeto += neto
-        totalIVA += iva
-        totalComisiones += comision
+      if (!transacciones || transacciones.length === 0) {
+        alert(' No hay datos en el período seleccionado')
+        setLoading(false)
+        return
+      }
 
-        salesRows.push({
-          Fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
-          Concepto: t.descripcion || 'Venta',
-          Medio: key,
-          Bruto: monto,
-          Neto: neto,
-          IVA: iva,
-          Comision: comision,
-          NetoReal: neto - comision
-        })
+      let totalFacturado = 0, totalNeto = 0, totalIVA = 0, totalComisiones = 0, totalGastos = 0, totalGastosNeto = 0, totalGastosIVA = 0
+      const salesRows = [], expenseRows = [], methodsMap = {}, calendarMap = {}
 
-        if (!methodsMap[key]) methodsMap[key] = { nombre: key, bruto: 0, neto: 0, iva: 0, comisiones: 0, cantidad: 0 }
-        methodsMap[key].bruto += monto
-        methodsMap[key].neto += neto
-        methodsMap[key].iva += iva
-        methodsMap[key].comisiones += comision
-        methodsMap[key].cantidad++
+      transacciones.forEach(t => {
+        const medio = mediosMap.get(t.medio_pago_id) || { nombre: 'Sin Medio', banco_emisor: '', dias_acreditacion: 0, tipo_comision: 'NINGUNA', valor_comision: 0 }
+        const key = medio.banco_emisor ? `${medio.nombre} (${medio.banco_emisor})` : medio.nombre
 
-        let fechaAcred = t.fecha_acreditacion_estimada
-        if (!fechaAcred) {
-          const d = new Date(t.creado_en)
-          d.setDate(d.getDate() + (medio.dias_acreditacion || 0))
-          fechaAcred = d.toISOString().split('T')[0]
+        if (t.tipo === 'COBRO_RECIBIDO') {
+          const monto = t.monto || 0
+          const comision = medio.tipo_comision === 'PORCENTAJE' ? (monto * (medio.valor_comision || 0)) / 100 : 0
+          const iva = t.monto_iva || (monto - monto / 1.21)
+          const neto = t.monto_neto || (monto - iva)
+
+          totalFacturado += monto
+          totalNeto += neto
+          totalIVA += iva
+          totalComisiones += comision
+
+          salesRows.push({
+            Fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
+            Concepto: t.descripcion || 'Venta',
+            Medio: key,
+            Bruto: monto,
+            Neto: neto,
+            IVA: iva,
+            Comision: comision,
+            NetoReal: neto - comision
+          })
+
+          if (!methodsMap[key]) methodsMap[key] = { nombre: key, bruto: 0, neto: 0, iva: 0, comisiones: 0, cantidad: 0 }
+          methodsMap[key].bruto += monto
+          methodsMap[key].neto += neto
+          methodsMap[key].iva += iva
+          methodsMap[key].comisiones += comision
+          methodsMap[key].cantidad++
+
+          let fechaAcred = t.fecha_acreditacion_estimada
+          if (!fechaAcred) {
+            const d = new Date(t.creado_en)
+            d.setDate(d.getDate() + (medio.dias_acreditacion || 0))
+            fechaAcred = d.toISOString().split('T')[0]
+          }
+          if (!calendarMap[fechaAcred]) calendarMap[fechaAcred] = { fecha: fechaAcred, total: 0 }
+          calendarMap[fechaAcred].total += (neto - comision)
+
+        } else if (t.tipo === 'GASTO_REGISTRADO') {
+          const monto = t.monto || 0
+          const iva = t.monto_iva || (monto - monto / 1.21)
+          const neto = t.monto_neto || (monto - iva)
+          totalGastos += monto
+          totalGastosNeto += neto
+          totalGastosIVA += iva
+
+          expenseRows.push({
+            Fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
+            Concepto: t.descripcion || 'Gasto',
+            Medio: key,
+            Bruto: monto,
+            Neto: neto,
+            IVA: iva
+          })
         }
-        if (!calendarMap[fechaAcred]) calendarMap[fechaAcred] = { fecha: fechaAcred, total: 0 }
-        calendarMap[fechaAcred].total += (neto - comision)
+      })
 
-      } else if (t.tipo === 'GASTO_REGISTRADO') {
-        const monto = t.monto || 0
-        const iva = t.monto_iva || (monto - monto / 1.21)
-        const neto = t.monto_neto || (monto - iva)
-        totalGastos += monto
-        totalGastosNeto += neto
-        totalGastosIVA += iva
+      const resultado = totalNeto - totalComisiones - totalGastos
+      const wb = XLSX.utils.book_new()
 
-        expenseRows.push({
-          Fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
-          Concepto: t.descripcion || 'Gasto',
-          Medio: key,
-          Bruto: monto,
-          Neto: neto,
-          IVA: iva
-        })
+      const applyStyle = (ws, cellRef, style) => {
+        if (ws[cellRef]) {
+          ws[cellRef].s = style
+        }
       }
-    })
 
-    const resultado = totalNeto - totalComisiones - totalGastos
-    const wb = XLSX.utils.book_new()
-
-    // Función helper para aplicar estilos de forma segura
-    const applyStyle = (ws, cellRef, style) => {
-      if (ws[cellRef]) {
-        ws[cellRef].s = style
-      }
-    }
-
-    // ============================================
-    // HOJA 1: RESUMEN EJECUTIVO
-    // ============================================
-    const resumenData = [
-      ['RESUMEN EJECUTIVO', ''],
-      ['Período:', `${new Date(exportStartDate).toLocaleDateString('es-AR')} - ${new Date(exportEndDate).toLocaleDateString('es-AR')}`],
-      ['Generado:', new Date().toLocaleString('es-AR')],
-      ['', ''],
-      ['Total Facturado (bruto)', totalFacturado],
-      ['(-) IVA Débito Fiscal', -totalIVA],
-      ['Neto Gravado', totalNeto],
-      ['(-) Comisiones de medios de pago', -totalComisiones],
-      ['INGRESO NETO REAL', totalNeto - totalComisiones],
-      ['(-) Gastos operativos', -totalGastos],
-      ['(-) IVA Crédito Fiscal (compras)', -totalGastosIVA],
-      ['RESULTADO DEL EJERCICIO', resultado],
-      ['', ''],
-      ['Ventas registradas', salesRows.length],
-      ['Gastos registrados', expenseRows.length],
-      ['IVA a pagar (neto)', totalIVA - totalGastosIVA]
-    ]
-    const wsResumen = XLSX.utils.aoa_to_sheet(resumenData, { sheetStubs: true })
-    
-    wsResumen['!cols'] = [{ wch: 35 }, { wch: 25 }]
-    
-    // Título
-    applyStyle(wsResumen, 'A1', { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } })
-    applyStyle(wsResumen, 'B1', { fill: { fgColor: { rgb: '1E293B' } } })
-    
-    // Info
-    applyStyle(wsResumen, 'A2', { font: { bold: true, sz: 11 } })
-    applyStyle(wsResumen, 'A3', { font: { italic: true, color: { rgb: '64748B' }, sz: 10 } })
-    
-    // Líneas de resumen
-    applyStyle(wsResumen, 'A5', { font: { bold: true, sz: 11 } })
-    applyStyle(wsResumen, 'B5', { font: { sz: 11 }, numFmt: '#,##0.00' })
-    
-    applyStyle(wsResumen, 'A6', { font: { color: { rgb: 'DC2626' }, sz: 11 } })
-    applyStyle(wsResumen, 'B6', { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' })
-    
-    applyStyle(wsResumen, 'A7', { font: { bold: true, sz: 11 } })
-    applyStyle(wsResumen, 'B7', { font: { bold: true, sz: 11 }, numFmt: '#,##0.00' })
-    
-    applyStyle(wsResumen, 'A8', { font: { color: { rgb: 'DC2626' }, sz: 11 } })
-    applyStyle(wsResumen, 'B8', { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' })
-    
-    // Ingreso Neto Real
-    applyStyle(wsResumen, 'A9', { font: { bold: true, sz: 12 }, fill: { fgColor: { rgb: 'F0FDF4' } }, border: { bottom: { style: 'thin', color: { rgb: '15803D' } } } })
-    applyStyle(wsResumen, 'B9', { font: { bold: true, sz: 12, color: { rgb: '15803D' } }, fill: { fgColor: { rgb: 'F0FDF4' } }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: '15803D' } } } })
-    
-    applyStyle(wsResumen, 'A10', { font: { color: { rgb: 'DC2626' }, sz: 11 } })
-    applyStyle(wsResumen, 'B10', { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' })
-    
-    applyStyle(wsResumen, 'A11', { font: { color: { rgb: '2563EB' }, sz: 11 } })
-    applyStyle(wsResumen, 'B11', { font: { color: { rgb: '2563EB' }, sz: 11 }, numFmt: '#,##0.00' })
-    
-    // Resultado
-    const resultadoColor = resultado >= 0 ? '15803D' : 'B91C1C'
-    const resultadoBg = resultado >= 0 ? 'F0FDF4' : 'FEF2F2'
-    applyStyle(wsResumen, 'A12', { font: { bold: true, sz: 13 }, fill: { fgColor: { rgb: resultadoBg } }, border: { top: { style: 'double', color: { rgb: '0F172A' } }, bottom: { style: 'double', color: { rgb: '0F172A' } } } })
-    applyStyle(wsResumen, 'B12', { font: { bold: true, sz: 13, color: { rgb: resultadoColor } }, fill: { fgColor: { rgb: resultadoBg } }, numFmt: '#,##0.00', border: { top: { style: 'double', color: { rgb: '0F172A' } }, bottom: { style: 'double', color: { rgb: '0F172A' } } } })
-    
-    // Stats
-    for (let i = 14; i <= 16; i++) {
-      applyStyle(wsResumen, `A${i}`, { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } })
-      applyStyle(wsResumen, `B${i}`, { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } }, numFmt: '#,##0.00' })
-    }
-    applyStyle(wsResumen, 'A16', { font: { bold: true, sz: 10, color: { rgb: 'DC2626' } }, fill: { fgColor: { rgb: 'F1F5F9' } } })
-    applyStyle(wsResumen, 'B16', { font: { bold: true, sz: 10, color: { rgb: 'DC2626' } }, fill: { fgColor: { rgb: 'F1F5F9' } }, numFmt: '#,##0.00' })
-    
-    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
-
-    // ============================================
-    // HOJA 2: LIBRO IVA VENTAS
-    // ============================================
-    const ventasHeaders = [
-      { v: 'Fecha', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Concepto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Neto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'IVA', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Comisión', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Neto Real', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
-    ]
-    
-    const ventasData = [ventasHeaders]
-    salesRows.forEach(row => {
-      ventasData.push([
-        { v: row.Fecha, s: { font: { sz: 10 } } },
-        { v: row.Concepto, s: { font: { sz: 10 } } },
-        { v: row.Medio, s: { font: { sz: 10, color: { rgb: '64748B' } } } },
-        { v: row.Bruto, s: { font: { sz: 10, bold: true }, numFmt: '#,##0.00' } },
-        { v: row.Neto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
-        { v: row.IVA, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
-        { v: row.Comision, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
-        { v: row.NetoReal, s: { font: { sz: 10, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00' } }
-      ])
-    })
-    
-    ventasData.push([
-      { v: 'TOTALES', s: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: '', s: {} },
-      { v: '', s: {} },
-      { v: totalFacturado, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: totalNeto, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: totalIVA, s: { font: { bold: true, sz: 11, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: totalComisiones, s: { font: { bold: true, sz: 11, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: totalNeto - totalComisiones, s: { font: { bold: true, sz: 11, color: { rgb: '15803D' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } }
-    ])
-    
-    const wsVentas = XLSX.utils.aoa_to_sheet(ventasData)
-    wsVentas['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
-    XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
-
-    // ============================================
-    // HOJA 3: LIBRO IVA COMPRAS
-    // ============================================
-    const comprasHeaders = [
-      { v: 'Fecha', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Concepto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Neto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'IVA (Crédito Fiscal)', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
-    ]
-    
-    const comprasData = [comprasHeaders]
-    expenseRows.forEach(row => {
-      comprasData.push([
-        { v: row.Fecha, s: { font: { sz: 10 } } },
-        { v: row.Concepto, s: { font: { sz: 10 } } },
-        { v: row.Medio, s: { font: { sz: 10, color: { rgb: '64748B' } } } },
-        { v: row.Bruto, s: { font: { sz: 10, bold: true }, numFmt: '#,##0.00' } },
-        { v: row.Neto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
-        { v: row.IVA, s: { font: { sz: 10, color: { rgb: '2563EB' } }, numFmt: '#,##0.00' } }
-      ])
-    })
-    
-    comprasData.push([
-      { v: 'TOTALES', s: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: '', s: {} },
-      { v: '', s: {} },
-      { v: totalGastos, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: totalGastosNeto, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
-      { v: totalGastosIVA, s: { font: { bold: true, sz: 11, color: { rgb: '2563EB' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } }
-    ])
-    
-    const wsCompras = XLSX.utils.aoa_to_sheet(comprasData)
-    wsCompras['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }]
-    XLSX.utils.book_append_sheet(wb, wsCompras, 'Libro IVA Compras')
-
-    // ============================================
-    // HOJA 4: MEDIOS DE PAGO
-    // ============================================
-    const mediosHeaders = [
-      { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Cant. Operaciones', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'IVA', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Comisiones', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Neto Real', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
-    ]
-    
-    const mediosDataArray = Object.values(methodsMap).sort((a, b) => b.neto - a.neto)
-    const mediosDataForSheet = [mediosHeaders]
-    mediosDataArray.forEach(m => {
-      mediosDataForSheet.push([
-        { v: m.nombre, s: { font: { sz: 10, bold: true } } },
-        { v: m.cantidad, s: { font: { sz: 10 }, alignment: { horizontal: 'center' } } },
-        { v: m.bruto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
-        { v: m.iva, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
-        { v: m.comisiones, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
-        { v: m.neto - m.comisiones, s: { font: { sz: 10, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00' } }
-      ])
-    })
-    
-    const wsMedios = XLSX.utils.aoa_to_sheet(mediosDataForSheet)
-    wsMedios['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
-    XLSX.utils.book_append_sheet(wb, wsMedios, 'Medios de Pago')
-
-    // ============================================
-    // HOJA 5: CALENDARIO DE ACREDITACIONES
-    // ============================================
-    const calendarHeaders = [
-      { v: 'Fecha de Acreditación', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Estado', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
-      { v: 'Monto a Acreditar', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
-    ]
-    
-    const calendarSorted = Object.values(calendarMap).sort((a, b) => a.fecha.localeCompare(b.fecha))
-    const calendarDataForSheet = [calendarHeaders]
-    calendarSorted.forEach(c => {
-      const isPast = c.fecha < hoyStr
-      const isToday = c.fecha === hoyStr
-      const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
-      const estadoColor = isPast ? '15803D' : isToday ? '3B82F6' : 'D97706'
-      const rowBg = isToday ? 'F0FDF4' : undefined
+      const resumenData = [
+        ['RESUMEN EJECUTIVO', ''],
+        ['Período:', `${new Date(exportStartDate).toLocaleDateString('es-AR')} - ${new Date(exportEndDate).toLocaleDateString('es-AR')}`],
+        ['Generado:', new Date().toLocaleString('es-AR')],
+        ['', ''],
+        ['Total Facturado (bruto)', totalFacturado],
+        ['(-) IVA Débito Fiscal', -totalIVA],
+        ['Neto Gravado', totalNeto],
+        ['(-) Comisiones de medios de pago', -totalComisiones],
+        ['INGRESO NETO REAL', totalNeto - totalComisiones],
+        ['(-) Gastos operativos', -totalGastos],
+        ['(-) IVA Crédito Fiscal (compras)', -totalGastosIVA],
+        ['RESULTADO DEL EJERCICIO', resultado],
+        ['', ''],
+        ['Ventas registradas', salesRows.length],
+        ['Gastos registrados', expenseRows.length],
+        ['IVA a pagar (neto)', totalIVA - totalGastosIVA]
+      ]
+      const wsResumen = XLSX.utils.aoa_to_sheet(resumenData, { sheetStubs: true })
       
-      calendarDataForSheet.push([
-        { v: new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), s: { font: { sz: 10, bold: true }, fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } },
-        { v: estado, s: { font: { sz: 10, bold: true, color: { rgb: estadoColor } }, fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } },
-        { v: c.total, s: { font: { sz: 11, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00', fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } }
+      wsResumen['!cols'] = [{ wch: 35 }, { wch: 25 }]
+      
+      applyStyle(wsResumen, 'A1', { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } })
+      applyStyle(wsResumen, 'B1', { fill: { fgColor: { rgb: '1E293B' } } })
+      applyStyle(wsResumen, 'A2', { font: { bold: true, sz: 11 } })
+      applyStyle(wsResumen, 'A3', { font: { italic: true, color: { rgb: '64748B' }, sz: 10 } })
+      applyStyle(wsResumen, 'A5', { font: { bold: true, sz: 11 } })
+      applyStyle(wsResumen, 'B5', { font: { sz: 11 }, numFmt: '#,##0.00' })
+      applyStyle(wsResumen, 'A6', { font: { color: { rgb: 'DC2626' }, sz: 11 } })
+      applyStyle(wsResumen, 'B6', { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' })
+      applyStyle(wsResumen, 'A7', { font: { bold: true, sz: 11 } })
+      applyStyle(wsResumen, 'B7', { font: { bold: true, sz: 11 }, numFmt: '#,##0.00' })
+      applyStyle(wsResumen, 'A8', { font: { color: { rgb: 'DC2626' }, sz: 11 } })
+      applyStyle(wsResumen, 'B8', { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' })
+      applyStyle(wsResumen, 'A9', { font: { bold: true, sz: 12 }, fill: { fgColor: { rgb: 'F0FDF4' } }, border: { bottom: { style: 'thin', color: { rgb: '15803D' } } } })
+      applyStyle(wsResumen, 'B9', { font: { bold: true, sz: 12, color: { rgb: '15803D' } }, fill: { fgColor: { rgb: 'F0FDF4' } }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: '15803D' } } } })
+      applyStyle(wsResumen, 'A10', { font: { color: { rgb: 'DC2626' }, sz: 11 } })
+      applyStyle(wsResumen, 'B10', { font: { color: { rgb: 'DC2626' }, sz: 11 }, numFmt: '#,##0.00' })
+      applyStyle(wsResumen, 'A11', { font: { color: { rgb: '2563EB' }, sz: 11 } })
+      applyStyle(wsResumen, 'B11', { font: { color: { rgb: '2563EB' }, sz: 11 }, numFmt: '#,##0.00' })
+      
+      const resultadoColor = resultado >= 0 ? '15803D' : 'B91C1C'
+      const resultadoBg = resultado >= 0 ? 'F0FDF4' : 'FEF2F2'
+      applyStyle(wsResumen, 'A12', { font: { bold: true, sz: 13 }, fill: { fgColor: { rgb: resultadoBg } }, border: { top: { style: 'double', color: { rgb: '0F172A' } }, bottom: { style: 'double', color: { rgb: '0F172A' } } } })
+      applyStyle(wsResumen, 'B12', { font: { bold: true, sz: 13, color: { rgb: resultadoColor } }, fill: { fgColor: { rgb: resultadoBg } }, numFmt: '#,##0.00', border: { top: { style: 'double', color: { rgb: '0F172A' } }, bottom: { style: 'double', color: { rgb: '0F172A' } } } })
+      
+      for (let i = 14; i <= 16; i++) {
+        applyStyle(wsResumen, `A${i}`, { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } })
+        applyStyle(wsResumen, `B${i}`, { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } }, numFmt: '#,##0.00' })
+      }
+      applyStyle(wsResumen, 'A16', { font: { bold: true, sz: 10, color: { rgb: 'DC2626' } }, fill: { fgColor: { rgb: 'F1F5F9' } } })
+      applyStyle(wsResumen, 'B16', { font: { bold: true, sz: 10, color: { rgb: 'DC2626' } }, fill: { fgColor: { rgb: 'F1F5F9' } }, numFmt: '#,##0.00' })
+      
+      XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
+
+      const ventasHeaders = [
+        { v: 'Fecha', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Concepto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'IVA', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Comisión', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto Real', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const ventasData = [ventasHeaders]
+      salesRows.forEach(row => {
+        ventasData.push([
+          { v: row.Fecha, s: { font: { sz: 10 } } },
+          { v: row.Concepto, s: { font: { sz: 10 } } },
+          { v: row.Medio, s: { font: { sz: 10, color: { rgb: '64748B' } } } },
+          { v: row.Bruto, s: { font: { sz: 10, bold: true }, numFmt: '#,##0.00' } },
+          { v: row.Neto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
+          { v: row.IVA, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: row.Comision, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: row.NetoReal, s: { font: { sz: 10, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00' } }
+        ])
+      })
+      
+      ventasData.push([
+        { v: 'TOTALES', s: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: '', s: {} },
+        { v: '', s: {} },
+        { v: totalFacturado, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalNeto, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalIVA, s: { font: { bold: true, sz: 11, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalComisiones, s: { font: { bold: true, sz: 11, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalNeto - totalComisiones, s: { font: { bold: true, sz: 11, color: { rgb: '15803D' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } }
       ])
-    })
-    
-    const wsCalendar = XLSX.utils.aoa_to_sheet(calendarDataForSheet)
-    wsCalendar['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }]
-    XLSX.utils.book_append_sheet(wb, wsCalendar, 'Calendario')
+      
+      const wsVentas = XLSX.utils.aoa_to_sheet(ventasData)
+      wsVentas['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
+      XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
 
-    const fileName = `Reporte_${businessName.replace(/\s+/g, '_')}_${exportStartDate}_${exportEndDate}.xlsx`
-    XLSX.writeFile(wb, fileName)
+      const comprasHeaders = [
+        { v: 'Fecha', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Concepto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'IVA (Crédito Fiscal)', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const comprasData = [comprasHeaders]
+      expenseRows.forEach(row => {
+        comprasData.push([
+          { v: row.Fecha, s: { font: { sz: 10 } } },
+          { v: row.Concepto, s: { font: { sz: 10 } } },
+          { v: row.Medio, s: { font: { sz: 10, color: { rgb: '64748B' } } } },
+          { v: row.Bruto, s: { font: { sz: 10, bold: true }, numFmt: '#,##0.00' } },
+          { v: row.Neto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
+          { v: row.IVA, s: { font: { sz: 10, color: { rgb: '2563EB' } }, numFmt: '#,##0.00' } }
+        ])
+      })
+      
+      comprasData.push([
+        { v: 'TOTALES', s: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: '', s: {} },
+        { v: '', s: {} },
+        { v: totalGastos, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalGastosNeto, s: { font: { bold: true, sz: 11 }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } },
+        { v: totalGastosIVA, s: { font: { bold: true, sz: 11, color: { rgb: '2563EB' } }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } } }
+      ])
+      
+      const wsCompras = XLSX.utils.aoa_to_sheet(comprasData)
+      wsCompras['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }]
+      XLSX.utils.book_append_sheet(wb, wsCompras, 'Libro IVA Compras')
 
-    setShowExportModal(false)
-  } catch (err) {
-    console.error('Error exportando:', err)
-    alert('❌ Error al exportar: ' + err.message)
-  } finally {
-    setLoading(false)
-  }
-}
+      const mediosHeaders = [
+        { v: 'Medio de Pago', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Cant. Operaciones', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Bruto', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'IVA', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Comisiones', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Neto Real', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const mediosDataArray = Object.values(methodsMap).sort((a, b) => b.neto - a.neto)
+      const mediosDataForSheet = [mediosHeaders]
+      mediosDataArray.forEach(m => {
+        mediosDataForSheet.push([
+          { v: m.nombre, s: { font: { sz: 10, bold: true } } },
+          { v: m.cantidad, s: { font: { sz: 10 }, alignment: { horizontal: 'center' } } },
+          { v: m.bruto, s: { font: { sz: 10 }, numFmt: '#,##0.00' } },
+          { v: m.iva, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: m.comisiones, s: { font: { sz: 10, color: { rgb: 'DC2626' } }, numFmt: '#,##0.00' } },
+          { v: m.neto - m.comisiones, s: { font: { sz: 10, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00' } }
+        ])
+      })
+      
+      const wsMedios = XLSX.utils.aoa_to_sheet(mediosDataForSheet)
+      wsMedios['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
+      XLSX.utils.book_append_sheet(wb, wsMedios, 'Medios de Pago')
 
-      // Guardar archivo
+      const calendarHeaders = [
+        { v: 'Fecha de Acreditación', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Estado', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } },
+        { v: 'Monto a Acreditar', s: { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } } }
+      ]
+      
+      const calendarSorted = Object.values(calendarMap).sort((a, b) => a.fecha.localeCompare(b.fecha))
+      const calendarDataForSheet = [calendarHeaders]
+      calendarSorted.forEach(c => {
+        const isPast = c.fecha < hoyStr
+        const isToday = c.fecha === hoyStr
+        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
+        const estadoColor = isPast ? '15803D' : isToday ? '3B82F6' : 'D97706'
+        const rowBg = isToday ? 'F0FDF4' : undefined
+        
+        calendarDataForSheet.push([
+          { v: new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), s: { font: { sz: 10, bold: true }, fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } },
+          { v: estado, s: { font: { sz: 10, bold: true, color: { rgb: estadoColor } }, fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } },
+          { v: c.total, s: { font: { sz: 11, bold: true, color: { rgb: '15803D' } }, numFmt: '#,##0.00', fill: rowBg ? { fgColor: { rgb: rowBg } } : undefined } }
+        ])
+      })
+      
+      const wsCalendar = XLSX.utils.aoa_to_sheet(calendarDataForSheet)
+      wsCalendar['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }]
+      XLSX.utils.book_append_sheet(wb, wsCalendar, 'Calendario')
+
       const fileName = `Reporte_${businessName.replace(/\s+/g, '_')}_${exportStartDate}_${exportEndDate}.xlsx`
       XLSX.writeFile(wb, fileName)
 
       setShowExportModal(false)
     } catch (err) {
       console.error('Error exportando:', err)
-      alert('❌ Error al exportar: ' + err.message)
+      alert(' Error al exportar: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -483,7 +440,7 @@ export default function Reportes() {
       <header style={{ backgroundColor: '#1e293b', padding: '1rem', borderBottom: '3px solid #3b82f6' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.25rem', color: '#ffffff', fontWeight: '800' }}> Reportes Contables</h1>
+            <h1 style={{ margin: 0, fontSize: '1.25rem', color: '#ffffff', fontWeight: '800' }}>📊 Reportes Contables</h1>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>{businessName} • {nombreMes}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -505,7 +462,7 @@ export default function Reportes() {
 
         {!summary ? (
           <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '8px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a' }}>Sin datos para este mes</h3>
             <p style={{ margin: 0, color: '#64748b' }}>No hay transacciones registradas en {nombreMes}.</p>
           </div>
@@ -593,7 +550,7 @@ export default function Reportes() {
             {expensesBook.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1rem', color: 'white', fontWeight: '700', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span> LIBRO IVA COMPRAS (Crédito Fiscal)</span>
+                  <span>📕 LIBRO IVA COMPRAS (Crédito Fiscal)</span>
                   <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#94a3b8' }}>{expensesBook.length} registros</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
