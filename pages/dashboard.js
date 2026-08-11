@@ -303,7 +303,7 @@ export default function CajaDelDia() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '8px', border: '2px solid #16a34a' }}>
                   <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700' }}>✅ DISPONIBLE HOY</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#15803d' }}>${totalAvailable.toFixed(2)}</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#15803d' }}>{formatCurrency(totalAvailable)}</div>
                 </div>
                 <div style={{ backgroundColor: '#fffbeb', padding: '0.75rem', borderRadius: '8px', border: '2px solid #d97706' }}>
                   <div style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: '700' }}>⏳ EN TRÁNSITO</div>
