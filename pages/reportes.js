@@ -139,7 +139,7 @@ export default function Reportes() {
 
   const handleExportExcel = async () => {
   if (!exportStartDate || !exportEndDate) {
-    alert('⚠️ Seleccioná fecha de inicio y fin')
+    toast.error('⚠️ Seleccioná fecha de inicio y fin')
     return
   }
 
@@ -414,7 +414,7 @@ export default function Reportes() {
     setShowExportModal(false)
   } catch (err) {
     console.error('Error exportando:', err)
-    alert('❌ Error al exportar: ' + err.message)
+    toast.error('❌ Error al exportar: ' + err.message)
   } finally {
     setLoading(false)
   }

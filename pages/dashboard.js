@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 import { formatCurrency } from '../lib/format'
+import toast from 'react-hot-toast'
 
 const CONCEPTOS_INGRESO = ['Venta del día', 'Venta mostrador', 'Delivery', 'Servicios', 'Otros ingresos']
 const CONCEPTOS_GASTO = ['Proveedor', 'Luz', 'Gas', 'Agua', 'Internet', 'Alquiler', 'Sueldos', 'Impuestos', 'Insumos', 'Otros gastos']
@@ -191,8 +192,8 @@ export default function CajaDelDia() {
 
   const handleOpenShift = async (e) => {
     e.preventDefault()
-    if (!openingAmount || parseFloat(openingAmount) < 0) return alert('Ingresá un monto válido')
-    if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) return alert('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
+    if (!openingAmount || parseFloat(openingAmount) < 0) return toast.error('Ingresá un monto válido')
+    if (lastShiftBalance > 0 && isAmountModified && !differenceReason.trim()) return toast.error('⚠️ Como el monto es diferente al cierre anterior, debés explicar el motivo de la diferencia.')
 
     try {
       setCreating(true)
@@ -243,13 +244,14 @@ export default function CajaDelDia() {
 
       if (error) throw error
       
+      toast.success('🔓 Caja abierta correctamente')
       setShowOpenShift(false)
       setOpeningAmount('')
       setDifferenceReason('')
       setIsAmountModified(false)
       loadData(user.id)
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      toast.error(`Error: ${err.message}`)
     } finally {
       setCreating(false)
     }
@@ -267,7 +269,7 @@ export default function CajaDelDia() {
       setMovements([])
       loadData(user.id)
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      toast.error(`Error: ${err.message}`)
     } finally {
       setCreating(false)
     }
@@ -275,9 +277,9 @@ export default function CajaDelDia() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!amount || amount <= 0) return alert('Ingresá un monto válido')
-    if (!selectedMethod) return alert('Seleccioná un medio de pago')
-    if (!activeShift) return alert('Primero abrí la caja')
+    if (!amount || amount <= 0) return toast.error('Ingresá un monto válido')
+    if (!selectedMethod) return toast.error('Seleccioná un medio de pago')
+    if (!activeShift) return toast.error('Primero abrí la caja')
 
     try {
       setCreating(true)
@@ -321,9 +323,10 @@ export default function CajaDelDia() {
       }])
 
       if (error) throw error
+      toast.success(`${isIncome ? '💰 Cobro' : '💸 Gasto'} registrado correctamente`)
       setShowForm(false)
       loadData(user.id)
-    } catch (err) { alert(`Error: ${err.message}`) } finally { setCreating(false) }
+    } catch (err) { toast.error(`Error: ${err.message}`) } finally { setCreating(false) }
   }
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
@@ -618,7 +621,8 @@ export default function CajaDelDia() {
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '12px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>🔓 Abrir Caja</h2>
-              <button onClick={() => setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <button onClick={() => toast.success('🔓 Caja abierta correctamente')
+      setShowOpenShift(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
             <form onSubmit={handleOpenShift}>
               <div style={{ marginBottom: '1rem' }}>
@@ -691,7 +695,8 @@ export default function CajaDelDia() {
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: formType === 'INCOME' ? '#15803d' : '#b91c1c' }}>
                 {formType === 'INCOME' ? '💰 Cobro' : '💸 Gasto'}
               </h2>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+              <button onClick={() => toast.success(`${isIncome ? '💰 Cobro' : '💸 Gasto'} registrado correctamente`)
+      setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -849,7 +854,7 @@ export default function CajaDelDia() {
                             <button 
                               type="button"
                               onClick={async () => {
-                                if (!newCategoryQuickName.trim()) return alert('Ingresá un nombre')
+                                if (!newCategoryQuickName.trim()) return toast.error('Ingresá un nombre')
                                 try {
                                   const { data, error } = await supabase.from('categorias_pago').insert([{ 
                                     nombre: newCategoryQuickName.trim(), 
@@ -863,7 +868,7 @@ export default function CajaDelDia() {
                                   setShowNewCategoryQuick(false)
                                   setNewCategoryQuickName('')
                                 } catch (err) {
-                                  alert('Error: ' + err.message)
+                                  toast.error('Error: ' + err.message)
                                 }
                               }}
                               style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
@@ -915,7 +920,7 @@ export default function CajaDelDia() {
                               <button 
                                 type="button"
                                 onClick={async () => {
-                                  if (!newOperatorQuickName.trim()) return alert('Ingresá un nombre')
+                                  if (!newOperatorQuickName.trim()) return toast.error('Ingresá un nombre')
                                   try {
                                     const { data, error } = await supabase.from('subcategorias_pago').insert([{ 
                                       categoria_id: quickMethodCategory,
@@ -928,7 +933,7 @@ export default function CajaDelDia() {
                                     setShowNewOperatorQuick(false)
                                     setNewOperatorQuickName('')
                                   } catch (err) {
-                                    alert('Error: ' + err.message)
+                                    toast.error('Error: ' + err.message)
                                   }
                                 }}
                                 style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
@@ -1068,8 +1073,8 @@ export default function CajaDelDia() {
                             <button 
                               type="button" 
                               onClick={async () => {
-                                if (!quickMethodCategory) return alert('Seleccioná un medio de pago')
-                                if (!quickMethodSubcategory) return alert('Seleccioná un operador')
+                                if (!quickMethodCategory) return toast.error('Seleccioná un medio de pago')
+                                if (!quickMethodSubcategory) return toast.error('Seleccioná un operador')
                                 try {
                                   setCreating(true)
                                   
@@ -1111,7 +1116,7 @@ export default function CajaDelDia() {
                                   setNewOperatorQuickName('')
                                   setNewBancoQuickName('')
                                 } catch (err) {
-                                  alert('Error al crear medio de pago: ' + err.message)
+                                  toast.error('Error al crear medio de pago: ' + err.message)
                                 } finally {
                                   setCreating(false)
                                 }
