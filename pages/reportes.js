@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 import * as XLSX from 'xlsx-js-style'
+import { formatCurrency } from '../lib/format'
 
 export default function Reportes() {
   const [user, setUser] = useState(null)
@@ -398,7 +399,7 @@ export default function Reportes() {
       calendarSorted.forEach(c => {
         const isPast = c.fecha < hoyStr
         const isToday = c.fecha === hoyStr
-        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
+        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : ' Pendiente'
         const estadoColor = isPast ? '15803D' : isToday ? '3B82F6' : 'D97706'
         const rowBg = isToday ? 'F0FDF4' : undefined
         
@@ -419,7 +420,7 @@ export default function Reportes() {
       setShowExportModal(false)
     } catch (err) {
       console.error('Error exportando:', err)
-      alert(' Error al exportar: ' + err.message)
+      alert('❌ Error al exportar: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -432,8 +433,6 @@ export default function Reportes() {
 
   const nombreMes = selectedMonth.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
   const isCurrentMonth = selectedMonth.getMonth() === hoy.getMonth() && selectedMonth.getFullYear() === hoy.getFullYear()
-
-  const fmt = (n) => n ? n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'
 
   return (
     <main style={{ padding: '0', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', paddingBottom: '70px' }}>
@@ -473,14 +472,14 @@ export default function Reportes() {
               <div style={{ padding: '1rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <tbody>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Total Facturado (bruto)</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>${fmt(summary.totalFacturado)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) IVA Débito Fiscal</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalIVA)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Neto Gravado</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>${fmt(summary.totalNeto)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Comisiones de medios de pago</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalComisiones)}</td></tr>
-                    <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}><td style={{ padding: '0.75rem', fontWeight: '700', color: '#0f172a' }}>INGRESO NETO REAL</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', fontSize: '1.125rem', color: '#15803d' }}>${fmt(summary.totalNeto - summary.totalComisiones)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Gastos operativos</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-${fmt(summary.totalGastos)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>    (-) IVA Crédito Fiscal (compras)</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#64748b' }}>-${fmt(summary.totalGastosIVA)}</td></tr>
-                    <tr style={{ backgroundColor: summary.resultado >= 0 ? '#f0fdf4' : '#fef2f2', borderBottom: '2px solid #0f172a' }}><td style={{ padding: '0.75rem', fontWeight: '800', color: '#0f172a', fontSize: '1rem' }}>RESULTADO DEL EJERCICIO</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', fontSize: '1.25rem', color: summary.resultado >= 0 ? '#15803d' : '#b91c1c' }}>${fmt(summary.resultado)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Total Facturado (bruto)</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>{formatCurrency(summary.totalFacturado)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) IVA Débito Fiscal</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-{formatCurrency(summary.totalIVA)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>Neto Gravado</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>{formatCurrency(summary.totalNeto)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Comisiones de medios de pago</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-{formatCurrency(summary.totalComisiones)}</td></tr>
+                    <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}><td style={{ padding: '0.75rem', fontWeight: '700', color: '#0f172a' }}>INGRESO NETO REAL</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', fontSize: '1.125rem', color: '#15803d' }}>{formatCurrency(summary.totalNeto - summary.totalComisiones)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>(-) Gastos operativos</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>-{formatCurrency(summary.totalGastos)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}><td style={{ padding: '0.75rem', color: '#64748b' }}>    (-) IVA Crédito Fiscal (compras)</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#64748b' }}>-{formatCurrency(summary.totalGastosIVA)}</td></tr>
+                    <tr style={{ backgroundColor: summary.resultado >= 0 ? '#f0fdf4' : '#fef2f2', borderBottom: '2px solid #0f172a' }}><td style={{ padding: '0.75rem', fontWeight: '800', color: '#0f172a', fontSize: '1rem' }}>RESULTADO DEL EJERCICIO</td><td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '800', fontSize: '1.25rem', color: summary.resultado >= 0 ? '#15803d' : '#b91c1c' }}>{formatCurrency(summary.resultado)}</td></tr>
                   </tbody>
                 </table>
                 <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', fontSize: '0.75rem' }}>
@@ -494,7 +493,7 @@ export default function Reportes() {
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '6px', textAlign: 'center' }}>
                     <div style={{ color: '#64748b' }}>IVA a pagar (neto)</div>
-                    <div style={{ fontWeight: '800', color: '#dc2626', fontSize: '1.125rem' }}>${fmt(summary.totalIVA - summary.totalGastosIVA)}</div>
+                    <div style={{ fontWeight: '800', color: '#dc2626', fontSize: '1.125rem' }}>{formatCurrency(summary.totalIVA - summary.totalGastosIVA)}</div>
                   </div>
                 </div>
               </div>
@@ -526,20 +525,20 @@ export default function Reportes() {
                           <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.fecha}</td>
                           <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.concepto}</td>
                           <td style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.7rem' }}>{row.medio}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>${fmt(row.bruto)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(row.neto)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(row.iva)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(row.comision)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(row.netoReal)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>{formatCurrency(row.bruto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(row.neto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>{formatCurrency(row.iva)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>{formatCurrency(row.comision)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>{formatCurrency(row.netoReal)}</td>
                         </tr>
                       ))}
                       <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #0f172a', fontWeight: '800' }}>
                         <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right', color: '#0f172a' }}>TOTALES</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalFacturado)}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalNeto)}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#dc2626' }}>${fmt(summary.totalIVA)}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#dc2626' }}>${fmt(summary.totalComisiones)}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#15803d' }}>${fmt(summary.totalNeto - summary.totalComisiones)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(summary.totalFacturado)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(summary.totalNeto)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#dc2626' }}>{formatCurrency(summary.totalIVA)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#dc2626' }}>{formatCurrency(summary.totalComisiones)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#15803d' }}>{formatCurrency(summary.totalNeto - summary.totalComisiones)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -571,16 +570,16 @@ export default function Reportes() {
                           <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.fecha}</td>
                           <td style={{ padding: '0.5rem', color: '#0f172a' }}>{row.concepto}</td>
                           <td style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.7rem' }}>{row.medio}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>${fmt(row.bruto)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(row.neto)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2563eb' }}>${fmt(row.iva)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>{formatCurrency(row.bruto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(row.neto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2563eb' }}>{formatCurrency(row.iva)}</td>
                         </tr>
                       ))}
                       <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #0f172a', fontWeight: '800' }}>
                         <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right', color: '#0f172a' }}>TOTALES</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalGastos)}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>${fmt(summary.totalGastosNeto)}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#2563eb' }}>${fmt(summary.totalGastosIVA)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(summary.totalGastos)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(summary.totalGastosNeto)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#2563eb' }}>{formatCurrency(summary.totalGastosIVA)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -608,10 +607,10 @@ export default function Reportes() {
                         <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.5rem', fontWeight: '600', color: '#0f172a' }}>{m.nombre}</td>
                           <td style={{ padding: '0.5rem', textAlign: 'right' }}>{m.cantidad}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>${fmt(m.bruto)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(m.iva)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>${fmt(m.comisiones)}</td>
-                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(m.neto - m.comisiones)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(m.bruto)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>{formatCurrency(m.iva)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>{formatCurrency(m.comisiones)}</td>
+                          <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>{formatCurrency(m.neto - m.comisiones)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -649,7 +648,7 @@ export default function Reportes() {
                                isToday ? <span style={{ color: '#3b82f6', fontWeight: '700' }}>📍 Hoy</span> : 
                                <span style={{ color: '#d97706', fontWeight: '700' }}>⏳ Pendiente</span>}
                             </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>${fmt(day.total)}</td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '700', color: '#15803d' }}>{formatCurrency(day.total)}</td>
                           </tr>
                         )
                       })}
