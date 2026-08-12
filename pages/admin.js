@@ -40,10 +40,12 @@ export default function AdminPanel() {
     loadData()
   }, [roleLoading, role, userId])
 
-  const loadData = async () => {
+    const loadData = async () => {
     try {
       setLoading(true)
-      
+      const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
+      console.log('🔍 [Admin] Cargando datos para role:', role, 'globalRole:', globalRole, 'localId:', activeLocalId)
+
       // ==========================================
       // SUPER USER: Ve todo el sistema
       // ==========================================
@@ -57,6 +59,120 @@ export default function AdminPanel() {
           usuarios: countUsuarios || 0,
           transacciones: countTx || 0
         })
+
+        const { data: localesData } = await supabase
+          .from('locales')
+          .select('id, nombre, rubro, creado_en, creado_por')
+          .order('creado_en', { ascending: false })
+        setAllLocales(localesData || [])
+      }
+      
+      // ==========================================
+      // OWNER: Ve su local completo
+      // ==========================================
+      if (role === 'owner' || globalRole === 'super_user') {
+        if (activeLocalId) {
+          console.log('🔍 [Admin] Consultando local:', activeLocalId)
+          
+          // Info del local
+          const { data: localData, error: localError } = await supabase
+            .from('locales')
+            .select('*')
+            .eq('id', activeLocalId)
+            .maybeSingle()
+          
+          if (localError) console.error('❌ Error local:', localError)
+          else console.log('✅ Local encontrado:', localData)
+          setLocalInfo(localData)
+
+          // Estadísticas del local
+          const { data: ventasData, error: ventasError } = await supabase
+            .from('transacciones')
+            .select('monto')
+            .eq('local_id', activeLocalId)
+            .eq('tipo', 'COBRO_RECIBIDO')
+          
+          if (ventasError) console.error('❌ Error ventas:', ventasError)
+          else console.log('✅ Ventas encontradas:', ventasData?.length, 'filas')
+          
+          const totalVentas = ventasData?.reduce((sum, v) => sum + v.monto, 0) || 0
+
+          const { data: gastosData, error: gastosError } = await supabase
+            .from('transacciones')
+            .select('monto')
+            .eq('local_id', activeLocalId)
+            .eq('tipo', 'GASTO_REGISTRADO')
+          
+          if (gastosError) console.error('❌ Error gastos:', gastosError)
+          
+          const totalGastos = gastosData?.reduce((sum, g) => sum + g.monto, 0) || 0
+
+          const { count: countTx, error: countError } = await supabase
+            .from('transacciones')
+            .select('*', { count: 'exact', head: true })
+            .eq('local_id', activeLocalId)
+
+          if (countError) console.error('❌ Error count:', countError)
+          else console.log('✅ Total transacciones:', countTx)
+
+          setLocalStats({
+            ventas: totalVentas,
+            gastos: totalGastos,
+            transacciones: countTx || 0
+          })
+
+          // Miembros del local
+          const { data: miembrosData } = await supabase
+            .from('miembros_locales')
+            .select(`
+              id, rol, activo, aceptado_en,
+              user:auth.users(id, email)
+            `)
+            .eq('local_id', activeLocalId)
+            .eq('activo', true)
+          setMiembros(miembrosData || [])
+
+          // Logs de auditoría del local
+          const { data: logsData } = await supabase
+            .from('logs_auditoria')
+            .select('*')
+            .eq('local_id', activeLocalId)
+            .order('creado_en', { ascending: false })
+            .limit(50)
+          setLogs(logsData || [])
+        }
+      }
+      
+      // ==========================================
+      // CAJERO: Ve información limitada
+      // ==========================================
+      if (role === 'cajero') {
+        if (activeLocalId) {
+          const { data: localData } = await supabase
+            .from('locales')
+            .select('nombre, rubro')
+            .eq('id', activeLocalId)
+            .maybeSingle()
+          setLocalInfo(localData)
+
+          const { data: misLogs } = await supabase
+            .from('logs_auditoria')
+            .select('*')
+            .eq('local_id', activeLocalId)
+            .eq('user_id', userId)
+            .order('creado_en', { ascending: false })
+            .limit(30)
+          setMisAcciones(misLogs || [])
+        }
+      }
+      
+    } catch (err) {
+      console.error('❌ Error fatal cargando datos del admin:', err)
+      toast.error('Error al cargar el panel')
+    } finally {
+      setLoading(false)
+    }
+  }
 
         const { data: localesData } = await supabase
           .from('locales')
