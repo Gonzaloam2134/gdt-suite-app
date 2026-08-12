@@ -1,28 +1,23 @@
 import '../styles/globals.css'
 import { Toaster } from 'react-hot-toast'
+import { UserRoleProvider } from '../lib/UserRoleContext'
 
 export default function App({ Component, pageProps }) {
   return (
-    <>
+    <UserRoleProvider>
       <Component {...pageProps} />
-      <Toaster
-        position="top-right"
+      <Toaster 
+        position="top-center"
         toastOptions={{
-          duration: 4000,
+          duration: 3000,
           style: {
             background: '#363636',
             color: '#fff',
             borderRadius: '8px',
             fontSize: '14px',
           },
-          success: {
-            iconTheme: { primary: '#10b981', secondary: '#fff' },
-          },
-          error: {
-            iconTheme: { primary: '#dc2626', secondary: '#fff' },
-          },
         }}
       />
-    </>
+    </UserRoleProvider>
   )
 }
