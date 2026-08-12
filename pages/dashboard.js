@@ -141,20 +141,26 @@ export default function CajaDelDia() {
       setCategories(catData || [])
       setSubcategories(subcatData || [])
       
-      // Cargar acreditaciones del día
+      // Cargar acreditaciones del día (solo pendientes de días anteriores, sin efectivo)
       const hoyStr = new Date().toISOString().split('T')[0]
+      
       const { data: allTx } = await supabase
         .from('transacciones')
         .select('*')
         .eq('local_id', activeLocalId)
         .eq('tipo', 'COBRO_RECIBIDO')
         .eq('fecha_acreditacion_estimada', hoyStr)
+        .lt('creado_en', `${hoyStr}T00:00:00`) // ✅ FILTRO: Solo ventas de días anteriores
       
-      const acreditaciones = (allTx || []).map(m => ({ 
-        ...m, 
-        method: (pmData || []).find(pm => pm.id === m.medio_pago_id), 
-        net: m.monto - (m.comision_monto || 0) 
-      }))
+      // ✅ FILTRO: Excluir efectivo de la lista de acreditaciones
+      const acreditaciones = (allTx || [])
+        .filter(m => m.medio_pago_id !== efectivoMethodId) 
+        .map(m => ({ 
+          ...m, 
+          method: (pmData || []).find(pm => pm.id === m.medio_pago_id), 
+          net: m.monto - (m.comision_monto || 0) 
+        }))
+      
       setAcreditacionesHoy(acreditaciones)
       
     } catch (err) { console.error('Error cargando datos:', err) } finally { setLoading(false) }
