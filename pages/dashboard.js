@@ -62,6 +62,13 @@ export default function CajaDelDia() {
 
   const [expandedAccreditation, setExpandedAccreditation] = useState(null)
   
+  // Navegación por fechas
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [isViewingHistory, setIsViewingHistory] = useState(false)
+  
+  // Acreditaciones del día (todas las transacciones del local)
+  const [acreditacionesHoy, setAcreditacionesHoy] = useState([])
+  
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
@@ -79,6 +86,13 @@ export default function CajaDelDia() {
       }
     })
   }, [router, activeLocalId])
+
+  // Cargar datos cuando cambia la fecha seleccionada
+  useEffect(() => {
+    if (user && activeLocalId) {
+      loadDataForDate(user.id, selectedDate)
+    }
+  }, [selectedDate])
 
   const loadData = async (userId) => {
     try {
@@ -123,7 +137,102 @@ export default function CajaDelDia() {
       const { data: subcatData } = await supabase.from('subcategorias_pago').select('*').eq('activo', true).order('nombre', { ascending: true })
       setCategories(catData || [])
       setSubcategories(subcatData || [])
+      
+      // Cargar acreditaciones del día (todas las transacciones del local que se acreditan hoy)
+      const hoyStr = new Date().toISOString().split('T')[0]
+      const { data: allTx } = await supabase
+        .from('transacciones')
+        .select('*')
+        .eq('local_id', activeLocalId)
+        .eq('tipo', 'COBRO_RECIBIDO')
+        .eq('fecha_acreditacion_estimada', hoyStr)
+      
+      const acreditaciones = (allTx || []).map(m => ({ 
+        ...m, 
+        method: (pmData || []).find(pm => pm.id === m.medio_pago_id), 
+        net: m.monto - (m.comision_monto || 0) 
+      }))
+      setAcreditacionesHoy(acreditaciones)
+      
     } catch (err) { console.error('Error cargando datos:', err) } finally { setLoading(false) }
+  }
+
+  // Cargar datos para una fecha específica
+  const loadDataForDate = async (userId, date) => {
+    try {
+      setLoading(true)
+      setIsViewingHistory(false)
+      
+      const { data: localData } = await supabase.from('locales').select('nombre, condicion_fiscal').eq('id', activeLocalId).single()
+      if (localData) {
+        setBusinessName(localData.nombre)
+        setCondicionFiscal(localData.condicion_fiscal || '')
+      }
+
+      // Buscar turno para esa fecha
+      const dateStart = `${date}T00:00:00`
+      const dateEnd = `${date}T23:59:59`
+      
+      const { data: shiftData } = await supabase
+        .from('turnos')
+        .select('*')
+        .eq('local_id', activeLocalId)
+        .gte('abierto_en', dateStart)
+        .lte('abierto_en', dateEnd)
+        .order('abierto_en', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (shiftData) {
+        setActiveShift(shiftData)
+        
+        // Si el turno es cerrado, marcar como histórico
+        if (shiftData.estado === 'CERRADO') {
+          setIsViewingHistory(true)
+        }
+        
+        const { data: txData } = await supabase
+          .from('transacciones')
+          .select('*')
+          .eq('turno_id', shiftData.id)
+          .order('creado_en', { ascending: false })
+          .limit(200)
+        setMovements(txData || [])
+      } else {
+        // No hay turno para esa fecha
+        setActiveShift(null)
+        setMovements([])
+        if (date !== new Date().toISOString().split('T')[0]) {
+          toast(`No hay registro de actividad para el ${new Date(date).toLocaleDateString('es-AR')}`, {
+            icon: '📭'
+          })
+        }
+      }
+
+      const { data: pmData } = await supabase.from('medios_pago').select(`*, subcategorias_pago (id, nombre, categorias_pago (id, nombre, icono))`).eq('local_id', activeLocalId).eq('activo', true).order('creado_en', { ascending: false })
+      setPaymentMethods(pmData || [])
+    } catch (err) { 
+      console.error('Error cargando datos para fecha:', err)
+    } finally { 
+      setLoading(false) 
+    }
+  }
+
+  const handleDateChange = (e) => {
+    const newDate = e.target.value
+    setSelectedDate(newDate)
+    
+    // Si selecciona hoy, volver al modo normal
+    if (newDate === new Date().toISOString().split('T')[0]) {
+      setIsViewingHistory(false)
+    }
+  }
+
+  const handleGoToToday = () => {
+    const today = new Date().toISOString().split('T')[0]
+    setSelectedDate(today)
+    setIsViewingHistory(false)
+    loadData(user.id)
   }
 
   const hoy = new Date()
@@ -141,14 +250,6 @@ export default function CajaDelDia() {
     return (m.fecha_acreditacion_estimada || hoyStr) === hoyStr
   }).reduce((sum, m) => sum + (m.monto - (m.comision_monto || 0)), 0)
 
-  const acreditacionesHoy = movements.filter(m => {
-    if (m.tipo !== 'COBRO_RECIBIDO' || m.medio_pago_id === efectivoMethodId) return false
-    const accreditationDate = m.fecha_acreditacion_estimada
-    if (!accreditationDate) return false
-    const createdDate = m.creado_en ? new Date(m.creado_en).toISOString().split('T')[0] : hoyStr
-    return accreditationDate === hoyStr && createdDate < hoyStr
-  }).map(m => ({ ...m, method: paymentMethods.find(pm => pm.id === m.medio_pago_id), net: m.monto - (m.comision_monto || 0) }))
-
   const totalAcreditacionesHoy = acreditacionesHoy.reduce((sum, m) => sum + m.net, 0)
   const totalDisponibleHoy = efectivoEnCaja + transferenciasInmediatas + totalAcreditacionesHoy
 
@@ -164,17 +265,6 @@ export default function CajaDelDia() {
     const commissions = methodMovements.filter(m => m.tipo === 'COBRO_RECIBIDO').reduce((sum, m) => sum + (m.comision_monto || 0), 0)
     return { method, income, expenses, commissions, netBalance: income - commissions - expenses }
   }).filter(b => b.income > 0 || b.expenses > 0)
-
-  const acreditacionesAgrupadas = {}
-  acreditacionesHoy.forEach(acc => {
-    const key = acc.medio_pago_id || 'unknown'
-    if (!acreditacionesAgrupadas[key]) {
-      const methodName = acc.method ? (acc.method.banco_emisor ? `${acc.method.nombre} (${acc.method.banco_emisor})` : acc.method.nombre) : 'Medio desconocido'
-      acreditacionesAgrupadas[key] = { method: acc.method, methodName, total: 0, transacciones: [] }
-    }
-    acreditacionesAgrupadas[key].total += acc.net
-    acreditacionesAgrupadas[key].transacciones.push(acc)
-  })
 
   const handleOpenForm = (type) => {
     setFormType(type); setAmount(''); setSelectedConcept(''); setCustomConcept(''); setShowCustomConcept(false); setSelectedMethod(''); setShowForm(true); setShowQuickAddMethod(false)
@@ -281,6 +371,36 @@ export default function CajaDelDia() {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
 
+  // Funciones helper para iconos y labels de medios de pago
+  const getMedioPagoIcono = (method) => {
+    if (!method) return '💳'
+    
+    const nombre = method.nombre?.toLowerCase() || ''
+    
+    if (nombre.includes('efectivo') || nombre.includes('cash')) return '💵'
+    if (nombre.includes('débito') || nombre.includes('debit')) return '💳'
+    if (nombre.includes('crédito') || nombre.includes('credito') || nombre.includes('visa') || nombre.includes('master')) return '💳'
+    if (nombre.includes('qr') || nombre.includes('mercado pago') || nombre.includes('modo')) return '📱'
+    if (nombre.includes('transferencia')) return ''
+    
+    return '💳'
+  }
+
+  const getMedioPagoLabel = (method) => {
+    if (!method) return 'Medio de pago'
+    
+    const nombre = method.nombre?.toLowerCase() || ''
+    
+    if (nombre.includes('efectivo') || nombre.includes('cash')) return 'Efectivo'
+    if (nombre.includes('débito') || nombre.includes('debit')) return 'Débito'
+    if (nombre.includes('crédito') || nombre.includes('credito')) return 'Crédito'
+    if (nombre.includes('qr') || nombre.includes('mercado pago')) return 'QR'
+    if (nombre.includes('modo')) return 'QR'
+    if (nombre.includes('transferencia')) return 'Transferencia'
+    
+    return method.nombre
+  }
+
   if (loading) return <div className="p-8 text-center text-sm">Cargando...</div>
 
   const conceptosList = formType === 'INCOME' ? CONCEPTOS_INGRESO : CONCEPTOS_GASTO
@@ -306,20 +426,45 @@ export default function CajaDelDia() {
         </div>
       </header>
 
+      {/* Selector de fecha */}
+      <div className="bg-white border-b border-gray-200 p-3">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <label className="text-sm font-semibold text-gray-700"> Fecha:</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={handleDateChange}
+            max={new Date().toISOString().split('T')[0]}
+            className="px-3 py-1.5 border-2 border-gray-200 rounded-lg text-sm font-medium focus:border-blue-500 focus:outline-none"
+          />
+          {isViewingHistory && (
+            <button
+              onClick={handleGoToToday}
+              className="px-3 py-1.5 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
+            >
+              Ir a hoy
+            </button>
+          )}
+          {isViewingHistory && (
+            <span className="text-xs text-amber-600 font-semibold">📜 Modo histórico</span>
+          )}
+        </div>
+      </div>
+
       <div className="max-w-2xl mx-auto p-4">
         {!activeShift ? (
-  <div className="text-center p-8 bg-white rounded-xl border-2 border-dashed border-gray-300 mb-4">
-    <div className="text-5xl mb-2">🔒</div>
-    <h3 className="m-0 mb-2 text-gray-900 text-base">Caja Cerrada</h3>
-    <p className="m-0 mb-4 text-gray-500 text-sm">Abrí la caja para empezar a operar</p>
-    <RoleGate allowedRoles={['owner', 'cajero']}>
-      <button onClick={() => setShowOpenShift(true)} className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">Abrir Caja</button>
-    </RoleGate>
-    <RoleGate allowedRoles={['empleado']}>
-      <p className="text-xs text-gray-400 mt-2">Esperá a que el dueño o cajero abra la caja.</p>
-    </RoleGate>
-  </div>
-) : (
+          <div className="text-center p-8 bg-white rounded-xl border-2 border-dashed border-gray-300 mb-4">
+            <div className="text-5xl mb-2">🔒</div>
+            <h3 className="m-0 mb-2 text-gray-900 text-base">Caja Cerrada</h3>
+            <p className="m-0 mb-4 text-gray-500 text-sm">Abrí la caja para empezar a operar</p>
+            <RoleGate allowedRoles={['owner', 'cajero']}>
+              <button onClick={() => setShowOpenShift(true)} className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">Abrir Caja</button>
+            </RoleGate>
+            <RoleGate allowedRoles={['empleado']}>
+              <p className="text-xs text-gray-400 mt-2">Esperá a que el dueño o cajero abra la caja.</p>
+            </RoleGate>
+          </div>
+        ) : (
           <>
             <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
               <h2 className="m-0 mb-3 text-base text-gray-900 font-bold">Resumen del Turno</h2>
@@ -353,7 +498,7 @@ export default function CajaDelDia() {
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
                     <div className="text-3xl mb-2"></div>
                     <div className="text-sm text-gray-600 font-semibold">Modo Empleado</div>
-                    <div className="text-xs text-gray-500 mt-1">Solo podés registrar gastos. Los totales los ve el dueño.</div>
+                    <div className="text-xs text-gray-500 mt-1">Podés registrar ventas del mostrador. Los totales y gastos los ve el dueño.</div>
                   </div>
                 </RoleGate>
 
@@ -368,7 +513,7 @@ export default function CajaDelDia() {
                         return (
                           <div key={method.id} className="flex justify-between items-center py-2 border-b border-gray-100">
                             <div>
-                              <div className="text-sm font-semibold text-gray-900">{esEfectivo ? '💵 Efectivo' : `${cat?.icono || ''} ${method.nombre || subcat?.nombre}`}</div>
+                              <div className="text-sm font-semibold text-gray-900">{esEfectivo ? '💵 Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}</div>
                               {!esEfectivo && method.banco_emisor && <div className="text-xs text-gray-500">{method.banco_emisor}</div>}
                             </div>
                             <div className="text-right">
@@ -384,44 +529,33 @@ export default function CajaDelDia() {
               </div>
             </div>
 
+            {/* Acreditaciones del día */}
             <RoleGate allowedRoles={['owner', 'super_user']}>
-              {Object.keys(acreditacionesAgrupadas).length > 0 && (
+              {acreditacionesHoy.length > 0 && (
                 <div className="bg-purple-50 p-4 rounded-xl border-2 border-purple-600 mb-4">
-                  <h2 className="m-0 mb-3 text-base text-purple-800 font-bold">📥 Acreditaciones de hoy</h2>
+                  <h2 className="m-0 mb-3 text-base text-purple-800 font-bold">📥 Acreditaciones de hoy ({acreditacionesHoy.length})</h2>
                   <div className="flex flex-col gap-2">
-                    {Object.entries(acreditacionesAgrupadas).map(([methodId, group]) => {
-                      const isExpanded = expandedAccreditation === methodId
+                    {acreditacionesHoy.map(acc => {
+                      const method = acc.method
+                      const icono = getMedioPagoIcono(method)
+                      const label = getMedioPagoLabel(method)
+                      const fechaTransaccion = new Date(acc.creado_en)
+                      
                       return (
-                        <div key={methodId} className="bg-white rounded-lg border border-purple-200 overflow-hidden">
-                          <div onClick={() => setExpandedAccreditation(isExpanded ? null : methodId)} className="p-3 cursor-pointer flex justify-between items-center">
-                            <div>
-                              <div className="font-bold text-sm text-gray-900">{group.methodName}</div>
-                              <div className="text-xs text-gray-500">{group.transacciones.length} venta{group.transacciones.length > 1 ? 's' : ''} anterior{group.transacciones.length > 1 ? 'es' : ''}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-base font-extrabold text-purple-700">{formatCurrency(group.total)}</div>
-                              <div className="text-xs text-gray-500">{isExpanded ? '▼ Ocultar' : '▶ Ver detalle'}</div>
+                        <div key={acc.id} className="bg-white rounded-lg border border-purple-200 p-3">
+                          <div className="flex items-start gap-3">
+                            <div className="text-3xl">{icono}</div>
+                            <div className="flex-1">
+                              <div className="text-xs text-purple-600 font-bold mb-1">📥 ACREDITACIÓN</div>
+                              <div className="text-lg font-extrabold text-purple-700">{formatCurrency(acc.net)}</div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {label} - {fechaTransaccion.toLocaleDateString('es-AR')} {fechaTransaccion.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
+                              </div>
+                              {acc.descripcion && (
+                                <div className="text-xs text-gray-500 mt-1">{acc.descripcion}</div>
+                              )}
                             </div>
                           </div>
-                          {isExpanded && (
-                            <div className="p-3 border-t border-gray-200 bg-gray-50">
-                              {group.transacciones.map(t => {
-                                const createdDate = new Date(t.creado_en)
-                                return (
-                                  <div key={t.id} className="p-2 mb-2 bg-white rounded-md border border-gray-200 text-xs">
-                                    <div className="flex justify-between mb-1">
-                                      <span className="text-gray-500">{createdDate.toLocaleDateString('es-AR')} {createdDate.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}</span>
-                                      <span className="font-bold text-purple-700">{formatCurrency(t.net)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                      <span className="text-gray-500">{t.descripcion} - {formatCurrency(t.monto)} bruto</span>
-                                      {t.comision_monto > 0 && <span className="text-red-600">-{formatCurrency(t.comision_monto)} comisión</span>}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
                         </div>
                       )
                     })}
@@ -431,26 +565,27 @@ export default function CajaDelDia() {
             </RoleGate>
 
             <div className="grid grid-cols-2 gap-3 mb-4">
-  {/* VENTA: Owner, Cajero y Empleado pueden registrar ventas */}
-  <RoleGate allowedRoles={['owner', 'cajero', 'empleado']}>
-    <button onClick={() => handleOpenForm('INCOME')} className="w-full p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-green-300">
-      <span className="text-2xl">💰</span> REGISTRAR VENTA
-    </button>
-  </RoleGate>
-
-  {/* GASTO/PAGO: Solo Owner y Cajero */}
-  <RoleGate allowedRoles={['owner', 'cajero']}>
-    <button onClick={() => handleOpenForm('EXPENSE')} className="w-full p-4 bg-red-200 text-red-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-red-300">
-      <span className="text-2xl">💸</span> REGISTRAR GASTO / PAGO
-    </button>
-  </RoleGate>
-</div>
+              <RoleGate allowedRoles={['owner', 'cajero', 'empleado']}>
+                <button onClick={() => handleOpenForm('INCOME')} className="w-full p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-green-300">
+                  <span className="text-2xl">💰</span> REGISTRAR VENTA
+                </button>
+              </RoleGate>
+              <RoleGate allowedRoles={['owner', 'cajero']}>
+                <button onClick={() => handleOpenForm('EXPENSE')} className="w-full p-4 bg-red-200 text-red-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-red-300">
+                  <span className="text-2xl">💸</span> REGISTRAR GASTO / PAGO
+                </button>
+              </RoleGate>
+            </div>
 
             <RoleGate allowedRoles={['owner', 'cajero']}>
-              <button onClick={() => setShowCloseShift(true)} className="w-full p-3 bg-gray-100 text-gray-500 border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer mb-4 hover:bg-gray-200">Cerrar Caja</button>
+              {!isViewingHistory && (
+                <button onClick={() => setShowCloseShift(true)} className="w-full p-3 bg-gray-100 text-gray-500 border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer mb-4 hover:bg-gray-200">Cerrar Caja</button>
+              )}
             </RoleGate>
 
-            <h3 className="text-sm font-bold text-slate-700 mb-3">Movimientos del Turno</h3>
+            <h3 className="text-sm font-bold text-slate-700 mb-3">
+              Movimientos del Turno {isViewingHistory && `(${new Date(selectedDate).toLocaleDateString('es-AR')})`}
+            </h3>
             {movements.length === 0 ? (
               <div className="text-center p-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300 text-sm mb-6">Sin movimientos en este turno</div>
             ) : (
@@ -467,14 +602,20 @@ export default function CajaDelDia() {
                     <div key={m.id} className="bg-white p-3 rounded-lg border border-gray-200">
                       <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>{isIncome ? '' : '📤'}</div>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
+                            {isIncome ? getMedioPagoIcono(method) : '💸'}
+                          </div>
                           <div>
                             <div className="font-semibold text-gray-900 text-sm">{m.descripcion}</div>
-                            <div className="text-xs text-gray-500">{new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} - {esEfectivo ? '💵 Efectivo' : `${cat?.icono || ''} ${subcat?.nombre || 'Medio de pago'}`}</div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} - {esEfectivo ? '💵 Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className={`font-bold text-sm ${isIncome ? 'text-green-700' : 'text-red-700'}`}>{isIncome ? '+' : '-'}{formatCurrency(m.monto)}</div>
+                          <div className={`font-bold text-sm ${isIncome ? 'text-green-700' : 'text-red-700'}`}>
+                            {isIncome ? '+' : '-'}{formatCurrency(m.monto)}
+                          </div>
                         </div>
                       </div>
                       {isIncome && !esEfectivo && commission > 0 && (
@@ -487,6 +628,12 @@ export default function CajaDelDia() {
                         <div className="flex justify-between items-center pt-1 text-xs">
                           <div className="text-green-700 font-semibold">Neto:</div>
                           <div className="text-green-700 font-bold">{formatCurrency(net)}</div>
+                        </div>
+                      )}
+                      {isIncome && !esEfectivo && m.fecha_acreditacion_estimada && (
+                        <div className="flex justify-between items-center pt-1 text-xs">
+                          <div className="text-blue-700 font-semibold">Se acredita:</div>
+                          <div className="text-blue-700 font-bold">{new Date(m.fecha_acreditacion_estimada).toLocaleDateString('es-AR')}</div>
                         </div>
                       )}
                     </div>
@@ -503,7 +650,7 @@ export default function CajaDelDia() {
           <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="m-0 text-xl font-bold text-gray-900">Abrir Caja</h2>
-              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
+              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500"></button>
             </div>
             <form onSubmit={handleOpenShift}>
               <div className="mb-4">
@@ -528,7 +675,7 @@ export default function CajaDelDia() {
           <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="m-0 text-xl font-bold text-gray-900">Cerrar Caja</h2>
-              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
+              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500"></button>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
               <div className="text-sm text-gray-500 mb-2"><strong>Resumen del turno:</strong></div>
@@ -598,7 +745,7 @@ export default function CajaDelDia() {
                         const esEfectivo = method.id === efectivoMethodId
                         return (
                           <button key={method.id} type="button" onClick={() => setSelectedMethod(method.id)} className={`p-4 rounded-lg cursor-pointer text-left flex flex-col gap-1 ${isSelected ? (formType === 'INCOME' ? 'border-[3px] border-green-600 bg-green-50' : 'border-[3px] border-red-600 bg-red-50') : 'border-2 border-gray-200 bg-white'}`}>
-                            <div className="font-bold text-sm text-gray-900">{esEfectivo ? '💵 Efectivo' : `${cat?.icono || ''} ${method.nombre || subcat?.nombre || 'Medio'}`}</div>
+                            <div className="font-bold text-sm text-gray-900">{esEfectivo ? '💵 Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}</div>
                             {!esEfectivo && method.banco_emisor && <div className="text-xs text-gray-500">{method.banco_emisor}</div>}
                             {isSelected && <div className={`text-xs font-bold mt-1 ${formType === 'INCOME' ? 'text-green-700' : 'text-red-600'}`}>✓ Seleccionado</div>}
                           </button>
@@ -671,7 +818,7 @@ export default function CajaDelDia() {
                             <div className="flex gap-2">
                               <input type="text" value={newBancoQuickName} onChange={e => setNewBancoQuickName(e.target.value)} placeholder="Nombre del banco" className="flex-1 p-2 border border-gray-300 rounded-md text-sm" />
                               <button type="button" onClick={() => { setQuickMethodBanco(newBancoQuickName); setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm">Guardar</button>
-                              <button type="button" onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"></button>
+                              <button type="button" onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm">✕</button>
                             </div>
                           )}
                         </div>
