@@ -60,14 +60,18 @@ export default function CajaDelDia() {
   const [newOperatorQuickName, setNewOperatorQuickName] = useState('')
   const [newBancoQuickName, setNewBancoQuickName] = useState('')
 
-  const [expandedAccreditation, setExpandedAccreditation] = useState(null)
-  
   // Navegación por fechas
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [isViewingHistory, setIsViewingHistory] = useState(false)
   
-  // Acreditaciones del día (todas las transacciones del local)
+  // Acreditaciones del día
   const [acreditacionesHoy, setAcreditacionesHoy] = useState([])
+  
+  // NUEVO: Estados para secciones colapsables
+  const [showResumen, setShowResumen] = useState(true)
+  const [showDetalleMedios, setShowDetalleMedios] = useState(false)
+  const [showAcreditaciones, setShowAcreditaciones] = useState(true)
+  const [showMovimientos, setShowMovimientos] = useState(true)
   
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
@@ -87,7 +91,6 @@ export default function CajaDelDia() {
     })
   }, [router, activeLocalId])
 
-  // Cargar datos cuando cambia la fecha seleccionada
   useEffect(() => {
     if (user && activeLocalId) {
       loadDataForDate(user.id, selectedDate)
@@ -138,7 +141,7 @@ export default function CajaDelDia() {
       setCategories(catData || [])
       setSubcategories(subcatData || [])
       
-      // Cargar acreditaciones del día (todas las transacciones del local que se acreditan hoy)
+      // Cargar acreditaciones del día
       const hoyStr = new Date().toISOString().split('T')[0]
       const { data: allTx } = await supabase
         .from('transacciones')
@@ -157,7 +160,6 @@ export default function CajaDelDia() {
     } catch (err) { console.error('Error cargando datos:', err) } finally { setLoading(false) }
   }
 
-  // Cargar datos para una fecha específica
   const loadDataForDate = async (userId, date) => {
     try {
       setLoading(true)
@@ -169,7 +171,6 @@ export default function CajaDelDia() {
         setCondicionFiscal(localData.condicion_fiscal || '')
       }
 
-      // Buscar turno para esa fecha
       const dateStart = `${date}T00:00:00`
       const dateEnd = `${date}T23:59:59`
       
@@ -186,7 +187,6 @@ export default function CajaDelDia() {
       if (shiftData) {
         setActiveShift(shiftData)
         
-        // Si el turno es cerrado, marcar como histórico
         if (shiftData.estado === 'CERRADO') {
           setIsViewingHistory(true)
         }
@@ -199,7 +199,6 @@ export default function CajaDelDia() {
           .limit(200)
         setMovements(txData || [])
       } else {
-        // No hay turno para esa fecha
         setActiveShift(null)
         setMovements([])
         if (date !== new Date().toISOString().split('T')[0]) {
@@ -222,7 +221,6 @@ export default function CajaDelDia() {
     const newDate = e.target.value
     setSelectedDate(newDate)
     
-    // Si selecciona hoy, volver al modo normal
     if (newDate === new Date().toISOString().split('T')[0]) {
       setIsViewingHistory(false)
     }
@@ -371,7 +369,6 @@ export default function CajaDelDia() {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
 
-  // Funciones helper para iconos y labels de medios de pago
   const getMedioPagoIcono = (method) => {
     if (!method) return '💳'
     
@@ -419,7 +416,7 @@ export default function CajaDelDia() {
               <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200">Reportes</button>
             </RoleGate>
             <RoleGate allowedRoles={['owner']}>
-              <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200">👥 Invitar</button>
+              <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200"> Invitar</button>
             </RoleGate>
             <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
           </div>
@@ -429,7 +426,7 @@ export default function CajaDelDia() {
       {/* Selector de fecha */}
       <div className="bg-white border-b border-gray-200 p-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <label className="text-sm font-semibold text-gray-700"> Fecha:</label>
+          <label className="text-sm font-semibold text-gray-700">📅 Fecha:</label>
           <input
             type="date"
             value={selectedDate}
@@ -466,104 +463,132 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
-              <h2 className="m-0 mb-3 text-base text-gray-900 font-bold">Resumen del Turno</h2>
-              <div className="space-y-3">
-                <RoleGate allowedRoles={['owner', 'cajero', 'super_user']}>
-                  <div className="bg-green-50 p-3 rounded-lg border-2 border-green-600">
-                    <div className="text-xs text-green-800 font-bold mb-1">💵 EFECTIVO EN CAJA</div>
-                    <div className="text-xl font-extrabold text-green-700">{formatCurrency(efectivoEnCaja)}</div>
-                  </div>
-                  <div className="bg-blue-50 p-3 rounded-lg border-2 border-blue-600">
-                    <div className="text-xs text-blue-800 font-bold mb-1">⚡ TRANSFERENCIAS INMEDIATAS</div>
-                    <div className="text-xl font-extrabold text-blue-700">{formatCurrency(transferenciasInmediatas)}</div>
-                  </div>
-                  <div className="bg-purple-50 p-3 rounded-lg border-2 border-purple-600">
-                    <div className="text-xs text-purple-800 font-bold mb-1">📥 ACREDITACIONES DEL DÍA</div>
-                    <div className="text-xl font-extrabold text-purple-700">{formatCurrency(totalAcreditacionesHoy)}</div>
-                  </div>
-                  <div className="bg-emerald-100 p-4 rounded-lg border-2 border-emerald-700">
-                    <div className="text-sm text-emerald-900 font-bold mb-1">✅ TOTAL DISPONIBLE HOY</div>
-                    <div className="text-2xl font-extrabold text-emerald-800">{formatCurrency(totalDisponibleHoy)}</div>
-                  </div>
-                  {enTransito > 0 && (
-                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-300">
-                      <div className="text-xs text-amber-800 font-bold mb-1">⏳ EN TRÁNSITO</div>
-                      <div className="text-lg font-extrabold text-amber-700">{formatCurrency(enTransito)}</div>
+            {/* SECCIÓN: Resumen del Turno (COLAPSABLE) */}
+            <RoleGate allowedRoles={['owner', 'cajero', 'super_user']}>
+              <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
+                <button
+                  onClick={() => setShowResumen(!showResumen)}
+                  className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors cursor-pointer border-none"
+                >
+                  <h2 className="m-0 text-base text-gray-900 font-bold">Resumen del Turno</h2>
+                  <span className="text-gray-400 text-xl">{showResumen ? '▼' : '▶'}</span>
+                </button>
+                
+                {showResumen && (
+                  <div className="p-4 pt-0 space-y-3">
+                    <div className="bg-green-50 p-3 rounded-lg border-2 border-green-600">
+                      <div className="text-xs text-green-800 font-bold mb-1">💵 EFECTIVO EN CAJA</div>
+                      <div className="text-xl font-extrabold text-green-700">{formatCurrency(efectivoEnCaja)}</div>
                     </div>
-                  )}
-                </RoleGate>
+                    <div className="bg-blue-50 p-3 rounded-lg border-2 border-blue-600">
+                      <div className="text-xs text-blue-800 font-bold mb-1">⚡ TRANSFERENCIAS INMEDIATAS</div>
+                      <div className="text-xl font-extrabold text-blue-700">{formatCurrency(transferenciasInmediatas)}</div>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg border-2 border-purple-600">
+                      <div className="text-xs text-purple-800 font-bold mb-1">📥 ACREDITACIONES DEL DÍA</div>
+                      <div className="text-xl font-extrabold text-purple-700">{formatCurrency(totalAcreditacionesHoy)}</div>
+                    </div>
+                    <div className="bg-emerald-100 p-4 rounded-lg border-2 border-emerald-700">
+                      <div className="text-sm text-emerald-900 font-bold mb-1">✅ TOTAL DISPONIBLE HOY</div>
+                      <div className="text-2xl font-extrabold text-emerald-800">{formatCurrency(totalDisponibleHoy)}</div>
+                    </div>
+                    {enTransito > 0 && (
+                      <div className="bg-amber-50 p-3 rounded-lg border border-amber-300">
+                        <div className="text-xs text-amber-800 font-bold mb-1">⏳ EN TRÁNSITO</div>
+                        <div className="text-lg font-extrabold text-amber-700">{formatCurrency(enTransito)}</div>
+                      </div>
+                    )}
 
-                <RoleGate allowedRoles={['empleado']}>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
-                    <div className="text-3xl mb-2"></div>
-                    <div className="text-sm text-gray-600 font-semibold">Modo Empleado</div>
-                    <div className="text-xs text-gray-500 mt-1">Podés registrar ventas del mostrador. Los totales y gastos los ve el dueño.</div>
+                    {/* Detalle por medio de pago (COLAPSABLE) */}
+                    {balanceByMethod.length > 0 && (
+                      <div className="border-t border-gray-200 pt-3 mt-4">
+                        <button
+                          onClick={() => setShowDetalleMedios(!showDetalleMedios)}
+                          className="w-full flex justify-between items-center cursor-pointer bg-none border-none p-0"
+                        >
+                          <span className="text-xs text-gray-500 font-semibold">Detalle por medio de pago:</span>
+                          <span className="text-gray-400 text-sm">{showDetalleMedios ? '▼' : '▶'}</span>
+                        </button>
+                        
+                        {showDetalleMedios && (
+                          <div className="mt-2">
+                            {balanceByMethod.map(({ method, income, expenses, commissions, netBalance }) => {
+                              const esEfectivo = method.id === efectivoMethodId
+                              return (
+                                <div key={method.id} className="flex justify-between items-center py-2 border-b border-gray-100">
+                                  <div>
+                                    <div className="text-sm font-semibold text-gray-900">{esEfectivo ? '💵 Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}</div>
+                                    {!esEfectivo && method.banco_emisor && <div className="text-xs text-gray-500">{method.banco_emisor}</div>}
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`text-sm font-bold ${netBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(netBalance)}</div>
+                                    {commissions > 0 && <div className="text-xs text-gray-500">Com: {formatCurrency(commissions)}</div>}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </RoleGate>
+                )}
+              </div>
+            </RoleGate>
 
-                <RoleGate allowedRoles={['owner', 'super_user']}>
-                  {balanceByMethod.length > 0 && (
-                    <div className="border-t border-gray-200 pt-3 mt-4">
-                      <div className="text-xs text-gray-500 font-semibold mb-2">Detalle por medio de pago:</div>
-                      {balanceByMethod.map(({ method, income, expenses, commissions, netBalance }) => {
-                        const subcat = method.subcategorias_pago
-                        const cat = subcat?.categorias_pago
-                        const esEfectivo = method.id === efectivoMethodId
+            <RoleGate allowedRoles={['empleado']}>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center mb-4">
+                <div className="text-3xl mb-2">👷</div>
+                <div className="text-sm text-gray-600 font-semibold">Modo Empleado</div>
+                <div className="text-xs text-gray-500 mt-1">Podés registrar ventas del mostrador. Los totales y gastos los ve el dueño.</div>
+              </div>
+            </RoleGate>
+
+            {/* SECCIÓN: Acreditaciones de hoy (COLAPSABLE) */}
+            <RoleGate allowedRoles={['owner', 'super_user']}>
+              {acreditacionesHoy.length > 0 && (
+                <div className="bg-purple-50 rounded-xl border-2 border-purple-600 mb-4 overflow-hidden">
+                  <button
+                    onClick={() => setShowAcreditaciones(!showAcreditaciones)}
+                    className="w-full p-4 flex justify-between items-center bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer border-none"
+                  >
+                    <h2 className="m-0 text-base text-purple-800 font-bold">📥 Acreditaciones de hoy ({acreditacionesHoy.length})</h2>
+                    <span className="text-purple-400 text-xl">{showAcreditaciones ? '▼' : '▶'}</span>
+                  </button>
+                  
+                  {showAcreditaciones && (
+                    <div className="p-4 pt-0 flex flex-col gap-2">
+                      {acreditacionesHoy.map(acc => {
+                        const method = acc.method
+                        const icono = getMedioPagoIcono(method)
+                        const label = getMedioPagoLabel(method)
+                        const fechaTransaccion = new Date(acc.creado_en)
+                        
                         return (
-                          <div key={method.id} className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900">{esEfectivo ? '💵 Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}</div>
-                              {!esEfectivo && method.banco_emisor && <div className="text-xs text-gray-500">{method.banco_emisor}</div>}
-                            </div>
-                            <div className="text-right">
-                              <div className={`text-sm font-bold ${netBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(netBalance)}</div>
-                              {commissions > 0 && <div className="text-xs text-gray-500">Com: {formatCurrency(commissions)}</div>}
+                          <div key={acc.id} className="bg-white rounded-lg border border-purple-200 p-3">
+                            <div className="flex items-start gap-3">
+                              <div className="text-3xl">{icono}</div>
+                              <div className="flex-1">
+                                <div className="text-xs text-purple-600 font-bold mb-1"> ACREDITACIÓN</div>
+                                <div className="text-lg font-extrabold text-purple-700">{formatCurrency(acc.net)}</div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                  {label} - {fechaTransaccion.toLocaleDateString('es-AR')} {fechaTransaccion.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
+                                </div>
+                                {acc.descripcion && (
+                                  <div className="text-xs text-gray-500 mt-1">{acc.descripcion}</div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )
                       })}
                     </div>
                   )}
-                </RoleGate>
-              </div>
-            </div>
-
-            {/* Acreditaciones del día */}
-            <RoleGate allowedRoles={['owner', 'super_user']}>
-              {acreditacionesHoy.length > 0 && (
-                <div className="bg-purple-50 p-4 rounded-xl border-2 border-purple-600 mb-4">
-                  <h2 className="m-0 mb-3 text-base text-purple-800 font-bold">📥 Acreditaciones de hoy ({acreditacionesHoy.length})</h2>
-                  <div className="flex flex-col gap-2">
-                    {acreditacionesHoy.map(acc => {
-                      const method = acc.method
-                      const icono = getMedioPagoIcono(method)
-                      const label = getMedioPagoLabel(method)
-                      const fechaTransaccion = new Date(acc.creado_en)
-                      
-                      return (
-                        <div key={acc.id} className="bg-white rounded-lg border border-purple-200 p-3">
-                          <div className="flex items-start gap-3">
-                            <div className="text-3xl">{icono}</div>
-                            <div className="flex-1">
-                              <div className="text-xs text-purple-600 font-bold mb-1">📥 ACREDITACIÓN</div>
-                              <div className="text-lg font-extrabold text-purple-700">{formatCurrency(acc.net)}</div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                {label} - {fechaTransaccion.toLocaleDateString('es-AR')} {fechaTransaccion.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
-                              </div>
-                              {acc.descripcion && (
-                                <div className="text-xs text-gray-500 mt-1">{acc.descripcion}</div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
                 </div>
               )}
             </RoleGate>
 
+            {/* Botones de acción */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <RoleGate allowedRoles={['owner', 'cajero', 'empleado']}>
                 <button onClick={() => handleOpenForm('INCOME')} className="w-full p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-green-300">
@@ -583,64 +608,74 @@ export default function CajaDelDia() {
               )}
             </RoleGate>
 
-            <h3 className="text-sm font-bold text-slate-700 mb-3">
-              Movimientos del Turno {isViewingHistory && `(${new Date(selectedDate).toLocaleDateString('es-AR')})`}
-            </h3>
-            {movements.length === 0 ? (
-              <div className="text-center p-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300 text-sm mb-6">Sin movimientos en este turno</div>
-            ) : (
-              <div className="flex flex-col gap-2 mb-6">
-                {movements.map(m => {
-                  const isIncome = m.tipo === 'COBRO_RECIBIDO'
-                  const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
-                  const subcat = method?.subcategorias_pago
-                  const cat = subcat?.categorias_pago
-                  const commission = m.comision_monto || 0
-                  const net = m.monto - commission
-                  const esEfectivo = method?.id === efectivoMethodId
-                  return (
-                    <div key={m.id} className="bg-white p-3 rounded-lg border border-gray-200">
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
-                            {isIncome ? getMedioPagoIcono(method) : '💸'}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900 text-sm">{m.descripcion}</div>
-                            <div className="text-xs text-gray-500">
-                              {new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} - {esEfectivo ? '💵 Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}
+            {/* SECCIÓN: Movimientos del Turno (COLAPSABLE) */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowMovimientos(!showMovimientos)}
+                className="w-full flex justify-between items-center cursor-pointer bg-none border-none p-0 mb-3"
+              >
+                <h3 className="text-sm font-bold text-slate-700 m-0">
+                  Movimientos del Turno {isViewingHistory && `(${new Date(selectedDate).toLocaleDateString('es-AR')})`}
+                </h3>
+                <span className="text-gray-400 text-xl">{showMovimientos ? '▼' : '▶'}</span>
+              </button>
+              
+              {showMovimientos && (
+                movements.length === 0 ? (
+                  <div className="text-center p-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300 text-sm">Sin movimientos en este turno</div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {movements.map(m => {
+                      const isIncome = m.tipo === 'COBRO_RECIBIDO'
+                      const method = paymentMethods.find(pm => pm.id === m.medio_pago_id)
+                      const commission = m.comision_monto || 0
+                      const net = m.monto - commission
+                      const esEfectivo = method?.id === efectivoMethodId
+                      return (
+                        <div key={m.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
+                                {isIncome ? getMedioPagoIcono(method) : '💸'}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-gray-900 text-sm">{m.descripcion}</div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(m.creado_en).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})} - {esEfectivo ? ' Efectivo' : `${getMedioPagoIcono(method)} ${getMedioPagoLabel(method)}`}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className={`font-bold text-sm ${isIncome ? 'text-green-700' : 'text-red-700'}`}>
+                                {isIncome ? '+' : '-'}{formatCurrency(m.monto)}
+                              </div>
                             </div>
                           </div>
+                          {isIncome && !esEfectivo && commission > 0 && (
+                            <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 text-xs">
+                              <div className="text-gray-500">Comisión:</div>
+                              <div className="text-red-600 font-semibold">-{formatCurrency(commission)}</div>
+                            </div>
+                          )}
+                          {isIncome && !esEfectivo && (
+                            <div className="flex justify-between items-center pt-1 text-xs">
+                              <div className="text-green-700 font-semibold">Neto:</div>
+                              <div className="text-green-700 font-bold">{formatCurrency(net)}</div>
+                            </div>
+                          )}
+                          {isIncome && !esEfectivo && m.fecha_acreditacion_estimada && (
+                            <div className="flex justify-between items-center pt-1 text-xs">
+                              <div className="text-blue-700 font-semibold">Se acredita:</div>
+                              <div className="text-blue-700 font-bold">{new Date(m.fecha_acreditacion_estimada).toLocaleDateString('es-AR')}</div>
+                            </div>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <div className={`font-bold text-sm ${isIncome ? 'text-green-700' : 'text-red-700'}`}>
-                            {isIncome ? '+' : '-'}{formatCurrency(m.monto)}
-                          </div>
-                        </div>
-                      </div>
-                      {isIncome && !esEfectivo && commission > 0 && (
-                        <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 text-xs">
-                          <div className="text-gray-500">Comisión:</div>
-                          <div className="text-red-600 font-semibold">-{formatCurrency(commission)}</div>
-                        </div>
-                      )}
-                      {isIncome && !esEfectivo && (
-                        <div className="flex justify-between items-center pt-1 text-xs">
-                          <div className="text-green-700 font-semibold">Neto:</div>
-                          <div className="text-green-700 font-bold">{formatCurrency(net)}</div>
-                        </div>
-                      )}
-                      {isIncome && !esEfectivo && m.fecha_acreditacion_estimada && (
-                        <div className="flex justify-between items-center pt-1 text-xs">
-                          <div className="text-blue-700 font-semibold">Se acredita:</div>
-                          <div className="text-blue-700 font-bold">{new Date(m.fecha_acreditacion_estimada).toLocaleDateString('es-AR')}</div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                      )
+                    })}
+                  </div>
+                )
+              )}
+            </div>
           </>
         )}
       </div>
@@ -650,7 +685,7 @@ export default function CajaDelDia() {
           <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="m-0 text-xl font-bold text-gray-900">Abrir Caja</h2>
-              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500"></button>
+              <button onClick={() => { toast.success('Apertura cancelada'); setShowOpenShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
             </div>
             <form onSubmit={handleOpenShift}>
               <div className="mb-4">
@@ -675,7 +710,7 @@ export default function CajaDelDia() {
           <div className="bg-white w-full max-w-lg rounded-xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="m-0 text-xl font-bold text-gray-900">Cerrar Caja</h2>
-              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500"></button>
+              <button onClick={() => { toast.success('Cierre cancelado'); setShowCloseShift(false); }} className="bg-none border-none text-xl cursor-pointer text-gray-500">✕</button>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
               <div className="text-sm text-gray-500 mb-2"><strong>Resumen del turno:</strong></div>
@@ -739,8 +774,6 @@ export default function CajaDelDia() {
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
                       {paymentMethods.map(method => {
-                        const subcat = method.subcategorias_pago
-                        const cat = subcat?.categorias_pago
                         const isSelected = selectedMethod === method.id
                         const esEfectivo = method.id === efectivoMethodId
                         return (
@@ -818,7 +851,7 @@ export default function CajaDelDia() {
                             <div className="flex gap-2">
                               <input type="text" value={newBancoQuickName} onChange={e => setNewBancoQuickName(e.target.value)} placeholder="Nombre del banco" className="flex-1 p-2 border border-gray-300 rounded-md text-sm" />
                               <button type="button" onClick={() => { setQuickMethodBanco(newBancoQuickName); setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm">Guardar</button>
-                              <button type="button" onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm">✕</button>
+                              <button type="button" onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"></button>
                             </div>
                           )}
                         </div>
