@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient'
 const UserRoleContext = createContext(null)
 
 export function UserRoleProvider({ children }) {
-  const [role, setRole] = useState('owner') // ✅ FALLBACK: por defecto owner
+  const [role, setRole] = useState('owner') // ✅ Fallback seguro por defecto
   const [globalRole, setGlobalRole] = useState('owner')
   const [userId, setUserId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,80 +12,62 @@ export function UserRoleProvider({ children }) {
   useEffect(() => {
     const loadRole = async () => {
       try {
-        console.log('🔍 [UserRole] Iniciando carga de rol...')
-        
         const { data: { session } } = await supabase.auth.getSession()
-        console.log(' [UserRole] Session:', session?.user?.email)
         
         if (!session?.user) {
-          console.log('⚠️ [UserRole] No hay sesión')
           setLoading(false)
           return
         }
 
         setUserId(session.user.id)
 
-        // Cargar rol global desde perfiles
-        const { data: perfil, error: perfilError } = await supabase
+        // 1. Cargar rol global (usamos maybeSingle para evitar error si no existe la fila)
+        const { data: perfil } = await supabase
           .from('perfiles')
           .select('rol_global')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle() // ✅ CAMBIO CLAVE: No lanza error si hay 0 filas
 
-        if (perfilError) {
-          console.warn('⚠️ [UserRole] Error cargando perfil:', perfilError.message)
-        } else {
-          console.log('🔍 [UserRole] Perfil:', perfil)
-          setGlobalRole(perfil?.rol_global || 'owner')
+        if (perfil?.rol_global) {
+          setGlobalRole(perfil.rol_global)
         }
 
         // Si es super_user, tiene acceso total
         if (perfil?.rol_global === 'super_user') {
-          console.log('✅ [UserRole] Es super_user')
           setRole('super_user')
           setLoading(false)
           return
         }
 
-        // Cargar rol en el local activo
+        // 2. Cargar rol en el local activo
         const activeLocalId = typeof window !== 'undefined' 
           ? localStorage.getItem('activeLocalId') 
           : null
 
-        console.log('🔍 [UserRole] activeLocalId:', activeLocalId)
-
         if (!activeLocalId) {
-          console.log('️ [UserRole] No hay local activo')
-          setRole('owner') // Fallback
           setLoading(false)
           return
         }
 
-        const { data: miembro, error: miembroError } = await supabase
+        const { data: miembro } = await supabase
           .from('miembros_locales')
           .select('rol')
           .eq('local_id', activeLocalId)
           .eq('user_id', session.user.id)
           .eq('activo', true)
-          .single()
+          .maybeSingle() // ✅ CAMBIO CLAVE: No lanza error si no es miembro aún
 
-        if (miembroError) {
-          console.warn('⚠️ [UserRole] Error cargando miembro:', miembroError.message)
-          setRole('owner') // ✅ FALLBACK
-        } else if (!miembro) {
-          console.warn('⚠️ [UserRole] Miembro no encontrado. Usando fallback: owner')
-          setRole('owner') // ✅ FALLBACK
+        if (miembro?.rol) {
+          setRole(miembro.rol)
         } else {
-          console.log('✅ [UserRole] Miembro encontrado:', miembro)
-          setRole(miembro.rol || 'owner')
+          console.warn('⚠️ Usuario no encontrado en miembros_locales. Usando fallback: owner')
+          // Se mantiene el fallback 'owner' definido al inicio
         }
         
       } catch (err) {
         console.error('❌ [UserRole] Error fatal:', err)
-        setRole('owner') // ✅ FALLBACK SEGURO
       } finally {
         setLoading(false)
-        console.log('✅ [UserRole] Carga completada. Rol final:', role)
       }
     }
 
