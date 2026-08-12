@@ -26,13 +26,11 @@ export default function AdminPanel() {
   useEffect(() => {
     if (roleLoading) return
     
-    // Si no hay sesión, redirigir al login
     if (!userId) {
       router.push('/')
       return
     }
     
-    // Si es empleado, no debería ver el admin general (solo sus propias acciones)
     if (role === 'empleado') {
       setActiveTab('mis-acciones')
     }
@@ -44,15 +42,29 @@ export default function AdminPanel() {
     try {
       setLoading(true)
       const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
-      console.log('🔍 [Admin] Cargando datos para role:', role, 'globalRole:', globalRole, 'localId:', activeLocalId)
+      
+      console.log('🔍 [Admin] Iniciando carga - role:', role, 'globalRole:', globalRole, 'localId:', activeLocalId)
 
       // ==========================================
-      // SUPER USER: Ve todo el sistema
+      // SUPER USER: Solo ve estadísticas globales
       // ==========================================
       if (globalRole === 'super_user') {
-        const { count: countLocales } = await supabase.from('locales').select('*', { count: 'exact', head: true })
-        const { count: countUsuarios } = await supabase.from('perfiles').select('*', { count: 'exact', head: true })
-        const { count: countTx } = await supabase.from('transacciones').select('*', { count: 'exact', head: true })
+        console.log('🔍 [SuperUser] Cargando stats globales...')
+        
+        const { count: countLocales, error: localesError } = await supabase
+          .from('locales')
+          .select('*', { count: 'exact', head: true })
+        console.log('📊 Locales count:', countLocales, 'Error:', localesError)
+        
+        const { count: countUsuarios, error: usuariosError } = await supabase
+          .from('perfiles')
+          .select('*', { count: 'exact', head: true })
+        console.log(' Usuarios count:', countUsuarios, 'Error:', usuariosError)
+        
+        const { count: countTx, error: txError } = await supabase
+          .from('transacciones')
+          .select('*', { count: 'exact', head: true })
+        console.log('💰 Transacciones count:', countTx, 'Error:', txError)
         
         setGlobalStats({
           locales: countLocales || 0,
@@ -60,87 +72,92 @@ export default function AdminPanel() {
           transacciones: countTx || 0
         })
 
-        const { data: localesData } = await supabase
+        const { data: localesData, error: localesDataError } = await supabase
           .from('locales')
           .select('id, nombre, rubro, creado_en, creado_por')
           .order('creado_en', { ascending: false })
+        console.log('🏪 Locales data:', localesData?.length, 'Error:', localesDataError)
         setAllLocales(localesData || [])
+        
+        setActiveTab('resumen')
       }
       
       // ==========================================
-      // OWNER: Ve su local completo
+      // OWNER: Ve SU local completo
       // ==========================================
-      if (role === 'owner' || globalRole === 'super_user') {
-        if (activeLocalId) {
-          console.log('🔍 [Admin] Consultando local:', activeLocalId)
-          
-          // Info del local
-          const { data: localData, error: localError } = await supabase
-            .from('locales')
-            .select('*')
-            .eq('id', activeLocalId)
-            .maybeSingle()
-          
-          if (localError) console.error('❌ Error local:', localError)
-          else console.log('✅ Local encontrado:', localData)
-          setLocalInfo(localData)
-
-          // Estadísticas del local
-          const { data: ventasData, error: ventasError } = await supabase
-            .from('transacciones')
-            .select('monto')
-            .eq('local_id', activeLocalId)
-            .eq('tipo', 'COBRO_RECIBIDO')
-          
-          if (ventasError) console.error('❌ Error ventas:', ventasError)
-          else console.log('✅ Ventas encontradas:', ventasData?.length, 'filas')
-          
-          const totalVentas = ventasData?.reduce((sum, v) => sum + v.monto, 0) || 0
-
-          const { data: gastosData, error: gastosError } = await supabase
-            .from('transacciones')
-            .select('monto')
-            .eq('local_id', activeLocalId)
-            .eq('tipo', 'GASTO_REGISTRADO')
-          
-          if (gastosError) console.error('❌ Error gastos:', gastosError)
-          
-          const totalGastos = gastosData?.reduce((sum, g) => sum + g.monto, 0) || 0
-
-          const { count: countTx, error: countError } = await supabase
-            .from('transacciones')
-            .select('*', { count: 'exact', head: true })
-            .eq('local_id', activeLocalId)
-
-          if (countError) console.error('❌ Error count:', countError)
-          else console.log('✅ Total transacciones:', countTx)
-
-          setLocalStats({
-            ventas: totalVentas,
-            gastos: totalGastos,
-            transacciones: countTx || 0
-          })
-
-          // Miembros del local
-          const { data: miembrosData } = await supabase
-            .from('miembros_locales')
-            .select(`
-              id, rol, activo, aceptado_en,
-              user:auth.users(id, email)
-            `)
-            .eq('local_id', activeLocalId)
-            .eq('activo', true)
-          setMiembros(miembrosData || [])
-
-          // Logs de auditoría del local
-          const { data: logsData } = await supabase
-            .from('logs_auditoria')
-            .select('*')
-            .eq('local_id', activeLocalId)
-            .order('creado_en', { ascending: false })
-            .limit(50)
-          setLogs(logsData || [])
+      if (role === 'owner') {
+        console.log('🔍 [Owner] Cargando datos del local:', activeLocalId)
+        
+        if (!activeLocalId) {
+          console.warn('⚠️ No hay local activo seleccionado')
+          toast.error('Seleccioná un local primero')
+          setLoading(false)
+          return
         }
+
+        // Info del local
+        const { data: localData, error: localError } = await supabase
+          .from('locales')
+          .select('*')
+          .eq('id', activeLocalId)
+          .maybeSingle()
+        
+        console.log('📋 Local data:', localData, 'Error:', localError)
+        setLocalInfo(localData)
+
+        // Estadísticas del local
+        const { data: ventasData, error: ventasError } = await supabase
+          .from('transacciones')
+          .select('monto')
+          .eq('local_id', activeLocalId)
+          .eq('tipo', 'COBRO_RECIBIDO')
+        
+        console.log('💰 Ventas:', ventasData?.length, 'Error:', ventasError)
+        const totalVentas = ventasData?.reduce((sum, v) => sum + v.monto, 0) || 0
+
+        const { data: gastosData, error: gastosError } = await supabase
+          .from('transacciones')
+          .select('monto')
+          .eq('local_id', activeLocalId)
+          .eq('tipo', 'GASTO_REGISTRADO')
+        
+        console.log('💸 Gastos:', gastosData?.length, 'Error:', gastosError)
+        const totalGastos = gastosData?.reduce((sum, g) => sum + g.monto, 0) || 0
+
+        const { count: countTx, error: countError } = await supabase
+          .from('transacciones')
+          .select('*', { count: 'exact', head: true })
+          .eq('local_id', activeLocalId)
+
+        console.log('📊 Total transacciones:', countTx, 'Error:', countError)
+
+        setLocalStats({
+          ventas: totalVentas,
+          gastos: totalGastos,
+          transacciones: countTx || 0
+        })
+
+        // Miembros del local
+        const { data: miembrosData, error: miembrosError } = await supabase
+          .from('miembros_locales')
+          .select(`
+            id, rol, activo, aceptado_en,
+            user:auth.users(id, email)
+          `)
+          .eq('local_id', activeLocalId)
+          .eq('activo', true)
+        console.log('👥 Miembros:', miembrosData?.length, 'Error:', miembrosError)
+        setMiembros(miembrosData || [])
+
+        // Logs de auditoría del local
+        const { data: logsData, error: logsError } = await supabase
+          .from('logs_auditoria')
+          .select('*')
+          .eq('local_id', activeLocalId)
+          .order('creado_en', { ascending: false })
+          .limit(50)
+        console.log('📋 Logs:', logsData?.length, 'Error:', logsError)
+        setLogs(logsData || [])
       }
       
       // ==========================================
@@ -168,7 +185,7 @@ export default function AdminPanel() {
       
     } catch (err) {
       console.error('❌ Error fatal cargando datos del admin:', err)
-      toast.error('Error al cargar el panel')
+      toast.error('Error al cargar el panel: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -179,9 +196,6 @@ export default function AdminPanel() {
     router.push('/')
   }
 
-  // ==========================================
-  // HELPERS DE FORMATO
-  // ==========================================
   const formatFecha = (fecha) => {
     if (!fecha) return '-'
     return new Date(fecha).toLocaleString('es-AR', {
@@ -207,9 +221,6 @@ export default function AdminPanel() {
     return labels[accion] || { icono: '📋', texto: accion, color: 'bg-gray-100 text-gray-800' }
   }
 
-  // ==========================================
-  // RENDER: Pantalla de carga
-  // ==========================================
   if (roleLoading || loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -222,58 +233,101 @@ export default function AdminPanel() {
   }
 
   // ==========================================
-  // RENDER: Empleado (solo ve sus acciones)
+  // RENDER: Super User
   // ==========================================
-  if (role === 'empleado') {
+  if (globalRole === 'super_user') {
     return (
-      <main className="min-h-screen bg-slate-100 pb-20">
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+      <main className="min-h-screen bg-slate-900 text-white pb-20">
+        <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
             <div>
-              <h1 className="m-0 text-lg font-bold text-gray-900">👷 Mis Acciones</h1>
-              <p className="mt-0.5 text-xs text-gray-500">Registro de tu actividad</p>
+              <h1 className="m-0 text-xl font-bold text-white">🛡️ Panel de Super Administrador</h1>
+              <p className="mt-0.5 text-xs text-slate-400">Vista global del sistema</p>
             </div>
-            <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer">Salir</button>
+            <button onClick={handleSignOut} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-md text-white text-xs font-medium cursor-pointer transition-colors">Cerrar Sesión</button>
           </div>
         </header>
 
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-blue-800 m-0">ℹ️ Como empleado, solo podés ver el registro de tus propias acciones.</p>
+        <div className="max-w-6xl mx-auto p-6">
+          <div className="flex gap-2 mb-6 border-b border-slate-700">
+            {[
+              { id: 'resumen', label: '📊 Resumen Global' },
+              { id: 'locales', label: `🏪 Locales (${allLocales.length})` }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-sm font-semibold cursor-pointer border-none rounded-t-lg transition-colors ${
+                  activeTab === tab.id 
+                    ? 'bg-slate-900 text-blue-400 border-b-2 border-blue-400' 
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {misAcciones.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
-              <div className="text-5xl mb-3">📭</div>
-              <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin acciones registradas</h3>
-              <p className="m-0 text-gray-500 text-sm">Aún no tenés acciones en el sistema de auditoría.</p>
+          {activeTab === 'resumen' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                  <div className="text-slate-400 text-sm font-semibold mb-2">LOCALES REGISTRADOS</div>
+                  <div className="text-4xl font-extrabold text-blue-400">{globalStats.locales}</div>
+                </div>
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                  <div className="text-slate-400 text-sm font-semibold mb-2">USUARIOS TOTALES</div>
+                  <div className="text-4xl font-extrabold text-emerald-400">{globalStats.usuarios}</div>
+                </div>
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                  <div className="text-slate-400 text-sm font-semibold mb-2">TRANSACCIONES GLOBALES</div>
+                  <div className="text-4xl font-extrabold text-purple-400">{globalStats.transacciones}</div>
+                </div>
+              </div>
+
+              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <h2 className="text-lg font-bold mb-4">⚙️ Estado del Sistema</h2>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
+                    <span className="text-slate-300 text-sm">Base de datos</span>
+                    <span className="text-emerald-400 text-sm font-bold">✅ Conectada</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
+                    <span className="text-slate-300 text-sm">Sistema de roles</span>
+                    <span className="text-emerald-400 text-sm font-bold">✅ Activo</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
+                    <span className="text-slate-300 text-sm">Logs de auditoría</span>
+                    <span className="text-emerald-400 text-sm font-bold">✅ Registrando</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {misAcciones.map(log => {
-                const accionInfo = getAccionLabel(log.accion)
-                return (
-                  <div key={log.id} className="bg-white p-4 rounded-lg border border-gray-200">
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${accionInfo.color}`}>
-                        {accionInfo.icono}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
-                        <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
-                        {log.detalles && (
-                          <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                            {log.detalles.descripcion && <div>📝 {log.detalles.descripcion}</div>}
-                            {log.detalles.monto && <div>💵 {formatCurrency(log.detalles.monto)}</div>}
-                            {log.detalles.email && <div>📧 {log.detalles.email}</div>}
-                            {log.detalles.rol_asignado && <div>🎭 Rol: {log.detalles.rol_asignado}</div>}
+          )}
+
+          {activeTab === 'locales' && (
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+              <h2 className="text-lg font-bold mb-4">🏪 Todos los Locales</h2>
+              {allLocales.length === 0 ? (
+                <p className="text-slate-400 text-sm">No hay locales registrados o no tenés permisos para verlos.</p>
+              ) : (
+                <div className="space-y-3">
+                  {allLocales.map(local => (
+                    <div key={local.id} className="p-4 bg-slate-900 rounded-lg border border-slate-700">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-bold text-white">{local.nombre}</div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            {local.rubro && <span className="bg-slate-700 px-2 py-0.5 rounded mr-2">{local.rubro}</span>}
+                            Creado: {formatFecha(local.creado_en)}
                           </div>
-                        )}
+                          <div className="text-xs text-slate-500 mt-1">ID: {local.id}</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -282,7 +336,159 @@ export default function AdminPanel() {
   }
 
   // ==========================================
-  // RENDER: Cajero (información limitada)
+  // RENDER: Owner
+  // ==========================================
+  if (role === 'owner') {
+    return (
+      <main className="min-h-screen bg-slate-100 pb-20">
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="m-0 text-lg font-bold text-gray-900">👑 Panel de Administración</h1>
+              <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Cargando local...'}</p>
+            </div>
+            <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer">Salir</button>
+          </div>
+        </header>
+
+        <div className="max-w-6xl mx-auto p-4">
+          <div className="flex gap-2 mb-4 border-b border-gray-200">
+            {[
+              { id: 'resumen', label: '📊 Resumen' },
+              { id: 'miembros', label: '👥 Miembros' },
+              { id: 'logs', label: '📋 Auditoría' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-sm font-semibold cursor-pointer border-none rounded-t-lg transition-colors ${
+                  activeTab === tab.id 
+                    ? 'bg-white text-blue-600 border-b-2 border-blue-600' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'resumen' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                  <div className="text-xs text-gray-500 font-semibold mb-1">💰 TOTAL VENTAS</div>
+                  <div className="text-2xl font-extrabold text-green-700">{formatCurrency(localStats.ventas)}</div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                  <div className="text-xs text-gray-500 font-semibold mb-1">💸 TOTAL GASTOS</div>
+                  <div className="text-2xl font-extrabold text-red-700">{formatCurrency(localStats.gastos)}</div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                  <div className="text-xs text-gray-500 font-semibold mb-1"> TRANSACCIONES</div>
+                  <div className="text-2xl font-extrabold text-blue-700">{localStats.transacciones}</div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-200">
+                <h2 className="m-0 mb-3 text-base font-bold text-gray-900"> Últimas Acciones de Auditoría</h2>
+                {logs.length === 0 ? (
+                  <p className="text-sm text-gray-500">Sin acciones registradas.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {logs.slice(0, 10).map(log => {
+                      const accionInfo = getAccionLabel(log.accion)
+                      return (
+                        <div key={log.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg ${accionInfo.color}`}>
+                            {accionInfo.icono}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-semibold text-gray-900">{accionInfo.texto}</div>
+                            <div className="text-xs text-gray-500">{formatFecha(log.creado_en)}</div>
+                          </div>
+                          {log.detalles?.monto && (
+                            <div className="text-sm font-bold text-gray-700">{formatCurrency(log.detalles.monto)}</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'miembros' && (
+            <div className="bg-white p-4 rounded-xl border border-gray-200">
+              <h2 className="m-0 mb-3 text-base font-bold text-gray-900">👥 Miembros del Local</h2>
+              {miembros.length === 0 ? (
+                <p className="text-sm text-gray-500">No hay miembros registrados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {miembros.map(miembro => (
+                    <div key={miembro.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">{miembro.user?.email || 'Usuario'}</div>
+                        <div className="text-xs text-gray-500">Aceptado: {formatFecha(miembro.aceptado_en)}</div>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        miembro.rol === 'owner' ? 'bg-purple-100 text-purple-800' :
+                        miembro.rol === 'cajero' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {miembro.rol === 'owner' ? '👑 Owner' : miembro.rol === 'cajero' ? '👨‍ Cajero' : '👷 Empleado'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'logs' && (
+            <div className="bg-white p-4 rounded-xl border border-gray-200">
+              <h2 className="m-0 mb-3 text-base font-bold text-gray-900">📋 Logs de Auditoría</h2>
+              {logs.length === 0 ? (
+                <p className="text-sm text-gray-500">Sin logs registrados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {logs.map(log => {
+                    const accionInfo = getAccionLabel(log.accion)
+                    return (
+                      <div key={log.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${accionInfo.color}`}>
+                            {accionInfo.icono}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
+                            <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
+                            {log.detalles && (
+                              <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border border-gray-200">
+                                {log.detalles.descripcion && <div>📝 {log.detalles.descripcion}</div>}
+                                {log.detalles.monto && <div>💵 {formatCurrency(log.detalles.monto)}</div>}
+                                {log.detalles.email && <div>📧 {log.detalles.email}</div>}
+                                {log.detalles.rol_asignado && <div>🎭 Rol asignado: {log.detalles.rol_asignado}</div>}
+                                {log.detalles.monto_inicial && <div>💰 Monto inicial: {formatCurrency(log.detalles.monto_inicial)}</div>}
+                                {log.detalles.motivo_diferencia && <div>️ {log.detalles.motivo_diferencia}</div>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    )
+  }
+
+  // ==========================================
+  // RENDER: Cajero
   // ==========================================
   if (role === 'cajero') {
     return (
@@ -354,150 +560,58 @@ export default function AdminPanel() {
   }
 
   // ==========================================
-  // RENDER: Owner (ve todo su local)
+  // RENDER: Empleado
   // ==========================================
-  if (role === 'owner') {
+  if (role === 'empleado') {
     return (
       <main className="min-h-screen bg-slate-100 pb-20">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
             <div>
-              <h1 className="m-0 text-lg font-bold text-gray-900">👑 Panel de Administración</h1>
-              <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Mi Local'}</p>
+              <h1 className="m-0 text-lg font-bold text-gray-900">👷 Mis Acciones</h1>
+              <p className="mt-0.5 text-xs text-gray-500">Registro de tu actividad</p>
             </div>
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer">Salir</button>
           </div>
         </header>
 
-        <div className="max-w-6xl mx-auto p-4">
-          <div className="flex gap-2 mb-4 border-b border-gray-200">
-            {[
-              { id: 'resumen', label: '📊 Resumen' },
-              { id: 'miembros', label: '👥 Miembros' },
-              { id: 'logs', label: '📋 Auditoría' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-semibold cursor-pointer border-none rounded-t-lg transition-colors ${
-                  activeTab === tab.id 
-                    ? 'bg-white text-blue-600 border-b-2 border-blue-600' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className="max-w-4xl mx-auto p-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800 m-0">ℹ️ Como empleado, solo podés ver el registro de tus propias acciones.</p>
           </div>
 
-          {activeTab === 'resumen' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-gray-200">
-                  <div className="text-xs text-gray-500 font-semibold mb-1">💰 TOTAL VENTAS</div>
-                  <div className="text-2xl font-extrabold text-green-700">{formatCurrency(localStats.ventas)}</div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-200">
-                  <div className="text-xs text-gray-500 font-semibold mb-1">💸 TOTAL GASTOS</div>
-                  <div className="text-2xl font-extrabold text-red-700">{formatCurrency(localStats.gastos)}</div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-200">
-                  <div className="text-xs text-gray-500 font-semibold mb-1">📊 TRANSACCIONES</div>
-                  <div className="text-2xl font-extrabold text-blue-700">{localStats.transacciones}</div>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-xl border border-gray-200">
-                <h2 className="m-0 mb-3 text-base font-bold text-gray-900">📋 Últimas Acciones de Auditoría</h2>
-                {logs.length === 0 ? (
-                  <p className="text-sm text-gray-500">Sin acciones registradas.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {logs.slice(0, 10).map(log => {
-                      const accionInfo = getAccionLabel(log.accion)
-                      return (
-                        <div key={log.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg ${accionInfo.color}`}>
-                            {accionInfo.icono}
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-gray-900">{accionInfo.texto}</div>
-                            <div className="text-xs text-gray-500">{formatFecha(log.creado_en)}</div>
-                          </div>
-                          {log.detalles?.monto && (
-                            <div className="text-sm font-bold text-gray-700">{formatCurrency(log.detalles.monto)}</div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+          {misAcciones.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
+              <div className="text-5xl mb-3">📭</div>
+              <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin acciones registradas</h3>
+              <p className="m-0 text-gray-500 text-sm">Aún no tenés acciones en el sistema de auditoría.</p>
             </div>
-          )}
-
-          {activeTab === 'miembros' && (
-            <div className="bg-white p-4 rounded-xl border border-gray-200">
-              <h2 className="m-0 mb-3 text-base font-bold text-gray-900">👥 Miembros del Local</h2>
-              {miembros.length === 0 ? (
-                <p className="text-sm text-gray-500">No hay miembros registrados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {miembros.map(miembro => (
-                    <div key={miembro.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">{miembro.user?.email || 'Usuario'}</div>
-                        <div className="text-xs text-gray-500">Aceptado: {formatFecha(miembro.aceptado_en)}</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {misAcciones.map(log => {
+                const accionInfo = getAccionLabel(log.accion)
+                return (
+                  <div key={log.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${accionInfo.color}`}>
+                        {accionInfo.icono}
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        miembro.rol === 'owner' ? 'bg-purple-100 text-purple-800' :
-                        miembro.rol === 'cajero' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {miembro.rol === 'owner' ? '👑 Owner' : miembro.rol === 'cajero' ? '👨‍💼 Cajero' : '👷 Empleado'}
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
+                        <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
+                        {log.detalles && (
+                          <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                            {log.detalles.descripcion && <div>📝 {log.detalles.descripcion}</div>}
+                            {log.detalles.monto && <div>💵 {formatCurrency(log.detalles.monto)}</div>}
+                            {log.detalles.email && <div>📧 {log.detalles.email}</div>}
+                            {log.detalles.rol_asignado && <div>🎭 Rol: {log.detalles.rol_asignado}</div>}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'logs' && (
-            <div className="bg-white p-4 rounded-xl border border-gray-200">
-              <h2 className="m-0 mb-3 text-base font-bold text-gray-900">📋 Logs de Auditoría</h2>
-              {logs.length === 0 ? (
-                <p className="text-sm text-gray-500">Sin logs registrados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {logs.map(log => {
-                    const accionInfo = getAccionLabel(log.accion)
-                    return (
-                      <div key={log.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${accionInfo.color}`}>
-                            {accionInfo.icono}
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
-                            <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
-                            {log.detalles && (
-                              <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border border-gray-200">
-                                {log.detalles.descripcion && <div>📝 {log.detalles.descripcion}</div>}
-                                {log.detalles.monto && <div>💵 {formatCurrency(log.detalles.monto)}</div>}
-                                {log.detalles.email && <div>📧 {log.detalles.email}</div>}
-                                {log.detalles.rol_asignado && <div>🎭 Rol asignado: {log.detalles.rol_asignado}</div>}
-                                {log.detalles.monto_inicial && <div>💰 Monto inicial: {formatCurrency(log.detalles.monto_inicial)}</div>}
-                                {log.detalles.motivo_diferencia && <div>⚠️ {log.detalles.motivo_diferencia}</div>}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -505,131 +619,6 @@ export default function AdminPanel() {
     )
   }
 
-  // ==========================================
-  // RENDER: Super User (ve todo el sistema)
-  // ==========================================
-  if (globalRole === 'super_user') {
-    return (
-      <main className="min-h-screen bg-slate-900 text-white pb-20">
-        <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div>
-              <h1 className="m-0 text-xl font-bold text-white">🛡️ Panel de Super Administrador</h1>
-              <p className="mt-0.5 text-xs text-slate-400">Vista global del sistema</p>
-            </div>
-            <button onClick={handleSignOut} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-md text-white text-xs font-medium cursor-pointer transition-colors">Cerrar Sesión</button>
-          </div>
-        </header>
-
-        <div className="max-w-6xl mx-auto p-6">
-          <div className="flex gap-2 mb-6 border-b border-slate-700">
-            {[
-              { id: 'resumen', label: '📊 Resumen Global' },
-              { id: 'locales', label: '🏪 Locales' },
-              { id: 'logs', label: '📋 Auditoría Global' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-semibold cursor-pointer border-none rounded-t-lg transition-colors ${
-                  activeTab === tab.id 
-                    ? 'bg-slate-900 text-blue-400 border-b-2 border-blue-400' 
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {activeTab === 'resumen' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                  <div className="text-slate-400 text-sm font-semibold mb-2">LOCALES REGISTRADOS</div>
-                  <div className="text-4xl font-extrabold text-blue-400">{globalStats.locales}</div>
-                </div>
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                  <div className="text-slate-400 text-sm font-semibold mb-2">USUARIOS TOTALES</div>
-                  <div className="text-4xl font-extrabold text-emerald-400">{globalStats.usuarios}</div>
-                </div>
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                  <div className="text-slate-400 text-sm font-semibold mb-2">TRANSACCIONES GLOBALES</div>
-                  <div className="text-4xl font-extrabold text-purple-400">{globalStats.transacciones}</div>
-                </div>
-              </div>
-
-              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                <h2 className="text-lg font-bold mb-4">⚙️ Estado del Sistema</h2>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
-                    <span className="text-slate-300 text-sm">Base de datos</span>
-                    <span className="text-emerald-400 text-sm font-bold">✅ Conectada</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
-                    <span className="text-slate-300 text-sm">Sistema de roles</span>
-                    <span className="text-emerald-400 text-sm font-bold">✅ Activo</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
-                    <span className="text-slate-300 text-sm">Logs de auditoría</span>
-                    <span className="text-emerald-400 text-sm font-bold">✅ Registrando</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'locales' && (
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-              <h2 className="text-lg font-bold mb-4">🏪 Todos los Locales</h2>
-              {allLocales.length === 0 ? (
-                <p className="text-slate-400 text-sm">No hay locales registrados.</p>
-              ) : (
-                <div className="space-y-3">
-                  {allLocales.map(local => (
-                    <div key={local.id} className="p-4 bg-slate-900 rounded-lg border border-slate-700">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-bold text-white">{local.nombre}</div>
-                          <div className="text-xs text-slate-400 mt-1">
-                            {local.rubro && <span className="bg-slate-700 px-2 py-0.5 rounded mr-2">{local.rubro}</span>}
-                            Creado: {formatFecha(local.creado_en)}
-                          </div>
-                        </div>
-                        <div className="text-xs text-slate-500 font-mono">{local.id.slice(0, 8)}...</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'logs' && (
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-              <h2 className="text-lg font-bold mb-4">📋 Auditoría Global</h2>
-              <p className="text-slate-400 text-sm mb-4">Los logs de auditoría se muestran por local. Seleccioná un local para ver sus logs.</p>
-              <div className="space-y-3">
-                {allLocales.slice(0, 5).map(local => (
-                  <div key={local.id} className="p-4 bg-slate-900 rounded-lg border border-slate-700">
-                    <div className="font-bold text-white">{local.nombre}</div>
-                    <div className="text-xs text-slate-400 mt-1">ID: {local.id}</div>
-                    <button className="mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-semibold cursor-pointer transition-colors">
-                      Ver logs de este local
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-    )
-  }
-
-  // ==========================================
-  // RENDER: Fallback (rol no reconocido)
-  // ==========================================
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-xl border border-gray-200 text-center">
