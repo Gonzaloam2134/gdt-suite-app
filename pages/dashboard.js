@@ -70,7 +70,7 @@ export default function CajaDelDia() {
   // NUEVO: Estados para secciones colapsables
   const [showResumen, setShowResumen] = useState(true)
   const [showDetalleMedios, setShowDetalleMedios] = useState(false)
-  const [showAcreditaciones, setShowAcreditaciones] = useState(true)
+  const [showAcreditaciones, setShowAcreditaciones] = useState(false)
   const [showMovimientos, setShowMovimientos] = useState(true)
   
   const router = useRouter()
