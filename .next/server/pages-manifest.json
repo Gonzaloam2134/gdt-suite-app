@@ -3,7 +3,7 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/": "pages/index.js",
-  "/dashboard": "pages/dashboard.js",
   "/locales": "pages/locales.js",
-  "/admin": "pages/admin.js"
+  "/admin": "pages/admin.js",
+  "/reset-password": "pages/reset-password.js"
 }

@@ -1,11 +1,13 @@
 import { supabase } from '../lib/supabaseClient'
+import InviteUserModal from '../components/InviteUserModal'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import RoleGate from '../components/RoleGate'
-import InviteUserModal from '../components/InviteUserModal'
+import AddUserModal from '../components/AddUserModal'
+
 
 const CONCEPTOS_INGRESO = ['Venta de mostrador', 'Venta por Delivery', 'Pedido / Encargo', 'Servicios', 'Otro ingreso']
 const CONCEPTOS_GASTO = ['Compra de insumos/proveedores', 'Servicios (Luz, Gas, Internet)', 'Sueldos / Jornales', 'Alquiler', 'Impuestos', 'Otros egresos']
@@ -32,7 +34,8 @@ export default function CajaDelDia() {
   const [showOpenShift, setShowOpenShift] = useState(false)
   const [showCloseShift, setShowCloseShift] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
-  
+  const [showAddUserModal, setShowAddUserModal] = useState(false)
+  const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [amount, setAmount] = useState('')
   const [selectedConcept, setSelectedConcept] = useState('')
   const [customConcept, setCustomConcept] = useState('')
@@ -59,7 +62,7 @@ export default function CajaDelDia() {
   const [newCategoryQuickName, setNewCategoryQuickName] = useState('')
   const [newOperatorQuickName, setNewOperatorQuickName] = useState('')
   const [newBancoQuickName, setNewBancoQuickName] = useState('')
-
+  const [showAddUserModal, setShowAddUserModal] = useState(false)
   // Navegación por fechas
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [isViewingHistory, setIsViewingHistory] = useState(false)
@@ -76,17 +79,32 @@ export default function CajaDelDia() {
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+      useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
+        return
+      }
+      
+      // 1. ¡IMPORTANTE! Guardar el usuario en el estado
+      setUser(session.user)
+
+      // 2. Obtener el perfil del usuario desde la base de datos
+      const { data: profile } = await supabase
+        .from('perfiles')
+        .select('rol_global, rol')
+        .eq('id', session.user.id)
+        .single()
+      
+      const userRole = profile?.rol_global || profile?.rol || 'owner'
+      
+      // 3. Redirecciones inteligentes
+      if (userRole === 'owner' && !activeLocalId) {
+        router.push('/locales') // Redirige a la pantalla de creación/onboarding
+      } else if (!activeLocalId) {
+        router.push('/locales') // Redirige a la pantalla de "Esperando asignación"
       } else {
-        setUser(session.user)
-        if (activeLocalId) {
-          loadData(session.user.id)
-        } else {
-          router.push('/locales')
-        }
+        loadData(session.user.id)
       }
     })
   }, [router, activeLocalId])
@@ -313,7 +331,39 @@ export default function CajaDelDia() {
       }]).select().single()
 
       if (error) throw error
-      toast.success('Caja abierta correctamente')
+            // ✅ NUEVO: Registrar log de apertura
+      await supabase.rpc('registrar_log', {
+        p_local_id: activeLocalId,
+        p_user_id: user.id,
+        p_accion: 'CAJA_ABIERTA',
+        p_detalles: { 
+          monto_inicial: parseFloat(openingAmount), 
+          motivo_diferencia: isAmountModified ? differenceReason : null 
+        }
+      });
+// ✅ NUEVO: Log de apertura de caja
+console.log('🔍 [DEBUG] Intentando registrar log de apertura...');
+try {
+  const { data, error } = await supabase.rpc('registrar_log', {
+    p_local_id: activeLocalId,
+    p_user_id: user.id,
+    p_accion: 'CAJA_ABIERTA',
+    p_detalles: { 
+      monto_inicial: parseFloat(openingAmount), 
+      motivo_diferencia: isAmountModified ? differenceReason : null 
+    }
+  });
+  
+  if (error) {
+    console.error(' [DEBUG] Error al registrar log:', error);
+  } else {
+    console.log('✅ [DEBUG] Log registrado exitosamente:', data);
+  }
+} catch (err) {
+  console.error('❌ [DEBUG] Excepción al registrar log:', err);
+}
+
+toast.success('Caja abierta correctamente');
       setShowOpenShift(false); setOpeningAmount(''); setDifferenceReason(''); setIsAmountModified(false)
       loadData(user.id)
     } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
@@ -325,7 +375,39 @@ export default function CajaDelDia() {
       setCreating(true)
       const { error } = await supabase.from('turnos').update({ estado: 'CERRADO', cerrado_en: new Date().toISOString(), cerrado_por: user.id }).eq('id', activeShift.id)
       if (error) throw error
-      toast.success('Caja cerrada correctamente')
+            // ✅ NUEVO: Registrar log de cierre
+      await supabase.rpc('registrar_log', {
+        p_local_id: activeLocalId,
+        p_user_id: user.id,
+        p_accion: 'CAJA_CERRADA',
+        p_detalles: { 
+          efectivo_final: efectivoEnCaja,
+          total_disponible: totalDisponibleHoy
+        }
+      });
+// ✅ NUEVO: Log de cierre de caja
+console.log(' [DEBUG] Intentando registrar log de cierre...');
+try {
+  const { data, error } = await supabase.rpc('registrar_log', {
+    p_local_id: activeLocalId,
+    p_user_id: user.id,
+    p_accion: 'CAJA_CERRADA',
+    p_detalles: { 
+      efectivo_final: efectivoEnCaja,
+      total_disponible: totalDisponibleHoy
+    }
+  });
+  
+  if (error) {
+    console.error('❌ [DEBUG] Error al registrar log:', error);
+  } else {
+    console.log('✅ [DEBUG] Log registrado exitosamente:', data);
+  }
+} catch (err) {
+  console.error('❌ [DEBUG] Excepción al registrar log:', err);
+}
+
+toast.success('Caja cerrada correctamente');
       setShowCloseShift(false); setActiveShift(null); setMovements([])
       loadData(user.id)
     } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
@@ -367,6 +449,17 @@ export default function CajaDelDia() {
       }])
 
       if (error) throw error
+      // ✅ NUEVO: Log de transacción
+await supabase.rpc('registrar_log', {
+  p_local_id: activeLocalId,
+  p_user_id: user.id,
+  p_accion: isIncome ? 'VENTA_REGISTRADA' : 'GASTO_REGISTRADO',
+  p_detalles: { 
+    descripcion: finalConcept || (isIncome ? 'Venta' : 'Gasto'), 
+    monto: parseFloat(amount),
+    medio_pago: method.nombre
+  }
+});
       toast.success(`${isIncome ? 'Venta' : 'Gasto'} registrado correctamente`)
       setShowForm(false)
       loadData(user.id)
@@ -419,13 +512,37 @@ export default function CajaDelDia() {
           </div>
           <div className="flex gap-1">
             <RoleGate allowedRoles={['owner', 'super_user']}>
-              <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200">Reportes</button>
-            </RoleGate>
-            <RoleGate allowedRoles={['owner']}>
-              <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200"> Invitar</button>
-            </RoleGate>
-            <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
-          </div>
+  <button 
+    onClick={() => setShowAddUserModal(true)}
+    className="px-2.5 py-1.5 bg-emerald-100 border-none rounded-md text-emerald-700 cursor-pointer text-xs font-semibold hover:bg-emerald-200 transition-colors"
+  >
+    ➕ Agregar Usuario
+  </button>
+</RoleGate>
+  <RoleGate allowedRoles={['owner', 'super_user']}>
+    <button 
+      onClick={() => router.push('/admin')} 
+      className="px-2.5 py-1.5 bg-purple-100 border-none rounded-md text-purple-700 cursor-pointer text-xs font-semibold hover:bg-purple-200"
+    >
+      📋 Auditoría
+    </button>
+  </RoleGate>
+  
+  <RoleGate allowedRoles={['owner', 'super_user']}>
+    <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200"> Reportes</button>
+  </RoleGate>
+  
+  <RoleGate allowedRoles={['owner']}>
+    <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200">👥 Invitar</button>
+  </RoleGate>
+  <button 
+  onClick={() => setShowAddUserModal(true)}
+  className="px-2.5 py-1.5 bg-emerald-100 border-none rounded-md text-emerald-700 cursor-pointer text-xs font-semibold hover:bg-emerald-200 transition-colors"
+>
+  ➕ Agregar Usuario
+</button>
+  <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
+</div>
         </div>
       </header>
 
@@ -916,13 +1033,20 @@ export default function CajaDelDia() {
           </div>
         </div>
       )}
-
-      <InviteUserModal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        localId={activeLocalId}
-        userId={user?.id}
-      />
+<AddUserModal 
+  isOpen={showAddUserModal}
+  onClose={() => setShowAddUserModal(false)}
+  localId={activeLocalId}
+  userId={user?.id}
+  onUserAdded={() => loadData(user?.id)}
+/>
+      <InviteUserModal 
+  isOpen={showAddUserModal}
+  onClose={() => setShowAddUserModal(false)}
+  localId={activeLocalId}
+  userId={user?.id}
+  onUserAdded={() => loadData(user?.id)}
+/>
 
       <BottomNav activeTab="caja" />
     </main>
