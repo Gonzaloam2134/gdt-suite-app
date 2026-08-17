@@ -5,54 +5,37 @@ import toast from 'react-hot-toast'
 const RUBROS = ['Gastronomía', 'Retail / Tienda', 'Servicios', 'Salud / Estética', 'Educación', 'Otro']
 const CONDICIONES = ['Monotributo', 'Responsable Inscripto', 'Exento', 'Consumidor Final']
 
-// Descripciones cortas y precisas de cada rol
 const ROLES_INFO = {
   cajero: {
     titulo: 'Cajero',
-    icono: '👨‍💼',
+    icono: '👨‍',
     descripcion: 'Opera la caja, registra ventas y gastos/pagos. Ve los totales del día.',
-    puede: [
-      'Abrir/cerrar caja',
-      'Registrar ventas',
-      'Registrar gastos/pagos',
-      'Ver resumen diario',
-      'Ver reportes'
-    ],
-    noPuede: [
-      'Crear medios de pago',
-      'Eliminar ventas registradas',
-      'Invitar usuarios'
-    ]
+    puede: ['Abrir/cerrar caja', 'Registrar ventas', 'Registrar gastos/pagos', 'Ver resumen diario', 'Ver reportes'],
+    noPuede: ['Crear medios de pago', 'Eliminar ventas registradas', 'Invitar usuarios']
   },
   empleado: {
     titulo: 'Empleado',
     icono: '👷',
     descripcion: 'Solo registra ventas del mostrador. No ve totales ni opera la caja.',
-    puede: [
-      'Registrar ventas (cobros a clientes)'
-    ],
-    noPuede: [
-      'Registrar gastos/pagos',
-      'Operar caja',
-      'Ver totales',
-      'Ver reportes'
-    ]
+    puede: ['Registrar ventas (cobros a clientes)'],
+    noPuede: ['Registrar gastos/pagos', 'Operar caja', 'Ver totales', 'Ver reportes']
   }
 }
 
-export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
+// ✅ CAMBIO 1: Agregar preloadedData a las props
+export default function OnboardingWizard({ onComplete, onCancel, userEmail, preloadedData }) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [skipTeamInvite, setSkipTeamInvite] = useState(false)
   
+  // ✅ CAMBIO 2: Precargar businessName desde preloadedData
   const [formData, setFormData] = useState({
-    businessName: '',
+    businessName: preloadedData?.businessName || '',
     rubro: '',
     condicionFiscal: '',
     numLocales: '1'
   })
 
-  // Estado para el paso 4: invitaciones
   const [invites, setInvites] = useState([])
   const [newInviteEmail, setNewInviteEmail] = useState('')
   const [newInviteRole, setNewInviteRole] = useState('cajero')
@@ -81,13 +64,10 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
       toast.error('Ingresá un email válido')
       return
     }
-    
-    // Verificar que no esté duplicado
     if (invites.some(inv => inv.email === newInviteEmail.toLowerCase())) {
       toast.error('Este email ya fue agregado')
       return
     }
-
     setInvites([...invites, { email: newInviteEmail.toLowerCase(), rol: newInviteRole }])
     setNewInviteEmail('')
     setNewInviteRole('cajero')
@@ -100,8 +80,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
   const handleFinish = async () => {
     try {
       setLoading(true)
-      
-      // Devolver los datos + invitaciones al padre
       onComplete({ ...formData, invites })
     } catch (err) {
       toast.error('Error: ' + err.message)
@@ -122,16 +100,9 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
             </h2>
             <button onClick={onCancel} className="bg-none border-none text-xl cursor-pointer text-gray-400 hover:text-gray-600">✕</button>
           </div>
-          
-          {/* Barra de progreso */}
           <div className="flex gap-2">
             {[1, 2, 3, 4].map(i => (
-              <div 
-                key={i} 
-                className={`h-2 flex-1 rounded-full transition-colors ${
-                  i <= step ? 'bg-blue-500' : 'bg-gray-200'
-                }`}
-              />
+              <div key={i} className={`h-2 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-200'}`} />
             ))}
           </div>
           <p className="mt-2 text-xs text-gray-500">Paso {step} de 4</p>
@@ -142,14 +113,20 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
           <div className="space-y-4">
             <p className="text-sm text-gray-600">Contanos un poco sobre tu negocio para personalizar tu experiencia.</p>
             
+            {/* ✅ CAMBIO 3: Input del nombre con precarga y bloqueo */}
             <div>
-              <label className="block mb-2 font-semibold text-gray-700 text-sm">Nombre del negocio *</label>
+              <label className="block mb-2 font-semibold text-gray-700 text-sm">
+                Nombre del negocio * {preloadedData && '(ya completado)'}
+              </label>
               <input
                 type="text"
                 value={formData.businessName}
                 onChange={e => updateField('businessName', e.target.value)}
                 placeholder="Ej: Panadería Los Trigales"
-                className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border focus:border-blue-500 focus:outline-none"
+                disabled={!!preloadedData}
+                className={`w-full p-3 text-base border-2 rounded-lg box-border focus:border-blue-500 focus:outline-none ${
+                  preloadedData ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-200'
+                }`}
               />
             </div>
 
@@ -191,7 +168,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">¿Cuántos locales o sucursales planeas manejar en GDT Suite?</p>
-            
             <div className="grid grid-cols-1 gap-3">
               {[
                 { val: '1', label: '1 Local', desc: 'Ideal para emprendedores y negocios unipersonales.' },
@@ -220,7 +196,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
         {step === 3 && (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">Revisá que todo esté correcto antes de empezar.</p>
-            
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Negocio:</span>
@@ -239,7 +214,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
                 <span className="text-sm font-bold text-gray-900">{formData.numLocales} local(es)</span>
               </div>
             </div>
-
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
               <p className="text-xs text-blue-800 m-0">
                 💡 <strong>Tip:</strong> Podrás cambiar estos datos y agregar más locales en cualquier momento desde la configuración.
@@ -248,7 +222,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
           </div>
         )}
 
-        {/* PASO 4: INVITAR EQUIPO (OPCIONAL) */}
+        {/* PASO 4: INVITAR EQUIPO */}
         {step === 4 && (
           <div className="space-y-4">
             <div>
@@ -259,7 +233,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
               </p>
             </div>
 
-            {/* Opción de saltar */}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -281,7 +254,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
 
             {!skipTeamInvite && (
               <>
-                {/* Formulario para agregar invitación */}
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <div className="mb-3">
                     <label className="block mb-2 font-semibold text-gray-700 text-sm">Email del usuario</label>
@@ -293,7 +265,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
                       className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
                     />
                   </div>
-
                   <div className="mb-3">
                     <label className="block mb-2 font-semibold text-gray-700 text-sm">Rol</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -317,7 +288,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
                       ))}
                     </div>
                   </div>
-
                   <button
                     type="button"
                     onClick={addInvite}
@@ -327,7 +297,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
                   </button>
                 </div>
 
-                {/* Info detallada de roles (expandible) */}
                 <div className="space-y-2">
                   {Object.entries(ROLES_INFO).map(([key, info]) => (
                     <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -361,7 +330,6 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail }) {
                   ))}
                 </div>
 
-                {/* Lista de invitaciones agregadas */}
                 {invites.length > 0 && (
                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
                     <div className="text-sm font-bold text-blue-900 mb-2">

@@ -14,37 +14,47 @@ export default function Locales() {
 
   const router = useRouter()
 
-  useEffect(() => {
+    useEffect(() => {
+    // Verificar si hay datos temporales del registro
+    const tempData = localStorage.getItem('onboarding_temp_data')
+    if (tempData) {
+      const parsed = JSON.parse(tempData)
+      // Precargar el nombre del negocio en el onboarding
+      // Esto lo manejaremos pasando props al OnboardingWizard
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
         return
       }
-      
+
       setUser(session.user)
-      
+
       try {
-        // 1. Obtener el rol global del usuario
-        const { data: perfil } = await supabase
+        const { data: perfil, error: perfilError } = await supabase
           .from('perfiles')
           .select('rol_global')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle()
+
+        if (perfilError) {
+          console.error('Error al obtener perfil:', perfilError)
+        }
 
         const rol = perfil?.rol_global || 'owner'
+        console.log('🔍 [Locales] Rol detectado:', rol)
         setUserRole(rol)
 
-        // 2. Si es Super Admin, al panel global directamente
         if (rol === 'super_user') {
           router.push('/admin')
           return
         }
 
-        // 3. Cargar SOLO los locales a los que este usuario pertenece (pasamos el rol)
         await loadMisLocales(session.user.id, rol)
 
       } catch (err) {
-        console.error('Error al cargar perfil:', err)
+        console.error('Error al cargar datos del usuario:', err)
         toast.error('Error al cargar datos del usuario')
       } finally {
         setLoading(false)
@@ -52,7 +62,8 @@ export default function Locales() {
     })
   }, [router])
 
-      const loadMisLocales = async (userId, currentRole) => {
+  const loadMisLocales = async (userId, currentRole) => {
+    console.log('🔍 [loadMisLocales] Iniciando para userId:', userId, 'rol:', currentRole)
     try {
       // PASO 1: Obtener solo los IDs de los locales a los que pertenece el usuario
       const { data: membresias, error: errorMembresia } = await supabase
@@ -61,13 +72,24 @@ export default function Locales() {
         .eq('user_id', userId)
         .eq('activo', true)
 
-      if (errorMembresia) throw errorMembresia
-      
+      if (errorMembresia) {
+        console.error('❌ [loadMisLocales] Error al obtener membresías:', errorMembresia)
+        throw errorMembresia
+      }
+
+      console.log('🔍 [loadMisLocales] Membresías encontradas:', membresias)
+
       // Si no tiene membresías
       if (!membresias || membresias.length === 0) {
         setMisLocales([])
+
+        // BUG CRÍTICO CORREGIDO: Solo mostramos onboarding si NO es cajero ni empleado
         if (currentRole !== 'cajero' && currentRole !== 'empleado') {
+          console.log('✅ [loadMisLocales] Es owner sin locales. Mostrando onboarding.')
           setShowOnboarding(true)
+        } else {
+          console.log('✅ [loadMisLocales] Es cajero/empleado sin locales. Mostrando espera.')
+          // No hacemos nada, el JSX de abajo se encargará de mostrar "Esperando asignación"
         }
         return
       }
@@ -80,77 +102,137 @@ export default function Locales() {
         .select('id, nombre, rubro, condicion_fiscal')
         .in('id', localIds)
 
-      if (errorLocales) throw errorLocales
-      
+      if (errorLocales) {
+        console.error('❌ [loadMisLocales] Error al obtener locales:', errorLocales)
+        throw errorLocales
+      }
+
+      console.log('✅ [loadMisLocales] Locales cargados:', localesData)
       setMisLocales(localesData || [])
 
+      // BUG CRÍTICO CORREGIDO: Si es cajero o empleado y YA tiene un local asignado,
+      // redirigirlo automáticamente al dashboard de ese local
+      if ((currentRole === 'cajero' || currentRole === 'empleado') && localesData && localesData.length > 0) {
+        console.log('🚀 [loadMisLocales] Cajero/Empleado con local asignado. Redirigiendo automáticamente...')
+        const primerLocalId = localesData[0].id
+        localStorage.setItem('activeLocalId', primerLocalId)
+        toast.success('Local seleccionado automáticamente')
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 500)
+        return
+      }
+
     } catch (err) {
-      console.error('Error detallado:', err)
+      console.error('❌ [loadMisLocales] Error detallado:', err)
       toast.error('Error al cargar tus locales: ' + err.message)
     }
   }
 
-  const handleOnboardingComplete = async (formData) => {
+      const handleOnboardingComplete = async (formData) => {
+    console.log('🔍 [DEBUG 1] Iniciando creación de local...');
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log(' [DEBUG 2] Sesión:', session ? 'ACTIVA' : 'INACTIVA');
+    console.log('🔍 [DEBUG 3] User ID:', session?.user?.id);
+
+    if (userRole === 'cajero' || userRole === 'empleado') {
+      toast.error(' No tenés permisos para crear locales.')
+      setShowOnboarding(false)
+      return
+    }
+
     try {
       setCreating(true)
       
-      // 1. Crear el local
+      const payload = {
+        nombre: formData.businessName?.trim() || 'Negocio Sin Nombre',
+        rubro: formData.rubro || 'Otro',
+        condicion_fiscal: formData.condicionFiscal || 'Consumidor Final',
+        creado_por: session?.user?.id
+      };
+      
+      console.log('🔍 [DEBUG 4] Payload:', payload);
+      
+      // PASO A: Insertar en locales
+      console.log('🔍 [DEBUG 5] Intentando INSERT en tabla LOCALES...');
       const { data: localData, error: localError } = await supabase
         .from('locales')
-        .insert([{
-          nombre: formData.businessName.trim(),
-          rubro: formData.rubro,
-          condicion_fiscal: formData.condicionFiscal,
-          creado_por: user.id
-        }])
+        .insert([payload])
         .select()
-        .single()
+        .single();
 
-      if (localError) throw localError
-
-      // 2. Registrar al creador como 'owner' en miembros_locales
-      await supabase
+      if (localError) {
+        console.error('❌ [DEBUG 6] FALLÓ INSERT EN LOCALES:', localError);
+        throw new Error(`Error en tabla LOCALES: ${localError.message}`);
+      }
+      
+      console.log('✅ [DEBUG 7] Local creado:', localData.id);
+      
+      // PASO B: Insertar en miembros_locales
+      console.log('🔍 [DEBUG 8] Intentando INSERT en tabla MIEMBROS_LOCALES...');
+      const { error: miembroError } = await supabase
         .from('miembros_locales')
         .insert([{
           local_id: localData.id,
-          user_id: user.id,
+          user_id: session?.user?.id,
           rol: 'owner',
           activo: true,
           aceptado_en: new Date().toISOString()
-        }])
+        }]);
 
-      // 3. Crear invitaciones si las hay
+      if (miembroError) {
+        console.error('❌ [DEBUG 9] FALLÓ INSERT EN MIEMBROS_LOCALES:', miembroError);
+        throw new Error(`Error en tabla MIEMBROS_LOCALES: ${miembroError.message}`);
+      }
+      
+      console.log('✅ [DEBUG 10] Miembro creado correctamente');
+
+      // PASO C: Insertar invitaciones (si hay)
       if (formData.invites && formData.invites.length > 0) {
+        console.log(' [DEBUG 11] Intentando INSERT en tabla INVITACIONES...');
         const invitaciones = formData.invites.map(inv => ({
           email_invitado: inv.email,
           local_id: localData.id,
           rol: inv.rol,
-          invitado_por: user.id,
+          invitado_por: session?.user?.id,
           token: crypto.randomUUID(),
           expira_en: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           estado: 'pendiente'
-        }))
+        }));
 
-        await supabase.from('invitaciones').insert(invitaciones)
-        toast.success(`✅ Local creado y ${formData.invites.length} invitación(es) enviada(s)`)
+        const { error: invitesError } = await supabase.from('invitaciones').insert(invitaciones);
+        if (invitesError) {
+          console.error('❌ [DEBUG 12] FALLÓ INSERT EN INVITACIONES:', invitesError);
+          toast.success(`✅ Local creado (error en invitaciones: ${invitesError.message})`);
+        } else {
+          console.log('✅ [DEBUG 13] Invitaciones creadas');
+          toast.success(`✅ Local creado y ${formData.invites.length} invitación(es) enviada(s)`);
+        }
       } else {
-        toast.success('🏪 Local creado correctamente')
+        toast.success('🏪 Local creado correctamente');
       }
-      
-      // 4. Auto-seleccionar y redirigir
-      localStorage.setItem('activeLocalId', localData.id)
+
+      localStorage.setItem('activeLocalId', localData.id);
+      localStorage.removeItem('onboarding_temp_data');
       setTimeout(() => {
-        router.push('/dashboard')
-      }, 1500)
-      
+        router.push('/dashboard');
+      }, 1500);
+
     } catch (err) {
-      toast.error('Error al crear local: ' + err.message)
+      console.error('❌ [DEBUG 14] Error final:', err);
+      toast.error('Error al crear local: ' + err.message);
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
   }
-
   const handleSelectLocal = (localId) => {
+    // Validación adicional: solo owners pueden seleccionar manualmente
+    if (userRole === 'cajero' || userRole === 'empleado') {
+      toast.error('⛔ Los cajeros y empleados son redirigidos automáticamente')
+      return
+    }
+
     localStorage.setItem('activeLocalId', localId)
     toast.success('Local seleccionado')
     router.push('/dashboard')
@@ -182,7 +264,9 @@ export default function Locales() {
               {misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}
             </p>
           </div>
-          <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer">Salir</button>
+          <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">
+            Salir
+          </button>
         </div>
       </header>
 
@@ -193,7 +277,7 @@ export default function Locales() {
             <div className="text-5xl mb-3">⏳</div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Esperando asignación</h3>
             <p className="m-0 mb-6 text-gray-500 text-sm max-w-xs mx-auto leading-relaxed">
-              Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local. 
+              Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local.
               <br /><br />
               Por favor, contactá al administrador para que te agregue al equipo.
             </p>
@@ -217,44 +301,47 @@ export default function Locales() {
         ) : (
           <div className="flex flex-col gap-3">
             {misLocales.map((local, index) => (
-  <div 
-    key={local.id || index} 
-    className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-lg transition-all"
-  >
-    <div className="flex items-start gap-3 mb-4">
-      <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm">
-        🏪
-      </div>
-      <div>
-        <h3 className="m-0 text-lg font-bold text-gray-900">{local.nombre}</h3>
-        <div className="flex gap-2 mt-1">
-          {local.rubro && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md">{local.rubro}</span>}
-          {local.condicion_fiscal && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">{local.condicion_fiscal}</span>}
-        </div>
-      </div>
-    </div>
-    
-    <div className="flex flex-col gap-2">
-      <button 
-        onClick={() => handleSelectLocal(local.id)}
-        className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 transition-colors"
-      >
-        → Entrar al Dashboard
-      </button>
-      
-      <button 
-        onClick={() => {
-          localStorage.setItem('activeLocalId', local.id)
-          router.push('/admin?tab=miembros')
-        }}
-        className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100 hover:border-purple-300 transition-colors"
-      >
-         Gestionar Equipo
-      </button>
-    </div>
-  </div>
-))}
-            
+              <div
+                key={local.id || index}
+                className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-lg transition-all"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm">
+                    🏪
+                  </div>
+                  <div>
+                    <h3 className="m-0 text-lg font-bold text-gray-900">{local.nombre}</h3>
+                    <div className="flex gap-2 mt-1">
+                      {local.rubro && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md">{local.rubro}</span>}
+                      {local.condicion_fiscal && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">{local.condicion_fiscal}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleSelectLocal(local.id)}
+                    className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 transition-colors"
+                  >
+                    → Entrar al Dashboard
+                  </button>
+
+                  {/* Solo el owner puede gestionar el equipo */}
+                  {userRole === 'owner' && (
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('activeLocalId', local.id)
+                        router.push('/admin?tab=miembros')
+                      }}
+                      className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100 hover:border-purple-300 transition-colors"
+                    >
+                      👥 Gestionar Equipo
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+
             {/* Solo el owner puede agregar más locales */}
             {userRole === 'owner' && (
               <button onClick={() => setShowOnboarding(true)} className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-semibold cursor-pointer hover:border-blue-400 hover:text-blue-500 transition-colors">
@@ -266,8 +353,16 @@ export default function Locales() {
       </div>
 
       {showOnboarding && (
-        <OnboardingWizard onComplete={handleOnboardingComplete} onCancel={() => setShowOnboarding(false)} userEmail={user?.email} />
-      )}
+  <OnboardingWizard 
+    onComplete={handleOnboardingComplete} 
+    onCancel={() => {
+      setShowOnboarding(false)
+      localStorage.removeItem('onboarding_temp_data')
+    }} 
+    userEmail={user?.email}
+    preloadedData={JSON.parse(localStorage.getItem('onboarding_temp_data') || 'null')}
+  />
+)}
     </main>
   )
 }

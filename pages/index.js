@@ -24,7 +24,7 @@ export default function Login() {
     try {
       setLoading(true)
 
-      if (isSignUp) {
+                  if (isSignUp) {
         if (!businessName.trim()) {
           toast.error('Ingresá el nombre de tu negocio')
           return
@@ -41,55 +41,46 @@ export default function Login() {
         if (authError) throw authError
 
         if (authData.user) {
-          const { error: localError } = await supabase
-            .from('locales')
+          // Creamos el perfil con rol 'owner'
+          const { error: perfilError } = await supabase
+            .from('perfiles')
             .insert([{
-              nombre: businessName.trim(),
-              creado_por: authData.user.id,
-              activo: true
+              id: authData.user.id,
+              email: email,
+              nombre: businessName.trim(), 
+              rol_global: 'owner' 
             }])
 
-          if (localError) throw localError
+          if (perfilError) {
+            console.error('Error creando perfil:', perfilError)
+            // Si falla el perfil, igual continuamos pero logueamos el error
+          }
 
-          toast.success('✅ Cuenta creada. Revisá tu email para confirmar.')
+          // Guardamos temporalmente los datos en localStorage para el onboarding
+          localStorage.setItem('onboarding_temp_data', JSON.stringify({
+            businessName: businessName.trim(),
+            userId: authData.user.id,
+            email: email
+          }))
+
+          toast.success('✅ Cuenta creada. Completá la configuración de tu local.')
+          
           setIsSignUp(false)
           setEmail('')
           setPassword('')
           setBusinessName('')
+          
+          // Redirigimos con query params para indicar que viene del registro
+          router.push('/locales?new_user=true&businessName=' + encodeURIComponent(businessName.trim()))
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        toast.success('👋 Bienvenido de vuelta')
+        toast.success(' Bienvenido de vuelta')
         router.push('/locales')
       }
     } catch (err) {
       toast.error(err.message || 'Error en la operación')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // NUEVO: Manejar recuperación de contraseña
-  const handleResetPassword = async (e) => {
-    e.preventDefault()
-    if (!email) {
-      toast.error('Ingresá tu email primero')
-      return
-    }
-
-    try {
-      setLoading(true)
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-
-      if (error) throw error
-
-      setResetEmailSent(true)
-      toast.success('📧 Email de recuperación enviado. Revisá tu bandeja de entrada.')
-    } catch (err) {
-      toast.error(err.message || 'Error al enviar el email')
     } finally {
       setLoading(false)
     }

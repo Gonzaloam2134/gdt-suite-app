@@ -10,15 +10,17 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('resumen')
   const [loading, setLoading] = useState(true)
   
-  const [globalStats, setGlobalStats] = useState({ locales: 0, usuarios: 0, transacciones: 0 })
-  const [allLocales, setAllLocales] = useState([])
-  
   const [localInfo, setLocalInfo] = useState(null)
   const [localStats, setLocalStats] = useState({ ventas: 0, gastos: 0, transacciones: 0 })
   const [miembros, setMiembros] = useState([])
   const [logs, setLogs] = useState([])
   const [misAcciones, setMisAcciones] = useState([])
   const [empleadosPendientes, setEmpleadosPendientes] = useState([])
+  
+  // Estado para edición
+  const [editingMember, setEditingMember] = useState(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
@@ -46,20 +48,6 @@ export default function AdminPanel() {
       setLoading(true)
       const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
       
-      if (globalRole === 'super_user') {
-        const { count: countLocales } = await supabase.from('locales').select('*', { count: 'exact', head: true })
-        const { count: countUsuarios } = await supabase.from('perfiles').select('*', { count: 'exact', head: true })
-        const { count: countTx } = await supabase.from('transacciones').select('*', { count: 'exact', head: true })
-        
-        setGlobalStats({ locales: countLocales || 0, usuarios: countUsuarios || 0, transacciones: countTx || 0 })
-
-        const { data: localesData } = await supabase
-          .from('locales')
-          .select('id, nombre, rubro, creado_en, creado_por')
-          .order('creado_en', { ascending: false })
-        setAllLocales(localesData || [])
-      }
-      
       if (role === 'owner' || globalRole === 'super_user') {
         if (activeLocalId) {
           const { data: localData } = await supabase.from('locales').select('*').eq('id', activeLocalId).maybeSingle()
@@ -74,34 +62,56 @@ export default function AdminPanel() {
           const { count: countTx } = await supabase.from('transacciones').select('*', { count: 'exact', head: true }).eq('local_id', activeLocalId)
           setLocalStats({ ventas: totalVentas, gastos: totalGastos, transacciones: countTx || 0 })
 
-          // Cargar miembros
-          const { data: membresiasData } = await supabase
+          // PASO 1: Cargar miembros (sin join, para evitar errores de relaciones en Supabase)
+          const { data: membresiasData, error: errorMiembros } = await supabase
             .from('miembros_locales')
             .select('id, rol, activo, aceptado_en, user_id')
             .eq('local_id', activeLocalId)
             .eq('activo', true)
           
-          let emailMap = {}
-          if (membresiasData && membresiasData.length > 0) {
-            const userIds = membresiasData.map(m => m.user_id)
-            const { data: perfilesData } = await supabase.from('perfiles').select('id, email, nombre').in('id', userIds)
-            if (perfilesData) {
-              perfilesData.forEach(p => { emailMap[p.id] = { email: p.email, nombre: p.nombre } })
-            }
-          }
-          
-          const miembrosConInfo = (membresiasData || []).map(m => {
-            const info = emailMap[m.user_id] || {}
-            return {
-              ...m,
-              user: { 
-                email: info.email || 'Sin email',
-                nombre: info.nombre,
-                displayName: info.nombre || info.email || 'Usuario'
+          if (errorMiembros) {
+            console.error('Error cargando miembros_locales:', errorMiembros)
+            toast.error('Error al cargar miembros')
+          } else {
+            // PASO 2: Obtener emails y nombres de los miembros
+            let userInfoMap = {}
+            if (membresiasData && membresiasData.length > 0) {
+              const userIds = membresiasData.map(m => m.user_id)
+              const { data: perfilesData, error: errorPerfiles } = await supabase
+                .from('perfiles')
+                .select('id, email, nombre')
+                .in('id', userIds)
+              
+              if (errorPerfiles) {
+                console.error('Error cargando perfiles:', errorPerfiles)
+              }
+              
+              if (perfilesData) {
+                perfilesData.forEach(p => { 
+                  userInfoMap[p.id] = { 
+                    email: p.email || 'Sin email', 
+                    nombre: p.nombre || 'Sin nombre'
+                  } 
+                })
               }
             }
-          })
-          setMiembros(miembrosConInfo)
+            
+            // Combinar miembros con información de usuario
+            const miembrosConInfo = (membresiasData || []).map(m => {
+              const userInfo = userInfoMap[m.user_id] || {}
+              const displayName = (userInfo.nombre && userInfo.nombre !== 'Sin nombre') ? userInfo.nombre : 
+                                 (userInfo.email && userInfo.email !== 'Sin email') ? userInfo.email : 'Usuario'
+              return {
+                ...m,
+                user: { 
+                  email: userInfo.email || 'Sin email',
+                  nombre: userInfo.nombre || 'Sin nombre',
+                  displayName: displayName
+                }
+              }
+            })
+            setMiembros(miembrosConInfo)
+          }
 
           // Cargar empleados pendientes
           const { data: pendientesData } = await supabase
@@ -112,7 +122,7 @@ export default function AdminPanel() {
             .order('creado_en', { ascending: false })
           setEmpleadosPendientes(pendientesData || [])
 
-          // Cargar logs y transacciones
+          // Cargar logs
           const { data: logsData } = await supabase.from('logs_auditoria').select('*').eq('local_id', activeLocalId).order('creado_en', { ascending: false }).limit(200)
           const { data: transaccionesData } = await supabase.from('transacciones').select('id, local_id, tipo, monto, comision_monto, descripcion, creado_por, creado_en, medio_pago_id').eq('local_id', activeLocalId).order('creado_en', { ascending: false }).limit(200)
           
@@ -120,31 +130,19 @@ export default function AdminPanel() {
           const mediosMap = {}
           if (mediosPagoData) mediosPagoData.forEach(mp => { mediosMap[mp.id] = mp.nombre })
           
-          const allUserIds = new Set()
-          if (logsData) logsData.forEach(l => { if (l.user_id) allUserIds.add(l.user_id) })
-          if (transaccionesData) transaccionesData.forEach(t => { if (t.creado_por) allUserIds.add(t.creado_por) })
-          
-          let fullEmailMap = { ...emailMap }
-          if (allUserIds.size > 0) {
-            const { data: perfilesData } = await supabase.from('perfiles').select('id, email').in('id', Array.from(allUserIds))
-            if (perfilesData) perfilesData.forEach(p => { fullEmailMap[p.id] = { email: p.email } })
-          }
-          
           const logsConTransacciones = []
           if (logsData) {
             logsData.forEach(log => {
-              const info = fullEmailMap[log.user_id] || {}
-              logsConTransacciones.push({ ...log, user_email: info.email || 'Sistema', esTransaccion: false })
+              logsConTransacciones.push({ ...log, user_email: 'Sistema', esTransaccion: false })
             })
           }
           if (transaccionesData) {
             transaccionesData.forEach(tx => {
-              const info = fullEmailMap[tx.creado_por] || {}
               logsConTransacciones.push({
                 id: `tx_${tx.id}`,
                 local_id: tx.local_id,
                 user_id: tx.creado_por,
-                user_email: info.email || 'Sistema',
+                user_email: 'Sistema',
                 accion: tx.tipo === 'COBRO_RECIBIDO' ? 'VENTA_REGISTRADA' : 'GASTO_REGISTRADO',
                 detalles: { descripcion: tx.descripcion, monto: tx.monto, medio_pago: mediosMap[tx.medio_pago_id] || 'N/A', comision: tx.comision_monto },
                 creado_en: tx.creado_en,
@@ -221,9 +219,9 @@ export default function AdminPanel() {
         estado: 'activo'
       }).eq('id', empleadoId)
 
-await supabase.auth.resetPasswordForEmail(email, {
-  redirectTo: window.location.origin + '/recuperar-password'
-})
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/recuperar-password'
+      })
 
       toast.success(`✅ ${empleado.nombre} activado. Email enviado a ${email}`)
       loadData()
@@ -244,6 +242,147 @@ await supabase.auth.resetPasswordForEmail(email, {
     }
   }
 
+  const handleAgregarMiembro = async () => {
+    const nombreInput = document.getElementById('nuevoMiembroNombre')
+    const emailInput = document.getElementById('nuevoMiembroEmail')
+    const rolInput = document.getElementById('nuevoMiembroRol')
+    
+    if (!nombreInput || !emailInput || !rolInput) return
+    
+    const nombre = nombreInput.value.trim()
+    const email = emailInput.value.trim()
+    const rol = rolInput.value
+    
+    if (!nombre) { toast.error('El nombre es obligatorio'); return }
+    if (!email || !email.includes('@')) { toast.error('Ingresá un email válido'); return }
+
+    try {
+      const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
+
+      // 1. Verificar si el usuario ya existe en perfiles
+      const { data: perfilExistente } = await supabase
+        .from('perfiles')
+        .select('id, nombre')
+        .eq('email', email)
+        .maybeSingle()
+
+      let userId = perfilExistente?.id
+
+      // 2. Si no existe, crearlo en auth + perfiles
+      if (!userId) {
+        const tempPassword = 'Temp' + Math.random().toString(36).slice(-8)
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email,
+          password: tempPassword,
+          options: { data: { nombre: nombre } }
+        })
+
+        if (authError) throw authError
+        userId = authData.user.id
+
+        await supabase.from('perfiles').insert({
+          id: userId,
+          email: email,
+          nombre: nombre,
+          rol_global: rol
+        })
+
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + '/recuperar-password'
+        })
+
+        toast.success(`✅ ${nombre} creado. Email enviado a ${email}`)
+      } else {
+        if (!perfilExistente.nombre) {
+          await supabase.from('perfiles').update({ nombre: nombre }).eq('id', userId)
+        }
+        toast.success(`✅ ${nombre} agregado al local`)
+      }
+
+      // 3. Agregar a miembros_locales
+      const { data: miembroExistente } = await supabase
+        .from('miembros_locales')
+        .select('id')
+        .eq('local_id', activeLocalId)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (miembroExistente) {
+        toast.error('Este usuario ya es miembro del local')
+        return
+      }
+
+      await supabase.from('miembros_locales').insert({
+        local_id: activeLocalId,
+        user_id: userId,
+        rol: rol,
+        activo: true,
+        aceptado_en: new Date().toISOString()
+      })
+
+      nombreInput.value = ''
+      emailInput.value = ''
+      rolInput.value = 'cajero'
+      
+      loadData()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleEditarMiembro = (miembro) => {
+    setEditingMember(miembro)
+    setEditNombre(miembro.user?.nombre || '')
+    setEditEmail(miembro.user?.email || '')
+  }
+
+  const handleGuardarEdicion = async () => {
+    if (!editingMember) return
+    
+    if (!editNombre.trim()) {
+      toast.error('El nombre no puede estar vacío')
+      return
+    }
+    
+    if (!editEmail.trim() || !editEmail.includes('@')) {
+      toast.error('Ingresá un email válido')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('perfiles')
+        .update({ 
+          nombre: editNombre.trim(),
+          email: editEmail.trim()
+        })
+        .eq('id', editingMember.user_id)
+
+      if (error) throw error
+
+      toast.success('✅ Miembro actualizado correctamente')
+      setEditingMember(null)
+      setEditNombre('')
+      setEditEmail('')
+      loadData()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleQuitarMiembro = async (miembro) => {
+    if (!confirm(`¿Quitar a ${miembro.user?.displayName} del local?`)) return
+    try {
+      const { error } = await supabase.from('miembros_locales').update({ activo: false }).eq('id', miembro.id)
+      if (error) throw error
+      toast.success('Miembro quitado')
+      loadData()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
   const formatFecha = (fecha) => {
     if (!fecha) return '-'
     return new Date(fecha).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -255,7 +394,7 @@ await supabase.auth.resetPasswordForEmail(email, {
       'CAJA_CERRADA': { icono: '🔒', texto: 'Caja Cerrada', color: 'bg-gray-100 text-gray-800' },
       'VENTA_REGISTRADA': { icono: '💰', texto: 'Venta Registrada', color: 'bg-green-100 text-green-800' },
       'GASTO_REGISTRADO': { icono: '💸', texto: 'Gasto Registrado', color: 'bg-red-100 text-red-800' },
-      'USUARIO_INVITADO': { icono: '', texto: 'Usuario Invitado', color: 'bg-purple-100 text-purple-800' },
+      'USUARIO_INVITADO': { icono: '👤', texto: 'Usuario Invitado', color: 'bg-purple-100 text-purple-800' },
       'INVITACION_ACEPTADA': { icono: '✅', texto: 'Invitación Aceptada', color: 'bg-emerald-100 text-emerald-800' }
     }
     return labels[accion] || { icono: '📝', texto: accion, color: 'bg-gray-100 text-gray-800' }
@@ -370,7 +509,7 @@ await supabase.auth.resetPasswordForEmail(email, {
                         <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
                         {log.detalles && (
                           <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                            {log.detalles.descripcion && <div> {log.detalles.descripcion}</div>}
+                            {log.detalles.descripcion && <div>📝 {log.detalles.descripcion}</div>}
                             {log.detalles.monto && <div>💰 {formatCurrency(log.detalles.monto)}</div>}
                           </div>
                         )}
@@ -460,7 +599,7 @@ await supabase.auth.resetPasswordForEmail(email, {
         <div className="max-w-6xl mx-auto p-4">
           <div className="flex gap-2 mb-4 border-b border-gray-200">
             {[
-              { id: 'resumen', label: ' Resumen' }, 
+              { id: 'resumen', label: '📊 Resumen' }, 
               { id: 'miembros', label: `👥 Miembros${empleadosPendientes.length > 0 ? ` (${empleadosPendientes.length} pendientes)` : ''}` }, 
               { id: 'logs', label: '📋 Auditoría' }
             ].map(tab => (
@@ -505,14 +644,14 @@ await supabase.auth.resetPasswordForEmail(email, {
               {empleadosPendientes.length > 0 && (
                 <div className="bg-yellow-50 p-4 rounded-lg mb-6 border-2 border-yellow-300">
                   <h3 className="m-0 mb-3 text-sm font-bold text-yellow-900">
-                     Empleados pendientes de email ({empleadosPendientes.length})
+                    ⏳ Empleados pendientes de email ({empleadosPendientes.length})
                   </h3>
                   <div className="space-y-2">
                     {empleadosPendientes.map(emp => (
                       <div key={emp.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-yellow-200">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center text-lg">
-                            {emp.rol === 'cajero' ? '👨💼' : '👷'}
+                            {emp.rol === 'cajero' ? '👨‍💼' : '👷'}
                           </div>
                           <div>
                             <div className="font-semibold text-gray-900 text-sm">{emp.nombre}</div>
@@ -533,7 +672,7 @@ await supabase.auth.resetPasswordForEmail(email, {
                             }}
                             className="px-3 py-1 bg-green-600 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-700"
                           >
-                             Asociar email
+                            📧 Asociar email
                           </button>
                           <button
                             onClick={() => handleEliminarPendiente(emp.id)}
@@ -548,108 +687,38 @@ await supabase.auth.resetPasswordForEmail(email, {
                 </div>
               )}
 
-              {/* Agregar miembro (nombre + rol, email opcional) */}
-<div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-  <h3 className="m-0 mb-3 text-sm font-bold text-blue-900"> Agregar miembro al local</h3>
-  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-    <input 
-      type="text"
-      placeholder="Nombre del empleado *"
-      className="p-2 border border-gray-300 rounded-md text-sm" 
-      id="nuevoMiembroNombre" 
-    />
-    <select className="p-2 border border-gray-300 rounded-md text-sm" id="nuevoMiembroRol">
-      <option value="cajero">👨‍💼 Cajero</option>
-      <option value="empleado">👷 Empleado</option>
-      <option value="owner">👑 Owner</option>
-    </select>
-    <input 
-      type="email"
-      placeholder="Email (opcional)"
-      className="p-2 border border-gray-300 rounded-md text-sm" 
-      id="nuevoMiembroEmail" 
-    />
-    <button
-      onClick={async () => {
-        const nombreInput = document.getElementById('nuevoMiembroNombre')
-        const rolInput = document.getElementById('nuevoMiembroRol')
-        const emailInput = document.getElementById('nuevoMiembroEmail')
-        
-        if (!nombreInput || !rolInput || !emailInput) return
-        
-        const nombre = nombreInput.value.trim()
-        const rol = rolInput.value
-        const email = emailInput.value.trim()
-        
-        if (!nombre) { 
-          toast.error('El nombre es obligatorio')
-          return 
-        }
-
-        try {
-          const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
-
-          // Si hay email, crear usuario completo
-          if (email) {
-            const tempPassword = 'Temp' + Math.random().toString(36).slice(-8)
-
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-              email: email,
-              password: tempPassword,
-              options: { data: { nombre: nombre } }
-            })
-
-            if (authError) throw authError
-
-            await supabase.from('perfiles').insert({
-              id: authData.user.id,
-              email: email,
-              nombre: nombre,
-              rol_global: rol
-            })
-
-            await supabase.from('miembros_locales').insert({
-              local_id: activeLocalId,
-              user_id: authData.user.id,
-              rol: rol,
-              activo: true,
-              aceptado_en: new Date().toISOString()
-            })
-
-            await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: window.location.origin + '/dashboard'
-            })
-
-            toast.success(`✅ ${nombre} agregado como ${rol}. Email enviado a ${email}`)
-          } else {
-            // Sin email: crear empleado pendiente
-            await supabase.from('empleados_pendientes').insert({
-              local_id: activeLocalId,
-              nombre: nombre,
-              rol: rol,
-              creado_por: userId,
-              estado: 'pendiente'
-            })
-
-            toast.success(`✅ ${nombre} agregado como ${rol}. Pendiente de email.`)
-          }
-
-          nombreInput.value = ''
-          emailInput.value = ''
-          loadData()
-        } catch (err) {
-          toast.error('Error: ' + err.message)
-        }
-      }}
-      className="p-2 bg-blue-600 text-white border-none rounded-md text-sm font-semibold cursor-pointer hover:bg-blue-700"
-    >
-      Agregar al local
-    </button>
-  </div>
-  <p className="m-0 mt-2 text-xs text-blue-700">
-    💡 Si no ingresás email, el empleado quedará pendiente. Podrás asociar el email después desde la sección de arriba.
-  </p>
-</div>
+              {/* Agregar miembro (nombre + email + rol) */}
+              <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                <h3 className="m-0 mb-3 text-sm font-bold text-blue-900">➕ Agregar miembro al local</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <input 
+                    type="text"
+                    placeholder="Nombre *"
+                    className="p-2 border border-gray-300 rounded-md text-sm" 
+                    id="nuevoMiembroNombre" 
+                  />
+                  <input 
+                    type="email" 
+                    placeholder="Email *"
+                    className="p-2 border border-gray-300 rounded-md text-sm" 
+                    id="nuevoMiembroEmail" 
+                  />
+                  <select className="p-2 border border-gray-300 rounded-md text-sm" id="nuevoMiembroRol">
+                    <option value="cajero">👨‍💼 Cajero</option>
+                    <option value="empleado">👷 Empleado</option>
+                    <option value="owner">👑 Owner</option>
+                  </select>
+                  <button
+                    onClick={handleAgregarMiembro}
+                    className="p-2 bg-blue-600 text-white border-none rounded-md text-sm font-semibold cursor-pointer hover:bg-blue-700"
+                  >
+                    Agregar al local
+                  </button>
+                </div>
+                <p className="m-0 mt-2 text-xs text-blue-700">
+                  💡 Si el usuario no existe, se creará automáticamente y recibirá un email para configurar su contraseña.
+                </p>
+              </div>
 
               {/* Lista de miembros actuales */}
               <h3 className="m-0 mb-3 text-sm font-bold text-gray-700">Miembros actuales ({miembros.length})</h3>
@@ -661,7 +730,7 @@ await supabase.auth.resetPasswordForEmail(email, {
                     <div key={miembro.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
-                          {miembro.rol === 'owner' ? '👑' : miembro.rol === 'cajero' ? '👨‍' : '👷'}
+                          {miembro.rol === 'owner' ? '👑' : miembro.rol === 'cajero' ? '👨‍💼' : '👷'}
                         </div>
                         <div>
                           <div className="font-semibold text-gray-900 text-sm">{miembro.user?.displayName || 'Usuario'}</div>
@@ -678,21 +747,23 @@ await supabase.auth.resetPasswordForEmail(email, {
                           miembro.rol === 'cajero' ? 'bg-blue-100 text-blue-800' : 
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {miembro.rol === 'owner' ? '👑 Owner' : miembro.rol === 'cajero' ? '👨💼 Cajero' : '👷 Empleado'}
+                          {miembro.rol === 'owner' ? '👑 Owner' : miembro.rol === 'cajero' ? '👨‍💼 Cajero' : '👷 Empleado'}
                         </span>
                         {miembro.rol !== 'owner' && (
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`¿Quitar a ${miembro.user?.displayName} del local?`)) return
-                              const { error } = await supabase.from('miembros_locales').update({ activo: false }).eq('id', miembro.id)
-                              if (error) { toast.error('Error: ' + error.message); return }
-                              toast.success('Miembro quitado')
-                              loadData()
-                            }}
-                            className="px-3 py-1 bg-red-100 text-red-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-red-200"
-                          >
-                            Quitar
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleEditarMiembro(miembro)}
+                              className="px-3 py-1 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              onClick={() => handleQuitarMiembro(miembro)}
+                              className="px-3 py-1 bg-red-100 text-red-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-red-200"
+                            >
+                              Quitar
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -706,7 +777,7 @@ await supabase.auth.resetPasswordForEmail(email, {
             <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h2 className="m-0 text-lg font-bold text-gray-900"> Auditoría de Operaciones</h2>
+                  <h2 className="m-0 text-lg font-bold text-gray-900">📋 Auditoría de Operaciones</h2>
                   <p className="m-0 text-xs text-gray-500 mt-1">Registro detallado de todas las operaciones</p>
                 </div>
                 <button onClick={exportarCSV} className="px-4 py-2 bg-green-600 text-white border-none rounded-md text-sm font-semibold cursor-pointer hover:bg-green-700">📥 Exportar CSV</button>
@@ -790,6 +861,76 @@ await supabase.auth.resetPasswordForEmail(email, {
             </div>
           )}
         </div>
+
+        {/* Modal de edición */}
+        {editingMember && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white w-full max-w-md rounded-xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="m-0 text-xl font-bold text-gray-900">✏️ Editar miembro</h2>
+                <button 
+                  onClick={() => {
+                    setEditingMember(null)
+                    setEditNombre('')
+                    setEditEmail('')
+                  }} 
+                  className="bg-none border-none text-xl cursor-pointer text-gray-500"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block mb-2 font-semibold text-gray-700 text-sm">Nombre</label>
+                  <input
+                    type="text"
+                    value={editNombre}
+                    onChange={(e) => setEditNombre(e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="Nombre del miembro"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block mb-2 font-semibold text-gray-700 text-sm">Email</label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="Email del miembro"
+                  />
+                </div>
+
+                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <p className="m-0 text-xs text-yellow-800">
+                    ⚠️ Si cambiás el email, el miembro deberá usar el nuevo email para iniciar sesión.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => {
+                    setEditingMember(null)
+                    setEditNombre('')
+                    setEditEmail('')
+                  }}
+                  className="flex-1 p-3 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleGuardarEdicion}
+                  className="flex-1 p-3 bg-blue-600 text-white border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-blue-700"
+                >
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     )
   }

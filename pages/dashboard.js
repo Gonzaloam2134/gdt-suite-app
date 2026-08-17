@@ -1,13 +1,12 @@
 import { supabase } from '../lib/supabaseClient'
 import InviteUserModal from '../components/InviteUserModal'
+import AddUserModal from '../components/AddUserModal'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import RoleGate from '../components/RoleGate'
-import AddUserModal from '../components/AddUserModal'
-
 
 const CONCEPTOS_INGRESO = ['Venta de mostrador', 'Venta por Delivery', 'Pedido / Encargo', 'Servicios', 'Otro ingreso']
 const CONCEPTOS_GASTO = ['Compra de insumos/proveedores', 'Servicios (Luz, Gas, Internet)', 'Sueldos / Jornales', 'Alquiler', 'Impuestos', 'Otros egresos']
@@ -35,7 +34,6 @@ export default function CajaDelDia() {
   const [showCloseShift, setShowCloseShift] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showAddUserModal, setShowAddUserModal] = useState(false)
-  const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [amount, setAmount] = useState('')
   const [selectedConcept, setSelectedConcept] = useState('')
   const [customConcept, setCustomConcept] = useState('')
@@ -62,7 +60,7 @@ export default function CajaDelDia() {
   const [newCategoryQuickName, setNewCategoryQuickName] = useState('')
   const [newOperatorQuickName, setNewOperatorQuickName] = useState('')
   const [newBancoQuickName, setNewBancoQuickName] = useState('')
-  const [showAddUserModal, setShowAddUserModal] = useState(false)
+  
   // Navegación por fechas
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [isViewingHistory, setIsViewingHistory] = useState(false)
@@ -70,7 +68,7 @@ export default function CajaDelDia() {
   // Acreditaciones del día
   const [acreditacionesHoy, setAcreditacionesHoy] = useState([])
   
-  // NUEVO: Estados para secciones colapsables
+  // Estados para secciones colapsables
   const [showResumen, setShowResumen] = useState(true)
   const [showDetalleMedios, setShowDetalleMedios] = useState(false)
   const [showAcreditaciones, setShowAcreditaciones] = useState(false)
@@ -79,17 +77,15 @@ export default function CajaDelDia() {
   const router = useRouter()
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
-      useEffect(() => {
+  useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
         return
       }
       
-      // 1. ¡IMPORTANTE! Guardar el usuario en el estado
       setUser(session.user)
 
-      // 2. Obtener el perfil del usuario desde la base de datos
       const { data: profile } = await supabase
         .from('perfiles')
         .select('rol_global, rol')
@@ -98,11 +94,10 @@ export default function CajaDelDia() {
       
       const userRole = profile?.rol_global || profile?.rol || 'owner'
       
-      // 3. Redirecciones inteligentes
       if (userRole === 'owner' && !activeLocalId) {
-        router.push('/locales') // Redirige a la pantalla de creación/onboarding
+        router.push('/locales')
       } else if (!activeLocalId) {
-        router.push('/locales') // Redirige a la pantalla de "Esperando asignación"
+        router.push('/locales')
       } else {
         loadData(session.user.id)
       }
@@ -130,7 +125,9 @@ export default function CajaDelDia() {
       if (shiftData) {
         const { data: txData } = await supabase.from('transacciones').select('*').eq('turno_id', shiftData.id).order('creado_en', { ascending: false }).limit(100)
         setMovements(txData || [])
-      } else { setMovements([]) }
+      } else { 
+        setMovements([]) 
+      }
 
       const { data: closedData } = await supabase.from('turnos').select('*').eq('local_id', activeLocalId).eq('estado', 'CERRADO').order('cerrado_en', { ascending: false }).limit(10)
 
@@ -149,7 +146,10 @@ export default function CajaDelDia() {
         setOpeningAmount(calculatedBalance.toFixed(2))
         setIsAmountModified(false)
         setDifferenceReason('')
-      } else { setLastShiftBalance(0); setOpeningAmount('') }
+      } else { 
+        setLastShiftBalance(0)
+        setOpeningAmount('') 
+      }
       
       const { data: pmData } = await supabase.from('medios_pago').select(`*, subcategorias_pago (id, nombre, categorias_pago (id, nombre, icono))`).eq('local_id', activeLocalId).eq('activo', true).order('creado_en', { ascending: false })
       setPaymentMethods(pmData || [])
@@ -159,20 +159,20 @@ export default function CajaDelDia() {
       setCategories(catData || [])
       setSubcategories(subcatData || [])
       
-      // Cargar acreditaciones del día (solo pendientes de días anteriores, sin efectivo)
       const hoyStr = new Date().toISOString().split('T')[0]
-      
       const { data: allTx } = await supabase
         .from('transacciones')
         .select('*')
         .eq('local_id', activeLocalId)
         .eq('tipo', 'COBRO_RECIBIDO')
         .eq('fecha_acreditacion_estimada', hoyStr)
-        .lt('creado_en', `${hoyStr}T00:00:00`) // ✅ FILTRO: Solo ventas de días anteriores
+        .lt('creado_en', `${hoyStr}T00:00:00`)
       
-      // ✅ FILTRO: Excluir efectivo de la lista de acreditaciones
+      const efectivoMethodTemp = (pmData || []).find(m => m.nombre?.toLowerCase().includes('efectivo') || m.nombre?.toLowerCase().includes('cash') || (!m.banco_emisor && !m.subcategorias_pago?.nombre))
+      const efectivoMethodIdTemp = efectivoMethodTemp?.id
+
       const acreditaciones = (allTx || [])
-        .filter(m => m.medio_pago_id !== efectivoMethodId) 
+        .filter(m => m.medio_pago_id !== efectivoMethodIdTemp) 
         .map(m => ({ 
           ...m, 
           method: (pmData || []).find(pm => pm.id === m.medio_pago_id), 
@@ -181,7 +181,11 @@ export default function CajaDelDia() {
       
       setAcreditacionesHoy(acreditaciones)
       
-    } catch (err) { console.error('Error cargando datos:', err) } finally { setLoading(false) }
+    } catch (err) { 
+      console.error('Error cargando datos:', err) 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const loadDataForDate = async (userId, date) => {
@@ -226,9 +230,7 @@ export default function CajaDelDia() {
         setActiveShift(null)
         setMovements([])
         if (date !== new Date().toISOString().split('T')[0]) {
-          toast(`No hay registro de actividad para el ${new Date(date).toLocaleDateString('es-AR')}`, {
-            icon: '📭'
-          })
+          toast(`No hay registro de actividad para el ${new Date(date).toLocaleDateString('es-AR')}`, { icon: '📭' })
         }
       }
 
@@ -295,8 +297,11 @@ export default function CajaDelDia() {
   const handleOpeningAmountChange = (e) => {
     const newVal = e.target.value
     setOpeningAmount(newVal)
-    if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) { setIsAmountModified(true) } 
-    else { setIsAmountModified(false); setDifferenceReason('') }
+    if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) { 
+      setIsAmountModified(true) 
+    } else { 
+      setIsAmountModified(false); setDifferenceReason('') 
+    }
   }
 
   const handleOpenShift = async (e) => {
@@ -331,42 +336,29 @@ export default function CajaDelDia() {
       }]).select().single()
 
       if (error) throw error
-            // ✅ NUEVO: Registrar log de apertura
-      await supabase.rpc('registrar_log', {
-        p_local_id: activeLocalId,
-        p_user_id: user.id,
-        p_accion: 'CAJA_ABIERTA',
-        p_detalles: { 
-          monto_inicial: parseFloat(openingAmount), 
-          motivo_diferencia: isAmountModified ? differenceReason : null 
-        }
-      });
-// ✅ NUEVO: Log de apertura de caja
-console.log('🔍 [DEBUG] Intentando registrar log de apertura...');
-try {
-  const { data, error } = await supabase.rpc('registrar_log', {
-    p_local_id: activeLocalId,
-    p_user_id: user.id,
-    p_accion: 'CAJA_ABIERTA',
-    p_detalles: { 
-      monto_inicial: parseFloat(openingAmount), 
-      motivo_diferencia: isAmountModified ? differenceReason : null 
-    }
-  });
-  
-  if (error) {
-    console.error(' [DEBUG] Error al registrar log:', error);
-  } else {
-    console.log('✅ [DEBUG] Log registrado exitosamente:', data);
-  }
-} catch (err) {
-  console.error('❌ [DEBUG] Excepción al registrar log:', err);
-}
 
-toast.success('Caja abierta correctamente');
+      try {
+        await supabase.rpc('registrar_log', {
+          p_local_id: activeLocalId,
+          p_user_id: user.id,
+          p_accion: 'CAJA_ABIERTA',
+          p_detalles: { 
+            monto_inicial: parseFloat(openingAmount), 
+            motivo_diferencia: isAmountModified ? differenceReason : null 
+          }
+        });
+      } catch (err) {
+        console.error('Error al registrar log de apertura:', err);
+      }
+
+      toast.success('Caja abierta correctamente');
       setShowOpenShift(false); setOpeningAmount(''); setDifferenceReason(''); setIsAmountModified(false)
       loadData(user.id)
-    } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
+    } catch (err) { 
+      toast.error('Error: ' + err.message) 
+    } finally { 
+      setCreating(false) 
+    }
   }
 
   const handleCloseShift = async () => {
@@ -375,42 +367,29 @@ toast.success('Caja abierta correctamente');
       setCreating(true)
       const { error } = await supabase.from('turnos').update({ estado: 'CERRADO', cerrado_en: new Date().toISOString(), cerrado_por: user.id }).eq('id', activeShift.id)
       if (error) throw error
-            // ✅ NUEVO: Registrar log de cierre
-      await supabase.rpc('registrar_log', {
-        p_local_id: activeLocalId,
-        p_user_id: user.id,
-        p_accion: 'CAJA_CERRADA',
-        p_detalles: { 
-          efectivo_final: efectivoEnCaja,
-          total_disponible: totalDisponibleHoy
-        }
-      });
-// ✅ NUEVO: Log de cierre de caja
-console.log(' [DEBUG] Intentando registrar log de cierre...');
-try {
-  const { data, error } = await supabase.rpc('registrar_log', {
-    p_local_id: activeLocalId,
-    p_user_id: user.id,
-    p_accion: 'CAJA_CERRADA',
-    p_detalles: { 
-      efectivo_final: efectivoEnCaja,
-      total_disponible: totalDisponibleHoy
-    }
-  });
-  
-  if (error) {
-    console.error('❌ [DEBUG] Error al registrar log:', error);
-  } else {
-    console.log('✅ [DEBUG] Log registrado exitosamente:', data);
-  }
-} catch (err) {
-  console.error('❌ [DEBUG] Excepción al registrar log:', err);
-}
+      
+      try {
+        await supabase.rpc('registrar_log', {
+          p_local_id: activeLocalId,
+          p_user_id: user.id,
+          p_accion: 'CAJA_CERRADA',
+          p_detalles: { 
+            efectivo_final: efectivoEnCaja,
+            total_disponible: totalDisponibleHoy
+          }
+        });
+      } catch (err) {
+        console.error('Error al registrar log de cierre:', err);
+      }
 
-toast.success('Caja cerrada correctamente');
+      toast.success('Caja cerrada correctamente');
       setShowCloseShift(false); setActiveShift(null); setMovements([])
       loadData(user.id)
-    } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
+    } catch (err) { 
+      toast.error('Error: ' + err.message) 
+    } finally { 
+      setCreating(false) 
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -449,51 +428,57 @@ toast.success('Caja cerrada correctamente');
       }])
 
       if (error) throw error
-      // ✅ NUEVO: Log de transacción
-await supabase.rpc('registrar_log', {
-  p_local_id: activeLocalId,
-  p_user_id: user.id,
-  p_accion: isIncome ? 'VENTA_REGISTRADA' : 'GASTO_REGISTRADO',
-  p_detalles: { 
-    descripcion: finalConcept || (isIncome ? 'Venta' : 'Gasto'), 
-    monto: parseFloat(amount),
-    medio_pago: method.nombre
-  }
-});
+      
+      try {
+        await supabase.rpc('registrar_log', {
+          p_local_id: activeLocalId,
+          p_user_id: user.id,
+          p_accion: isIncome ? 'VENTA_REGISTRADA' : 'GASTO_REGISTRADO',
+          p_detalles: { 
+            descripcion: finalConcept || (isIncome ? 'Venta' : 'Gasto'), 
+            monto: parseFloat(amount),
+            medio_pago: method.nombre
+          }
+        });
+      } catch (err) {
+        console.error('Error al registrar log de transacción:', err);
+      }
+
       toast.success(`${isIncome ? 'Venta' : 'Gasto'} registrado correctamente`)
       setShowForm(false)
       loadData(user.id)
-    } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
+    } catch (err) { 
+      toast.error('Error: ' + err.message) 
+    } finally { 
+      setCreating(false) 
+    }
   }
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
+  const handleSignOut = async () => { 
+    await supabase.auth.signOut(); 
+    router.push('/') 
+  }
 
   const getMedioPagoIcono = (method) => {
     if (!method) return '💳'
-    
     const nombre = method.nombre?.toLowerCase() || ''
-    
     if (nombre.includes('efectivo') || nombre.includes('cash')) return '💵'
     if (nombre.includes('débito') || nombre.includes('debit')) return '💳'
     if (nombre.includes('crédito') || nombre.includes('credito') || nombre.includes('visa') || nombre.includes('master')) return '💳'
     if (nombre.includes('qr') || nombre.includes('mercado pago') || nombre.includes('modo')) return '📱'
-    if (nombre.includes('transferencia')) return ''
-    
+    if (nombre.includes('transferencia')) return '🏦'
     return '💳'
   }
 
   const getMedioPagoLabel = (method) => {
     if (!method) return 'Medio de pago'
-    
     const nombre = method.nombre?.toLowerCase() || ''
-    
     if (nombre.includes('efectivo') || nombre.includes('cash')) return 'Efectivo'
     if (nombre.includes('débito') || nombre.includes('debit')) return 'Débito'
     if (nombre.includes('crédito') || nombre.includes('credito')) return 'Crédito'
     if (nombre.includes('qr') || nombre.includes('mercado pago')) return 'QR'
     if (nombre.includes('modo')) return 'QR'
     if (nombre.includes('transferencia')) return 'Transferencia'
-    
     return method.nombre
   }
 
@@ -510,43 +495,34 @@ await supabase.rpc('registrar_log', {
             <h1 className="m-0 text-lg text-gray-900 font-bold">{businessName}</h1>
             <p className="mt-0.5 text-xs text-gray-500">{activeShift ? `Turno activo - ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}</p>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap justify-end">
             <RoleGate allowedRoles={['owner', 'super_user']}>
-  <button 
-    onClick={() => setShowAddUserModal(true)}
-    className="px-2.5 py-1.5 bg-emerald-100 border-none rounded-md text-emerald-700 cursor-pointer text-xs font-semibold hover:bg-emerald-200 transition-colors"
-  >
-    ➕ Agregar Usuario
-  </button>
-</RoleGate>
-  <RoleGate allowedRoles={['owner', 'super_user']}>
-    <button 
-      onClick={() => router.push('/admin')} 
-      className="px-2.5 py-1.5 bg-purple-100 border-none rounded-md text-purple-700 cursor-pointer text-xs font-semibold hover:bg-purple-200"
-    >
-      📋 Auditoría
-    </button>
-  </RoleGate>
-  
-  <RoleGate allowedRoles={['owner', 'super_user']}>
-    <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200"> Reportes</button>
-  </RoleGate>
-  
-  <RoleGate allowedRoles={['owner']}>
-    <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200">👥 Invitar</button>
-  </RoleGate>
-  <button 
-  onClick={() => setShowAddUserModal(true)}
-  className="px-2.5 py-1.5 bg-emerald-100 border-none rounded-md text-emerald-700 cursor-pointer text-xs font-semibold hover:bg-emerald-200 transition-colors"
->
-  ➕ Agregar Usuario
-</button>
-  <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
-</div>
+              <button 
+                onClick={() => setShowAddUserModal(true)}
+                className="px-2.5 py-1.5 bg-emerald-100 border-none rounded-md text-emerald-700 cursor-pointer text-xs font-semibold hover:bg-emerald-200 transition-colors"
+              >
+                ➕ Agregar Usuario
+              </button>
+            </RoleGate>
+            <RoleGate allowedRoles={['owner', 'super_user']}>
+              <button 
+                onClick={() => router.push('/admin')} 
+                className="px-2.5 py-1.5 bg-purple-100 border-none rounded-md text-purple-700 cursor-pointer text-xs font-semibold hover:bg-purple-200"
+              >
+                📋 Auditoría
+              </button>
+            </RoleGate>
+            <RoleGate allowedRoles={['owner', 'super_user']}>
+              <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200"> Reportes</button>
+            </RoleGate>
+            <RoleGate allowedRoles={['owner']}>
+              <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200">👥 Invitar</button>
+            </RoleGate>
+            <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
+          </div>
         </div>
       </header>
 
-      {/* Selector de fecha */}
       <div className="bg-white border-b border-gray-200 p-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <label className="text-sm font-semibold text-gray-700">📅 Fecha:</label>
@@ -558,15 +534,15 @@ await supabase.rpc('registrar_log', {
             className="px-3 py-1.5 border-2 border-gray-200 rounded-lg text-sm font-medium focus:border-blue-500 focus:outline-none"
           />
           {isViewingHistory && (
-            <button
-              onClick={handleGoToToday}
-              className="px-3 py-1.5 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
-            >
-              Ir a hoy
-            </button>
-          )}
-          {isViewingHistory && (
-            <span className="text-xs text-amber-600 font-semibold">📜 Modo histórico</span>
+            <>
+              <button
+                onClick={handleGoToToday}
+                className="px-3 py-1.5 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
+              >
+                Ir a hoy
+              </button>
+              <span className="text-xs text-amber-600 font-semibold">📜 Modo histórico</span>
+            </>
           )}
         </div>
       </div>
@@ -586,7 +562,6 @@ await supabase.rpc('registrar_log', {
           </div>
         ) : (
           <>
-            {/* SECCIÓN: Resumen del Turno (COLAPSABLE) */}
             <RoleGate allowedRoles={['owner', 'cajero', 'super_user']}>
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
                 <button
@@ -622,7 +597,6 @@ await supabase.rpc('registrar_log', {
                       </div>
                     )}
 
-                    {/* Detalle por medio de pago (COLAPSABLE) */}
                     {balanceByMethod.length > 0 && (
                       <div className="border-t border-gray-200 pt-3 mt-4">
                         <button
@@ -667,7 +641,6 @@ await supabase.rpc('registrar_log', {
               </div>
             </RoleGate>
 
-            {/* SECCIÓN: Acreditaciones de hoy (COLAPSABLE) */}
             <RoleGate allowedRoles={['owner', 'super_user']}>
               {acreditacionesHoy.length > 0 && (
                 <div className="bg-purple-50 rounded-xl border-2 border-purple-600 mb-4 overflow-hidden">
@@ -692,7 +665,7 @@ await supabase.rpc('registrar_log', {
                             <div className="flex items-start gap-3">
                               <div className="text-3xl">{icono}</div>
                               <div className="flex-1">
-                                <div className="text-xs text-purple-600 font-bold mb-1"> ACREDITACIÓN</div>
+                                <div className="text-xs text-purple-600 font-bold mb-1">ACREDITACIÓN</div>
                                 <div className="text-lg font-extrabold text-purple-700">{formatCurrency(acc.net)}</div>
                                 <div className="text-sm text-gray-600 mt-1">
                                   {label} - {fechaTransaccion.toLocaleDateString('es-AR')} {fechaTransaccion.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
@@ -711,7 +684,6 @@ await supabase.rpc('registrar_log', {
               )}
             </RoleGate>
 
-            {/* Botones de acción */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <RoleGate allowedRoles={['owner', 'cajero', 'empleado']}>
                 <button onClick={() => handleOpenForm('INCOME')} className="w-full p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-green-300">
@@ -731,7 +703,6 @@ await supabase.rpc('registrar_log', {
               )}
             </RoleGate>
 
-            {/* SECCIÓN: Movimientos del Turno (COLAPSABLE) */}
             <div className="mb-6">
               <button
                 onClick={() => setShowMovimientos(!showMovimientos)}
@@ -974,7 +945,7 @@ await supabase.rpc('registrar_log', {
                             <div className="flex gap-2">
                               <input type="text" value={newBancoQuickName} onChange={e => setNewBancoQuickName(e.target.value)} placeholder="Nombre del banco" className="flex-1 p-2 border border-gray-300 rounded-md text-sm" />
                               <button type="button" onClick={() => { setQuickMethodBanco(newBancoQuickName); setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-4 py-2 bg-emerald-500 text-white border-none rounded-md font-semibold cursor-pointer text-sm">Guardar</button>
-                              <button type="button" onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm"></button>
+                              <button type="button" onClick={() => { setShowNewBancoQuick(false); setNewBancoQuickName('') }} className="px-3 py-2 bg-red-500 text-white border-none rounded-md cursor-pointer text-sm">✕</button>
                             </div>
                           )}
                         </div>
@@ -1033,20 +1004,22 @@ await supabase.rpc('registrar_log', {
           </div>
         </div>
       )}
-<AddUserModal 
-  isOpen={showAddUserModal}
-  onClose={() => setShowAddUserModal(false)}
-  localId={activeLocalId}
-  userId={user?.id}
-  onUserAdded={() => loadData(user?.id)}
-/>
+
+      <AddUserModal 
+        isOpen={showAddUserModal}
+        onClose={() => setShowAddUserModal(false)}
+        localId={activeLocalId}
+        userId={user?.id}
+        onUserAdded={() => loadData(user?.id)}
+      />
+      
       <InviteUserModal 
-  isOpen={showAddUserModal}
-  onClose={() => setShowAddUserModal(false)}
-  localId={activeLocalId}
-  userId={user?.id}
-  onUserAdded={() => loadData(user?.id)}
-/>
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        localId={activeLocalId}
+        userId={user?.id}
+        onUserAdded={() => loadData(user?.id)}
+      />
 
       <BottomNav activeTab="caja" />
     </main>
