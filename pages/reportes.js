@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx-js-style'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
+import ContactModal from '../components/ContactModal'
 
 // ✅ FUNCIÓN REUTILIZABLE: Procesa transacciones una sola vez
 const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
@@ -411,7 +412,7 @@ export default function Reportes() {
         const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
         calendarDataForSheet.push([new Date(c.fecha + 'T12:00:00'), estado, c.total])
       })
-      
+      const [showContactModal, setShowContactModal] = useState(false)
       const wsCalendar = XLSX.utils.aoa_to_sheet(calendarDataForSheet)
       wsCalendar['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 20 }]
       
@@ -456,10 +457,17 @@ export default function Reportes() {
             >
               📥 Exportar Excel
             </button>
+                <button 
+  onClick={() => setShowContactModal(true)} 
+  className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+>
+   Ayuda
+</button>
             <button 
               onClick={() => router.push('/locales')} 
               className="px-3 py-1.5 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
             >
+                
               ← Volver
             </button>
             <button 
@@ -779,6 +787,13 @@ export default function Reportes() {
           </div>
         </div>
       )}
+<ContactModal 
+  isOpen={showContactModal}
+  onClose={() => setShowContactModal(false)}
+  user={user}
+  localId={selectedLocalId || null}
+  paginaOrigen="Reportes"
+/>
     </main>
   )
 }
