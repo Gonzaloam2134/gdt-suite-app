@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import OnboardingWizard from '../components/OnboardingWizard'
 import RoleGate from '../components/RoleGate'
+import ContactModal from '../components/ContactModal'
 
 export default function Locales() {
   const [user, setUser] = useState(null)
@@ -12,6 +13,7 @@ export default function Locales() {
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [skipScaleStep, setSkipScaleStep] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
 
   const router = useRouter()
 
@@ -114,7 +116,7 @@ export default function Locales() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900">🏪 Mis Locales</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900"> Mis Locales</h1>
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
           <div className="flex gap-2">
@@ -128,6 +130,12 @@ export default function Locales() {
                 ⚙️ Administración
               </button>
             </RoleGate>
+            <button 
+              onClick={() => setShowContactModal(true)} 
+              className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+            >
+              💬 Ayuda
+            </button>
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
           </div>
         </div>
@@ -185,6 +193,15 @@ export default function Locales() {
           skipScaleStep={skipScaleStep}
         />
       )}
+
+      {/* ✅ Modal de Contacto */}
+      <ContactModal 
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        user={user}
+        localId={misLocales[0]?.id || null}
+        paginaOrigen="Mis Locales"
+      />
     </main>
   )
 }
