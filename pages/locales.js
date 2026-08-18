@@ -130,17 +130,14 @@ export default function Locales() {
   }
 
       const handleOnboardingComplete = async (formData) => {
-    console.log('🔍 [DEBUG 1] Iniciando creación de local...');
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log(' [DEBUG 2] Sesión:', session ? 'ACTIVA' : 'INACTIVA');
-    console.log('🔍 [DEBUG 3] User ID:', session?.user?.id);
+  // ✅ NUEVA VALIDACIÓN: Evitar duplicación
+  if (misLocales && misLocales.length > 0) {
+    console.warn('⚠️ El usuario ya tiene al menos un local');
+    toast.error('Ya tenés un local registrado. No se pueden crear múltiples locales en esta versión.');
+    setShowOnboarding(false);
+    return;
+  }
 
-    if (userRole === 'cajero' || userRole === 'empleado') {
-      toast.error(' No tenés permisos para crear locales.')
-      setShowOnboarding(false)
-      return
-    }
 
     try {
       setCreating(true)
