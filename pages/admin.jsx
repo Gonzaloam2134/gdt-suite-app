@@ -10,21 +10,15 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('resumen')
   const [loading, setLoading] = useState(true)
   
-  // Estados globales
   const [globalStats, setGlobalStats] = useState({ locales: 0, usuarios: 0, transacciones: 0 })
   const [allLocales, setAllLocales] = useState([])
-  
-  // Estados del local
   const [localInfo, setLocalInfo] = useState(null)
   const [localStats, setLocalStats] = useState({ ventas: 0, gastos: 0, transacciones: 0 })
   const [miembros, setMiembros] = useState([])
   const [logs, setLogs] = useState([])
   const [misAcciones, setMisAcciones] = useState([])
-  
-  // ✅ NUEVO: Estados para Medios de Pago
   const [mediosPago, setMediosPago] = useState([])
 
-  // Estados para edición de miembros
   const [editingMember, setEditingMember] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [newRole, setNewRole] = useState('')
@@ -72,15 +66,12 @@ export default function AdminPanel() {
         const { count: countTx } = await supabase.from('transacciones').select('*', { count: 'exact', head: true }).eq('local_id', activeLocalId)
         setLocalStats({ ventas: totalVentas, gastos: totalGastos, transacciones: countTx || 0 })
 
-        // Miembros
         const { data: miembrosData } = await supabase.from('miembros_locales').select(`id, rol, activo, aceptado_en, user_id, perfiles (id, email, nombre)`).eq('local_id', activeLocalId).eq('activo', true)
         setMiembros((miembrosData || []).map(m => ({ ...m, user: m.perfiles })))
 
-        // ✅ NUEVO: Cargar Medios de Pago
         const { data: mediosData } = await supabase.from('medios_pago').select('*').eq('local_id', activeLocalId).order('orden', { ascending: true })
         setMediosPago(mediosData || [])
 
-        // Logs
         const { data: logsData } = await supabase.from('logs_auditoria').select('*').eq('local_id', activeLocalId).order('creado_en', { ascending: false }).limit(50)
         setLogs(logsData || [])
 
@@ -97,7 +88,6 @@ export default function AdminPanel() {
     }
   }
 
-  // --- Funciones de Miembros ---
   const handleEditRole = async (miembroId, userIdPerfil, nuevoRol, nuevoNombre, nuevoEmail) => {
     try {
       await supabase.from('miembros_locales').update({ rol: nuevoRol }).eq('id', miembroId)
@@ -116,7 +106,6 @@ export default function AdminPanel() {
     } catch (err) { toast.error('Error: ' + err.message) }
   }
 
-  // ✅ NUEVO: Función para activar/desactivar medio de pago
   const handleToggleMedioPago = async (medioId, estadoActual) => {
     try {
       const { error } = await supabase.from('medios_pago').update({ habilitado: !estadoActual }).eq('id', medioId)
@@ -131,10 +120,10 @@ export default function AdminPanel() {
 
   const getAccionLabel = (accion) => {
     const labels = {
-      'CAJA_ABIERTA': { icono: '🔓', texto: 'Caja Abierta', color: 'bg-blue-100 text-blue-800' },
+      'CAJA_ABIERTA': { icono: '', texto: 'Caja Abierta', color: 'bg-blue-100 text-blue-800' },
       'CAJA_CERRADA': { icono: '🔒', texto: 'Caja Cerrada', color: 'bg-gray-100 text-gray-800' },
       'VENTA_REGISTRADA': { icono: '💰', texto: 'Venta', color: 'bg-green-100 text-green-800' },
-      'GASTO_REGISTRADO': { icono: '💸', texto: 'Gasto', color: 'bg-red-100 text-red-800' },
+      'GASTO_REGISTRADO': { icono: '', texto: 'Gasto', color: 'bg-red-100 text-red-800' },
       'ROL_CAMBIADO': { icono: '🔄', texto: 'Rol Cambiado', color: 'bg-indigo-100 text-indigo-800' }
     }
     return labels[accion] || { icono: '📋', texto: accion, color: 'bg-gray-100 text-gray-800' }
@@ -142,9 +131,6 @@ export default function AdminPanel() {
 
   if (roleLoading || loading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando panel...</p></div>
 
-  // ==========================================
-  // RENDER: Owner
-  // ==========================================
   if (role === 'owner') {
     return (
       <main className="min-h-screen bg-slate-100 pb-20">
@@ -159,14 +145,14 @@ export default function AdminPanel() {
         </header>
 
         <div className="max-w-4xl mx-auto p-4">
-          {/* ✅ TABS ACTUALIZADAS: 4 TABS EXACTAS */}
+          {/* ✅ BARRA DE TABS SUPERIOR - 4 TABS */}
           <div className="flex gap-2 mb-4 border-b border-gray-200 overflow-x-auto">
-{[
-  { id: 'resumen', label: '📊 Resumen' },
-  { id: 'miembros', label: ' Miembros' },
-  { id: 'medios-pago', label: '💳 Medios de Pago' },
-  { id: 'logs', label: '⚙️ Administración' }  // ✅ CAMBIADO
-].map(tab => (
+            {[
+              { id: 'resumen', label: '📊 Resumen' },
+              { id: 'miembros', label: '👥 Miembros' },
+              { id: 'medios-pago', label: '💳 Medios de Pago' },
+              { id: 'logs', label: '⚙️ Administración' }
+            ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -202,7 +188,7 @@ export default function AdminPanel() {
                 <div key={miembro.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${miembro.rol === 'owner' ? 'bg-purple-100' : miembro.rol === 'cajero' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                      {miembro.rol === 'owner' ? '👑' : miembro.rol === 'cajero' ? '👨‍💼' : '👷'}
+                      {miembro.rol === 'owner' ? '👑' : miembro.rol === 'cajero' ? '👨‍💼' : ''}
                     </div>
                     <div>
                       <div className="font-semibold text-gray-900 text-sm">{miembro.perfiles?.nombre || miembro.user?.email || 'Usuario'}</div>
@@ -225,11 +211,10 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {/* ✅ NUEVA TAB: MEDIOS DE PAGO */}
           {activeTab === 'medios-pago' && (
             <div className="space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-800 m-0">ℹ️ Desde aquí podés activar o desactivar los medios de pago que se muestran en la Caja. Los configurados en el onboarding aparecen como "Por defecto".</p>
+                <p className="text-sm text-blue-800 m-0">ℹ️ Desde aquí podés activar o desactivar los medios de pago que se muestran en la Caja.</p>
               </div>
               {mediosPago.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-8">No hay medios de pago configurados aún.</p>
@@ -280,7 +265,6 @@ export default function AdminPanel() {
           )}
         </div>
 
-        {/* Modal de Edición de Miembro (sin cambios, ya funciona) */}
         {showEditModal && editingMember && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
@@ -313,6 +297,5 @@ export default function AdminPanel() {
     )
   }
 
-  // (El render de cajero/empleado/super_user se mantiene igual que antes, omitido por brevedad, pero está en tu archivo original)
-  return <div className="p-8 text-center">Acceso restringido o cargando...</div>
+  return <div className="p-8 text-center">Cargando o acceso restringido...</div>
 }
