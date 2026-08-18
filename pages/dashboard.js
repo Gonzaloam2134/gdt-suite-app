@@ -1,12 +1,11 @@
 import { supabase } from '../lib/supabaseClient'
-import InviteUserModal from '../components/InviteUserModal'
-import AddUserModal from '../components/AddUserModal'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import BottomNav from '../components/BottomNav'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import RoleGate from '../components/RoleGate'
+import InviteUserModal from '../components/InviteUserModal'
 
 const CONCEPTOS_INGRESO = ['Venta de mostrador', 'Venta por Delivery', 'Pedido / Encargo', 'Servicios', 'Otro ingreso']
 const CONCEPTOS_GASTO = ['Compra de insumos/proveedores', 'Servicios (Luz, Gas, Internet)', 'Sueldos / Jornales', 'Alquiler', 'Impuestos', 'Otros egresos']
@@ -33,7 +32,7 @@ export default function CajaDelDia() {
   const [showOpenShift, setShowOpenShift] = useState(false)
   const [showCloseShift, setShowCloseShift] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
-  const [showAddUserModal, setShowAddUserModal] = useState(false)
+  
   const [amount, setAmount] = useState('')
   const [selectedConcept, setSelectedConcept] = useState('')
   const [customConcept, setCustomConcept] = useState('')
@@ -60,7 +59,7 @@ export default function CajaDelDia() {
   const [newCategoryQuickName, setNewCategoryQuickName] = useState('')
   const [newOperatorQuickName, setNewOperatorQuickName] = useState('')
   const [newBancoQuickName, setNewBancoQuickName] = useState('')
-  
+
   // Navegación por fechas
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [isViewingHistory, setIsViewingHistory] = useState(false)
@@ -68,7 +67,7 @@ export default function CajaDelDia() {
   // Acreditaciones del día
   const [acreditacionesHoy, setAcreditacionesHoy] = useState([])
   
-  // Estados para secciones colapsables
+  // NUEVO: Estados para secciones colapsables
   const [showResumen, setShowResumen] = useState(true)
   const [showDetalleMedios, setShowDetalleMedios] = useState(false)
   const [showAcreditaciones, setShowAcreditaciones] = useState(false)
@@ -78,28 +77,16 @@ export default function CajaDelDia() {
   const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
-        return
-      }
-      
-      setUser(session.user)
-
-      const { data: profile } = await supabase
-        .from('perfiles')
-        .select('rol_global, rol')
-        .eq('id', session.user.id)
-        .single()
-      
-      const userRole = profile?.rol_global || profile?.rol || 'owner'
-      
-      if (userRole === 'owner' && !activeLocalId) {
-        router.push('/locales')
-      } else if (!activeLocalId) {
-        router.push('/locales')
       } else {
-        loadData(session.user.id)
+        setUser(session.user)
+        if (activeLocalId) {
+          loadData(session.user.id)
+        } else {
+          router.push('/locales')
+        }
       }
     })
   }, [router, activeLocalId])
@@ -125,9 +112,7 @@ export default function CajaDelDia() {
       if (shiftData) {
         const { data: txData } = await supabase.from('transacciones').select('*').eq('turno_id', shiftData.id).order('creado_en', { ascending: false }).limit(100)
         setMovements(txData || [])
-      } else { 
-        setMovements([]) 
-      }
+      } else { setMovements([]) }
 
       const { data: closedData } = await supabase.from('turnos').select('*').eq('local_id', activeLocalId).eq('estado', 'CERRADO').order('cerrado_en', { ascending: false }).limit(10)
 
@@ -146,10 +131,7 @@ export default function CajaDelDia() {
         setOpeningAmount(calculatedBalance.toFixed(2))
         setIsAmountModified(false)
         setDifferenceReason('')
-      } else { 
-        setLastShiftBalance(0)
-        setOpeningAmount('') 
-      }
+      } else { setLastShiftBalance(0); setOpeningAmount('') }
       
       const { data: pmData } = await supabase.from('medios_pago').select(`*, subcategorias_pago (id, nombre, categorias_pago (id, nombre, icono))`).eq('local_id', activeLocalId).eq('activo', true).order('creado_en', { ascending: false })
       setPaymentMethods(pmData || [])
@@ -159,20 +141,20 @@ export default function CajaDelDia() {
       setCategories(catData || [])
       setSubcategories(subcatData || [])
       
+      // Cargar acreditaciones del día (solo pendientes de días anteriores, sin efectivo)
       const hoyStr = new Date().toISOString().split('T')[0]
+      
       const { data: allTx } = await supabase
         .from('transacciones')
         .select('*')
         .eq('local_id', activeLocalId)
         .eq('tipo', 'COBRO_RECIBIDO')
         .eq('fecha_acreditacion_estimada', hoyStr)
-        .lt('creado_en', `${hoyStr}T00:00:00`)
+        .lt('creado_en', `${hoyStr}T00:00:00`) // ✅ FILTRO: Solo ventas de días anteriores
       
-      const efectivoMethodTemp = (pmData || []).find(m => m.nombre?.toLowerCase().includes('efectivo') || m.nombre?.toLowerCase().includes('cash') || (!m.banco_emisor && !m.subcategorias_pago?.nombre))
-      const efectivoMethodIdTemp = efectivoMethodTemp?.id
-
+      // ✅ FILTRO: Excluir efectivo de la lista de acreditaciones
       const acreditaciones = (allTx || [])
-        .filter(m => m.medio_pago_id !== efectivoMethodIdTemp) 
+        .filter(m => m.medio_pago_id !== efectivoMethodId) 
         .map(m => ({ 
           ...m, 
           method: (pmData || []).find(pm => pm.id === m.medio_pago_id), 
@@ -181,11 +163,7 @@ export default function CajaDelDia() {
       
       setAcreditacionesHoy(acreditaciones)
       
-    } catch (err) { 
-      console.error('Error cargando datos:', err) 
-    } finally { 
-      setLoading(false) 
-    }
+    } catch (err) { console.error('Error cargando datos:', err) } finally { setLoading(false) }
   }
 
   const loadDataForDate = async (userId, date) => {
@@ -230,7 +208,9 @@ export default function CajaDelDia() {
         setActiveShift(null)
         setMovements([])
         if (date !== new Date().toISOString().split('T')[0]) {
-          toast(`No hay registro de actividad para el ${new Date(date).toLocaleDateString('es-AR')}`, { icon: '📭' })
+          toast(`No hay registro de actividad para el ${new Date(date).toLocaleDateString('es-AR')}`, {
+            icon: '📭'
+          })
         }
       }
 
@@ -297,11 +277,8 @@ export default function CajaDelDia() {
   const handleOpeningAmountChange = (e) => {
     const newVal = e.target.value
     setOpeningAmount(newVal)
-    if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) { 
-      setIsAmountModified(true) 
-    } else { 
-      setIsAmountModified(false); setDifferenceReason('') 
-    }
+    if (lastShiftBalance > 0 && newVal !== lastShiftBalance.toFixed(2)) { setIsAmountModified(true) } 
+    else { setIsAmountModified(false); setDifferenceReason('') }
   }
 
   const handleOpenShift = async (e) => {
@@ -336,29 +313,10 @@ export default function CajaDelDia() {
       }]).select().single()
 
       if (error) throw error
-
-      try {
-        await supabase.rpc('registrar_log', {
-          p_local_id: activeLocalId,
-          p_user_id: user.id,
-          p_accion: 'CAJA_ABIERTA',
-          p_detalles: { 
-            monto_inicial: parseFloat(openingAmount), 
-            motivo_diferencia: isAmountModified ? differenceReason : null 
-          }
-        });
-      } catch (err) {
-        console.error('Error al registrar log de apertura:', err);
-      }
-
-      toast.success('Caja abierta correctamente');
+      toast.success('Caja abierta correctamente')
       setShowOpenShift(false); setOpeningAmount(''); setDifferenceReason(''); setIsAmountModified(false)
       loadData(user.id)
-    } catch (err) { 
-      toast.error('Error: ' + err.message) 
-    } finally { 
-      setCreating(false) 
-    }
+    } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
   }
 
   const handleCloseShift = async () => {
@@ -367,29 +325,10 @@ export default function CajaDelDia() {
       setCreating(true)
       const { error } = await supabase.from('turnos').update({ estado: 'CERRADO', cerrado_en: new Date().toISOString(), cerrado_por: user.id }).eq('id', activeShift.id)
       if (error) throw error
-      
-      try {
-        await supabase.rpc('registrar_log', {
-          p_local_id: activeLocalId,
-          p_user_id: user.id,
-          p_accion: 'CAJA_CERRADA',
-          p_detalles: { 
-            efectivo_final: efectivoEnCaja,
-            total_disponible: totalDisponibleHoy
-          }
-        });
-      } catch (err) {
-        console.error('Error al registrar log de cierre:', err);
-      }
-
-      toast.success('Caja cerrada correctamente');
+      toast.success('Caja cerrada correctamente')
       setShowCloseShift(false); setActiveShift(null); setMovements([])
       loadData(user.id)
-    } catch (err) { 
-      toast.error('Error: ' + err.message) 
-    } finally { 
-      setCreating(false) 
-    }
+    } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
   }
 
   const handleSubmit = async (e) => {
@@ -428,57 +367,40 @@ export default function CajaDelDia() {
       }])
 
       if (error) throw error
-      
-      try {
-        await supabase.rpc('registrar_log', {
-          p_local_id: activeLocalId,
-          p_user_id: user.id,
-          p_accion: isIncome ? 'VENTA_REGISTRADA' : 'GASTO_REGISTRADO',
-          p_detalles: { 
-            descripcion: finalConcept || (isIncome ? 'Venta' : 'Gasto'), 
-            monto: parseFloat(amount),
-            medio_pago: method.nombre
-          }
-        });
-      } catch (err) {
-        console.error('Error al registrar log de transacción:', err);
-      }
-
       toast.success(`${isIncome ? 'Venta' : 'Gasto'} registrado correctamente`)
       setShowForm(false)
       loadData(user.id)
-    } catch (err) { 
-      toast.error('Error: ' + err.message) 
-    } finally { 
-      setCreating(false) 
-    }
+    } catch (err) { toast.error('Error: ' + err.message) } finally { setCreating(false) }
   }
 
-  const handleSignOut = async () => { 
-    await supabase.auth.signOut(); 
-    router.push('/') 
-  }
+  const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
 
   const getMedioPagoIcono = (method) => {
     if (!method) return '💳'
+    
     const nombre = method.nombre?.toLowerCase() || ''
+    
     if (nombre.includes('efectivo') || nombre.includes('cash')) return '💵'
     if (nombre.includes('débito') || nombre.includes('debit')) return '💳'
     if (nombre.includes('crédito') || nombre.includes('credito') || nombre.includes('visa') || nombre.includes('master')) return '💳'
     if (nombre.includes('qr') || nombre.includes('mercado pago') || nombre.includes('modo')) return '📱'
     if (nombre.includes('transferencia')) return '🏦'
+    
     return '💳'
   }
 
   const getMedioPagoLabel = (method) => {
     if (!method) return 'Medio de pago'
+    
     const nombre = method.nombre?.toLowerCase() || ''
+    
     if (nombre.includes('efectivo') || nombre.includes('cash')) return 'Efectivo'
     if (nombre.includes('débito') || nombre.includes('debit')) return 'Débito'
     if (nombre.includes('crédito') || nombre.includes('credito')) return 'Crédito'
     if (nombre.includes('qr') || nombre.includes('mercado pago')) return 'QR'
     if (nombre.includes('modo')) return 'QR'
     if (nombre.includes('transferencia')) return 'Transferencia'
+    
     return method.nombre
   }
 
@@ -489,7 +411,8 @@ export default function CajaDelDia() {
 
   return (
     <main className="p-0 font-sans bg-slate-100 min-h-screen pb-[70px]">
-            <header className="bg-white p-4 border-b border-gray-200 sticky top-0 z-10">
+      {/* ✅ HEADER CORREGIDO */}
+      <header className="bg-white p-4 border-b border-gray-200 sticky top-0 z-10">
         <div className="flex justify-between items-center max-w-2xl mx-auto">
           <div>
             <h1 className="m-0 text-lg text-gray-900 font-bold">{businessName}</h1>
@@ -536,6 +459,7 @@ export default function CajaDelDia() {
         </div>
       </header>
 
+      {/* Selector de fecha */}
       <div className="bg-white border-b border-gray-200 p-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <label className="text-sm font-semibold text-gray-700">📅 Fecha:</label>
@@ -547,15 +471,15 @@ export default function CajaDelDia() {
             className="px-3 py-1.5 border-2 border-gray-200 rounded-lg text-sm font-medium focus:border-blue-500 focus:outline-none"
           />
           {isViewingHistory && (
-            <>
-              <button
-                onClick={handleGoToToday}
-                className="px-3 py-1.5 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
-              >
-                Ir a hoy
-              </button>
-              <span className="text-xs text-amber-600 font-semibold">📜 Modo histórico</span>
-            </>
+            <button
+              onClick={handleGoToToday}
+              className="px-3 py-1.5 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
+            >
+              Ir a hoy
+            </button>
+          )}
+          {isViewingHistory && (
+            <span className="text-xs text-amber-600 font-semibold">📜 Modo histórico</span>
           )}
         </div>
       </div>
@@ -575,6 +499,7 @@ export default function CajaDelDia() {
           </div>
         ) : (
           <>
+            {/* SECCIÓN: Resumen del Turno (COLAPSABLE) */}
             <RoleGate allowedRoles={['owner', 'cajero', 'super_user']}>
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
                 <button
@@ -610,6 +535,7 @@ export default function CajaDelDia() {
                       </div>
                     )}
 
+                    {/* Detalle por medio de pago (COLAPSABLE) */}
                     {balanceByMethod.length > 0 && (
                       <div className="border-t border-gray-200 pt-3 mt-4">
                         <button
@@ -648,12 +574,13 @@ export default function CajaDelDia() {
 
             <RoleGate allowedRoles={['empleado']}>
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center mb-4">
-                <div className="text-3xl mb-2">👷</div>
+                <div className="text-3xl mb-2"></div>
                 <div className="text-sm text-gray-600 font-semibold">Modo Empleado</div>
                 <div className="text-xs text-gray-500 mt-1">Podés registrar ventas del mostrador. Los totales y gastos los ve el dueño.</div>
               </div>
             </RoleGate>
 
+            {/* SECCIÓN: Acreditaciones de hoy (COLAPSABLE) */}
             <RoleGate allowedRoles={['owner', 'super_user']}>
               {acreditacionesHoy.length > 0 && (
                 <div className="bg-purple-50 rounded-xl border-2 border-purple-600 mb-4 overflow-hidden">
@@ -661,7 +588,7 @@ export default function CajaDelDia() {
                     onClick={() => setShowAcreditaciones(!showAcreditaciones)}
                     className="w-full p-4 flex justify-between items-center bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer border-none"
                   >
-                    <h2 className="m-0 text-base text-purple-800 font-bold">📥 Acreditaciones de hoy ({acreditacionesHoy.length})</h2>
+                    <h2 className="m-0 text-base text-purple-800 font-bold"> Acreditaciones de hoy ({acreditacionesHoy.length})</h2>
                     <span className="text-purple-400 text-xl">{showAcreditaciones ? '▼' : '▶'}</span>
                   </button>
                   
@@ -678,7 +605,7 @@ export default function CajaDelDia() {
                             <div className="flex items-start gap-3">
                               <div className="text-3xl">{icono}</div>
                               <div className="flex-1">
-                                <div className="text-xs text-purple-600 font-bold mb-1">ACREDITACIÓN</div>
+                                <div className="text-xs text-purple-600 font-bold mb-1"> ACREDITACIÓN</div>
                                 <div className="text-lg font-extrabold text-purple-700">{formatCurrency(acc.net)}</div>
                                 <div className="text-sm text-gray-600 mt-1">
                                   {label} - {fechaTransaccion.toLocaleDateString('es-AR')} {fechaTransaccion.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}
@@ -697,6 +624,7 @@ export default function CajaDelDia() {
               )}
             </RoleGate>
 
+            {/* Botones de acción */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <RoleGate allowedRoles={['owner', 'cajero', 'empleado']}>
                 <button onClick={() => handleOpenForm('INCOME')} className="w-full p-4 bg-green-200 text-green-900 border-none rounded-lg text-sm font-bold cursor-pointer flex flex-col items-center gap-1 hover:bg-green-300">
@@ -716,6 +644,7 @@ export default function CajaDelDia() {
               )}
             </RoleGate>
 
+            {/* SECCIÓN: Movimientos del Turno (COLAPSABLE) */}
             <div className="mb-6">
               <button
                 onClick={() => setShowMovimientos(!showMovimientos)}
@@ -1018,20 +947,11 @@ export default function CajaDelDia() {
         </div>
       )}
 
-      <AddUserModal 
-        isOpen={showAddUserModal}
-        onClose={() => setShowAddUserModal(false)}
-        localId={activeLocalId}
-        userId={user?.id}
-        onUserAdded={() => loadData(user?.id)}
-      />
-      
-      <InviteUserModal 
+      <InviteUserModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         localId={activeLocalId}
         userId={user?.id}
-        onUserAdded={() => loadData(user?.id)}
       />
 
       <BottomNav activeTab="caja" />
