@@ -11,16 +11,13 @@ export default function Locales() {
   const [misLocales, setMisLocales] = useState([])
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [skipScaleStep, setSkipScaleStep] = useState(false) // ✅ NUEVO
 
   const router = useRouter()
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) {
-        router.push('/')
-        return
-      }
+      if (!session?.user) { router.push('/'); return }
       setUser(session.user)
       try {
         const { data: perfil } = await supabase.from('perfiles').select('rol_global').eq('id', session.user.id).maybeSingle()
@@ -66,7 +63,6 @@ export default function Locales() {
     if (userRole === 'cajero' || userRole === 'empleado') { toast.error('⛔ No tenés permisos para crear locales.'); setShowOnboarding(false); return }
 
     try {
-      setCreating(true)
       const payload = { nombre: formData.businessName?.trim() || 'Negocio', rubro: formData.rubro || 'Otro', condicion_fiscal: formData.condicionFiscal || 'Consumidor Final', creado_por: session.user.id }
       const { data: localData, error: localError } = await supabase.from('locales').insert([payload]).select().single()
       if (localError) throw new Error(`Error en LOCALES: ${localError.message}`)
@@ -85,11 +81,13 @@ export default function Locales() {
       toast.success('🏪 Local creado correctamente')
       localStorage.setItem('activeLocalId', localData.id)
       localStorage.removeItem('onboarding_temp_data')
-      setTimeout(() => router.push('/dashboard'), 1500)
+      
+      // ✅ Recargar la lista de locales en lugar de ir al dashboard
+      await loadMisLocales(session.user.id, userRole)
+      setShowOnboarding(false)
+      setSkipScaleStep(false)
     } catch (err) {
       toast.error('Error al crear local: ' + err.message)
-    } finally {
-      setCreating(false)
     }
   }
 
@@ -101,6 +99,12 @@ export default function Locales() {
   }
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
+
+  // ✅ Abrir onboarding para agregar local extra (salta paso de escala)
+  const handleAddNewLocal = () => {
+    setSkipScaleStep(true)
+    setShowOnboarding(true)
+  }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-100"><p>Cargando...</p></div>
 
@@ -161,12 +165,20 @@ export default function Locales() {
               </div>
             ))}
             {userRole === 'owner' && (
-              <button onClick={() => setShowOnboarding(true)} className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-semibold cursor-pointer hover:border-blue-400 hover:text-blue-500">+ Agregar otro local</button>
+              <button onClick={handleAddNewLocal} className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-semibold cursor-pointer hover:border-blue-400 hover:text-blue-500">+ Agregar otro local</button>
             )}
           </div>
         )}
       </div>
-      {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} onCancel={() => { setShowOnboarding(false); localStorage.removeItem('onboarding_temp_data') }} userEmail={user?.email} preloadedData={JSON.parse(localStorage.getItem('onboarding_temp_data') || 'null')} />}
+      {showOnboarding && (
+        <OnboardingWizard 
+          onComplete={handleOnboardingComplete} 
+          onCancel={() => { setShowOnboarding(false); setSkipScaleStep(false); localStorage.removeItem('onboarding_temp_data') }} 
+          userEmail={user?.email} 
+          preloadedData={JSON.parse(localStorage.getItem('onboarding_temp_data') || 'null')}
+          skipScaleStep={skipScaleStep} // ✅ PASAR LA PROP
+        />
+      )}
     </main>
   )
 }
