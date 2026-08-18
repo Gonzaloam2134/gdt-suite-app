@@ -12,7 +12,7 @@ const ICONOS_POR_TIPO = {
   credito: '💳',
   transferencia: '🏦',
   qr: '📱',
-  cheque: '',
+  cheque: '📄',
   otro: '📦'
 }
 
@@ -52,7 +52,7 @@ export default function AdminPanel() {
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
 
-  // ✅ NUEVO: Estados para gestión de medios de pago
+  // Estados para gestión de medios de pago
   const [showMedioModal, setShowMedioModal] = useState(false)
   const [editingMedio, setEditingMedio] = useState(null)
   const [medioForm, setMedioForm] = useState({
@@ -65,7 +65,7 @@ export default function AdminPanel() {
     habilitado: true
   })
 
-  // ✅ Estados para agregar "Otro" operador/banco
+  // Estados para agregar "Otro" operador/banco
   const [showNewOperador, setShowNewOperador] = useState(false)
   const [newOperadorName, setNewOperadorName] = useState('')
   const [showNewBanco, setShowNewBanco] = useState(false)
@@ -155,7 +155,7 @@ export default function AdminPanel() {
     } catch (err) { toast.error('Error: ' + err.message) }
   }
 
-  // ✅ NUEVO: Funciones de Medios de Pago
+  // --- Funciones de Medios de Pago ---
   const openMedioModal = (medio = null) => {
     if (medio) {
       setEditingMedio(medio)
@@ -187,7 +187,7 @@ export default function AdminPanel() {
     setShowMedioModal(true)
   }
 
-    const handleSaveMedio = async () => {
+  const handleSaveMedio = async () => {
     try {
       const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
       if (!activeLocalId) {
@@ -256,76 +256,6 @@ export default function AdminPanel() {
       toast.error('Error: ' + err.message)
     }
   }
-    try {
-      const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
-      if (!activeLocalId) {
-        toast.error('No hay local activo')
-        return
-      }
-
-        return
-      }
-
-      // ✅ Generar nombre automático inteligente
-let nombreFinal = medioForm.nombre.trim()
-
-if (!nombreFinal) {
-  const tipoLabel = {
-    efectivo: 'Efectivo',
-    debito: 'Débito',
-    credito: 'Crédito',
-    transferencia: 'Transferencia',
-    qr: 'QR',
-    cheque: 'Cheque',
-    otro: 'Otro'
-  }[medioForm.tipo] || 'Medio de pago'
-
-  if (medioForm.operador && medioForm.banco_emisor) {
-    nombreFinal = `${medioForm.operador} ${tipoLabel} - ${medioForm.banco_emisor}`
-  } else if (medioForm.operador) {
-    nombreFinal = `${medioForm.operador} ${tipoLabel}`
-  } else if (medioForm.banco_emisor) {
-    nombreFinal = `${tipoLabel} ${medioForm.banco_emisor}`
-  } else {
-    nombreFinal = tipoLabel
-  }
-}
-
-      const payload = {
-        local_id: activeLocalId,
-        nombre: nombreFinal,
-        tipo: medioForm.tipo,
-        icono: ICONOS_POR_TIPO[medioForm.tipo] || '💳',
-        operador: medioForm.operador || null,
-        banco_emisor: medioForm.banco_emisor || null,
-        comision_porcentaje: parseFloat(medioForm.comision_porcentaje) || 0,
-        plazo_acreditacion_dias: parseInt(medioForm.plazo_acreditacion_dias) || 0,
-        habilitado: medioForm.habilitado,
-        activo: medioForm.habilitado,
-        es_default: false,
-        orden: mediosPago.length,
-        creado_por: userId,
-        actualizado_en: new Date().toISOString()
-      }
-
-      if (editingMedio) {
-        const { error } = await supabase.from('medios_pago').update(payload).eq('id', editingMedio.id)
-        if (error) throw error
-        toast.success('✅ Medio de pago actualizado')
-      } else {
-        const { error } = await supabase.from('medios_pago').insert([payload])
-        if (error) throw error
-        toast.success('✅ Medio de pago creado')
-      }
-
-      setShowMedioModal(false)
-      setEditingMedio(null)
-      await loadData()
-    } catch (err) {
-      console.error('Error guardando medio:', err)
-      toast.error('Error: ' + err.message)
-    }
-  }
 
   const handleDeleteMedio = async (medioId, medioNombre) => {
     if (!confirm(`¿Eliminar "${medioNombre}"? Esta acción no se puede deshacer.`)) return
@@ -353,7 +283,6 @@ if (!nombreFinal) {
     } catch (err) { toast.error('Error al actualizar: ' + err.message) }
   }
 
-  // ✅ Agregar nuevo operador
   const handleAddOperador = () => {
     if (!newOperadorName.trim()) {
       toast.error('Ingresá un nombre para el operador')
@@ -366,7 +295,6 @@ if (!nombreFinal) {
     toast.success(`Operador "${newOperadorName.trim()}" agregado`)
   }
 
-  // ✅ Agregar nuevo banco
   const handleAddBanco = () => {
     if (!newBancoName.trim()) {
       toast.error('Ingresá un nombre para el banco')
@@ -380,17 +308,18 @@ if (!nombreFinal) {
   }
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
+  
   const formatFecha = (fecha) => fecha ? new Date(fecha).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
 
   const getAccionLabel = (accion) => {
     const labels = {
       'CAJA_ABIERTA': { icono: '🔓', texto: 'Caja Abierta', color: 'bg-blue-100 text-blue-800' },
-      'CAJA_CERRADA': { icono: '', texto: 'Caja Cerrada', color: 'bg-gray-100 text-gray-800' },
+      'CAJA_CERRADA': { icono: '🔒', texto: 'Caja Cerrada', color: 'bg-gray-100 text-gray-800' },
       'VENTA_REGISTRADA': { icono: '💰', texto: 'Venta', color: 'bg-green-100 text-green-800' },
-      'GASTO_REGISTRADO': { icono: '', texto: 'Gasto', color: 'bg-red-100 text-red-800' },
+      'GASTO_REGISTRADO': { icono: '💸', texto: 'Gasto', color: 'bg-red-100 text-red-800' },
       'ROL_CAMBIADO': { icono: '🔄', texto: 'Rol Cambiado', color: 'bg-indigo-100 text-indigo-800' }
     }
-    return labels[accion] || { icono: '', texto: accion, color: 'bg-gray-100 text-gray-800' }
+    return labels[accion] || { icono: '📋', texto: accion, color: 'bg-gray-100 text-gray-800' }
   }
 
   if (roleLoading || loading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando panel...</p></div>
@@ -401,7 +330,7 @@ if (!nombreFinal) {
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
             <div>
-              <h1 className="m-0 text-lg font-bold text-gray-900"> Panel de Administración</h1>
+              <h1 className="m-0 text-lg font-bold text-gray-900">👑 Panel de Administración</h1>
               <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Cargando...'}</p>
             </div>
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
@@ -411,7 +340,7 @@ if (!nombreFinal) {
         <div className="max-w-4xl mx-auto p-4">
           <div className="flex gap-2 mb-4 border-b border-gray-200 overflow-x-auto">
             {[
-              { id: 'resumen', label: ' Resumen' },
+              { id: 'resumen', label: '📊 Resumen' },
               { id: 'miembros', label: '👥 Miembros' },
               { id: 'medios-pago', label: '💳 Medios de Pago' },
               { id: 'logs', label: '⚙️ Administración' }
@@ -477,7 +406,7 @@ if (!nombreFinal) {
           {activeTab === 'medios-pago' && (
             <div className="space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-800 m-0">💡 Agregá, editá o desactivá los medios de pago. El icono se asigna automáticamente según el tipo.</p>
+                <p className="text-sm text-blue-800 m-0">💡 Agregá, editá o desactivá los medios de pago. El icono y nombre se generan automáticamente según el tipo.</p>
               </div>
               
               <button
@@ -493,12 +422,12 @@ if (!nombreFinal) {
                 mediosPago.map(medio => (
                   <div key={medio.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                     <div className="flex items-center gap-3 flex-1">
-                      <span className="text-2xl">{medio.icono || ICONOS_POR_TIPO[medio.tipo] || ''}</span>
+                      <span className="text-2xl">{medio.icono || ICONOS_POR_TIPO[medio.tipo] || '💳'}</span>
                       <div className="flex-1">
                         <div className="font-semibold text-gray-900 text-sm">{medio.nombre}</div>
                         <div className="text-xs text-gray-500 mt-0.5">
                           {medio.operador && <span className="mr-2">🏷️ {medio.operador}</span>}
-                          {medio.banco_emisor && <span className="mr-2"> {medio.banco_emisor}</span>}
+                          {medio.banco_emisor && <span className="mr-2">🏦 {medio.banco_emisor}</span>}
                           {medio.comision_porcentaje > 0 ? `${medio.comision_porcentaje}% comisión` : 'Sin comisión'} · {' '}
                           {medio.plazo_acreditacion_dias === 0 ? 'Acreditación inmediata' : `Se acredita en ${medio.plazo_acreditacion_dias} días`}
                         </div>
@@ -561,18 +490,9 @@ if (!nombreFinal) {
               <h3 className="text-lg font-bold text-gray-900 mb-4">✏️ Editar Miembro</h3>
               <div className="space-y-4">
                 <div>
-                  <div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Nombre <span className="text-gray-400 font-normal">(opcional)</span>
-  </label>
-  <input 
-    type="text" 
-    value={medioForm.nombre} 
-    onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
-    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-    placeholder="Se genera automáticamente si lo dejás vacío"
-  />
-</div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre:</label>
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm" />
+                </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Email:</label>
                   <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm" />
@@ -580,7 +500,7 @@ if (!nombreFinal) {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Rol:</label>
                   <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm">
-                    <option value="cajero">👨‍ Cajero</option>
+                    <option value="cajero">👨‍💼 Cajero</option>
                     <option value="empleado">👷 Empleado</option>
                   </select>
                 </div>
@@ -598,26 +518,26 @@ if (!nombreFinal) {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-bold text-gray-900 mb-1">
-                {editingMedio ? '✏️ Editar Medio de Pago' : ' Nuevo Medio de Pago'}
+                {editingMedio ? '✏️ Editar Medio de Pago' : '➕ Nuevo Medio de Pago'}
               </h3>
               <p className="text-xs text-gray-500 mb-4">
                 {editingMedio ? 'Modificá los datos del medio de pago.' : 'Configurá un nuevo medio de pago para tu caja.'}
               </p>
               
               <div className="space-y-4">
-                {/* Nombre */}
+                {/* Nombre (Opcional) */}
                 <div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Nombre <span className="text-gray-400 font-normal">(opcional)</span>
-  </label>
-  <input 
-    type="text" 
-    value={medioForm.nombre} 
-    onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
-    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-    placeholder="Se genera automáticamente si lo dejás vacío"
-  />
-</div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Nombre <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={medioForm.nombre} 
+                    onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Se genera automáticamente si lo dejás vacío"
+                  />
+                </div>
 
                 {/* Tipo (con icono automático) */}
                 <div>
