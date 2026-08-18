@@ -489,33 +489,49 @@ export default function CajaDelDia() {
 
   return (
     <main className="p-0 font-sans bg-slate-100 min-h-screen pb-[70px]">
-      <header className="bg-white p-4 border-b border-gray-200 sticky top-0 z-10">
+            <header className="bg-white p-4 border-b border-gray-200 sticky top-0 z-10">
         <div className="flex justify-between items-center max-w-2xl mx-auto">
           <div>
             <h1 className="m-0 text-lg text-gray-900 font-bold">{businessName}</h1>
-            <p className="mt-0.5 text-xs text-gray-500">{activeShift ? `Turno activo - ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {activeShift ? `Turno activo - ${new Date().toLocaleDateString('es-AR')}` : 'Caja cerrada'}
+            </p>
           </div>
           <div className="flex gap-1 flex-wrap justify-end">
+            {/* ✅ Botón Administración (reemplaza a Auditoría) */}
             <RoleGate allowedRoles={['owner', 'super_user']}>
               <button 
-                onClick={() => setShowAddUserModal(true)}
-                className="px-2.5 py-1.5 bg-emerald-100 border-none rounded-md text-emerald-700 cursor-pointer text-xs font-semibold hover:bg-emerald-200 transition-colors"
+                onClick={() => router.push('/admin')} 
+                className="px-2.5 py-1.5 bg-purple-100 border-none rounded-md text-purple-700 cursor-pointer text-xs font-semibold hover:bg-purple-200 transition-colors"
               >
-                ➕ Agregar Usuario
+                ⚙️ Administración
               </button>
             </RoleGate>
-            <RoleGate allowedRoles={['owner']}>
-  <button onClick={() => router.push('/admin')} className="px-2.5 py-1
-                📋 Administración
-              </button>
-            </RoleGate>
+            
             <RoleGate allowedRoles={['owner', 'super_user']}>
-              <button onClick={() => router.push('/reportes')} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200"> Reportes</button>
+              <button 
+                onClick={() => router.push('/reportes')} 
+                className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200 transition-colors"
+              >
+                Reportes
+              </button>
             </RoleGate>
+            
             <RoleGate allowedRoles={['owner']}>
-              <button onClick={() => setShowInviteModal(true)} className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200">👥 Invitar</button>
+              <button 
+                onClick={() => setShowInviteModal(true)} 
+                className="px-2.5 py-1.5 bg-blue-100 border-none rounded-md text-blue-700 cursor-pointer text-xs font-semibold hover:bg-blue-200 transition-colors"
+              >
+                👥 Invitar
+              </button>
             </RoleGate>
-            <button onClick={handleSignOut} className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs">Salir</button>
+            
+            <button 
+              onClick={handleSignOut} 
+              className="px-2.5 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 cursor-pointer text-xs hover:bg-gray-200 transition-colors"
+            >
+              Salir
+            </button>
           </div>
         </div>
       </header>
