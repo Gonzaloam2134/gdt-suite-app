@@ -187,7 +187,75 @@ export default function AdminPanel() {
     setShowMedioModal(true)
   }
 
-  const handleSaveMedio = async () => {
+    const handleSaveMedio = async () => {
+    try {
+      const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
+      if (!activeLocalId) {
+        toast.error('No hay local activo')
+        return
+      }
+
+      // ✅ Generar nombre automático inteligente (el nombre es opcional)
+      let nombreFinal = medioForm.nombre.trim()
+
+      if (!nombreFinal) {
+        const tipoLabel = {
+          efectivo: 'Efectivo',
+          debito: 'Débito',
+          credito: 'Crédito',
+          transferencia: 'Transferencia',
+          qr: 'QR',
+          cheque: 'Cheque',
+          otro: 'Otro'
+        }[medioForm.tipo] || 'Medio de pago'
+
+        if (medioForm.operador && medioForm.banco_emisor) {
+          nombreFinal = `${medioForm.operador} ${tipoLabel} - ${medioForm.banco_emisor}`
+        } else if (medioForm.operador) {
+          nombreFinal = `${medioForm.operador} ${tipoLabel}`
+        } else if (medioForm.banco_emisor) {
+          nombreFinal = `${tipoLabel} ${medioForm.banco_emisor}`
+        } else {
+          nombreFinal = tipoLabel
+        }
+      }
+
+      const payload = {
+        local_id: activeLocalId,
+        nombre: nombreFinal,
+        tipo: medioForm.tipo,
+        icono: ICONOS_POR_TIPO[medioForm.tipo] || '💳',
+        operador: medioForm.operador || null,
+        banco_emisor: medioForm.banco_emisor || null,
+        comision_porcentaje: parseFloat(medioForm.comision_porcentaje) || 0,
+        plazo_acreditacion_dias: parseInt(medioForm.plazo_acreditacion_dias) || 0,
+        habilitado: medioForm.habilitado,
+        activo: medioForm.habilitado,
+        es_default: false,
+        orden: mediosPago.length,
+        creado_por: userId,
+        actualizado_en: new Date().toISOString()
+      }
+
+      if (editingMedio) {
+        const { error } = await supabase.from('medios_pago').update(payload).eq('id', editingMedio.id)
+        if (error) throw error
+        toast.success('✅ Medio de pago actualizado')
+      } else {
+        const { error } = await supabase.from('medios_pago').insert([payload])
+        if (error) throw error
+        toast.success('✅ Medio de pago creado')
+      }
+
+      setShowMedioModal(false)
+      setEditingMedio(null)
+      await loadData()
+      
+    } catch (err) {
+      console.error('Error guardando medio:', err)
+      toast.error('Error: ' + err.message)
+    }
+  }
     try {
       const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
       if (!activeLocalId) {
@@ -493,9 +561,18 @@ if (!nombreFinal) {
               <h3 className="text-lg font-bold text-gray-900 mb-4">✏️ Editar Miembro</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre:</label>
-                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm" />
-                </div>
+                  <div>
+  <label className="block text-sm font-semibold text-gray-700 mb-2">
+    Nombre <span className="text-gray-400 font-normal">(opcional)</span>
+  </label>
+  <input 
+    type="text" 
+    value={medioForm.nombre} 
+    onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
+    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+    placeholder="Se genera automáticamente si lo dejás vacío"
+  />
+</div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Email:</label>
                   <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm" />
