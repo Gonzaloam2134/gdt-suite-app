@@ -5,7 +5,7 @@ import { useUserRole } from '../lib/useUserRole'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 
-const ICONOS_POR_TIPO = { efectivo: '💵', debito: '💳', credito: '💳', transferencia: '🏦', qr: '📱', cheque: '📄', otro: '📦' }
+const ICONOS_POR_TIPO = { efectivo: '', debito: '💳', credito: '', transferencia: '🏦', qr: '📱', cheque: '📄', otro: '📦' }
 const OPERADORES_TARJETA = ['Visa', 'Mastercard', 'American Express', 'Cabal', 'Naranja', 'Nevada', 'Argencard', 'Diners Club', 'Tarjeta Shopping']
 const BANCOS_ARGENTINA = ['Galicia', 'Santander Río', 'BBVA', 'Macro', 'Nación', 'ICBC', 'Brubank', 'Supervielle', 'HSBC', 'Citibank', 'Patagonia', 'Provincia', 'Ciudad', 'Comafi', 'Hipotecario', 'Itaú', 'BMA', 'Credicoop', 'Industrial', 'BICA']
 
@@ -19,7 +19,7 @@ export default function AdminPanel() {
   const [miembros, setMiembros] = useState([])
   const [logs, setLogs] = useState([])
   const [mediosPago, setMediosPago] = useState([])
-  const [misLocales, setMisLocales] = useState([]) // ✅ Lista de locales del owner
+  const [misLocales, setMisLocales] = useState([])
 
   const [editingMember, setEditingMember] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -76,7 +76,6 @@ export default function AdminPanel() {
         const { data: logsData } = await supabase.from('logs_auditoria').select('*').eq('local_id', activeLocalId).order('creado_en', { ascending: false }).limit(50)
         setLogs(logsData || [])
 
-        // ✅ Cargar todos los locales del owner para la asignación múltiple
         if (role === 'owner') {
           const { data: localesData } = await supabase
             .from('miembros_locales')
@@ -118,7 +117,6 @@ export default function AdminPanel() {
       setMedioForm({ nombre: medio.nombre || '', tipo: medio.tipo || 'efectivo', operador: medio.operador || '', banco_emisor: medio.banco_emisor || '', comision_porcentaje: String(medio.comision_porcentaje || 0), plazo_acreditacion_dias: String(medio.plazo_acreditacion_dias || 0), habilitado: medio.habilitado !== false, localesAsignados: [medio.local_id] })
     } else {
       setEditingMedio(null)
-      // ✅ REGLA: Si hay 1 solo local, se asigna auto. Si hay >1, empieza vacío (ninguno).
       const defaultLocales = misLocales.length === 1 ? [misLocales[0].id] : []
       setMedioForm({ nombre: '', tipo: 'efectivo', operador: '', banco_emisor: '', comision_porcentaje: '0', plazo_acreditacion_dias: '0', habilitado: true, localesAsignados: defaultLocales })
     }
@@ -138,7 +136,6 @@ export default function AdminPanel() {
         else nombreFinal = tipoLabel
       }
 
-      // ✅ Validar que haya al menos un local asignado
       const localesTarget = medioForm.localesAsignados.length > 0 ? medioForm.localesAsignados : [typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null].filter(Boolean)
       if (localesTarget.length === 0) {
         toast.error('Debés asignar este medio de pago a al menos un local')
@@ -151,7 +148,6 @@ export default function AdminPanel() {
         if (error) throw error
         toast.success('✅ Medio de pago actualizado')
       } else {
-        // ✅ Crear en TODOS los locales seleccionados
         const payloads = localesTarget.map((localId, index) => ({
           local_id: localId, nombre: nombreFinal, tipo: medioForm.tipo, icono: ICONOS_POR_TIPO[medioForm.tipo] || '💳',
           operador: medioForm.operador || null, banco_emisor: medioForm.banco_emisor || null,
@@ -210,9 +206,18 @@ export default function AdminPanel() {
       <main className="min-h-screen bg-slate-100 pb-20">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div>
-              <h1 className="m-0 text-lg font-bold text-gray-900">👑 Panel de Administración</h1>
-              <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Cargando...'}</p>
+            <div className="flex items-center gap-3">
+              {/* ✅ BOTÓN VOLVER A MIS LOCALES */}
+              <button 
+                onClick={() => router.push('/locales')} 
+                className="px-3 py-1.5 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200 flex items-center gap-1"
+              >
+                ← Volver a Mis Locales
+              </button>
+              <div>
+                <h1 className="m-0 text-lg font-bold text-gray-900">👑 Panel de Administración</h1>
+                <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Cargando...'}</p>
+              </div>
             </div>
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
           </div>
@@ -238,7 +243,7 @@ export default function AdminPanel() {
               {miembros.length === 0 ? <p className="text-sm text-gray-500">Sin miembros.</p> : miembros.map(miembro => (
                 <div key={miembro.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${miembro.rol === 'owner' ? 'bg-purple-100' : miembro.rol === 'cajero' ? 'bg-blue-100' : 'bg-gray-100'}`}>{miembro.rol === 'owner' ? '👑' : miembro.rol === 'cajero' ? '👨‍💼' : '👷'}</div>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${miembro.rol === 'owner' ? 'bg-purple-100' : miembro.rol === 'cajero' ? 'bg-blue-100' : 'bg-gray-100'}`}>{miembro.rol === 'owner' ? '👑' : miembro.rol === 'cajero' ? '‍💼' : '👷'}</div>
                     <div><div className="font-semibold text-gray-900 text-sm">{miembro.perfiles?.nombre || miembro.user?.email || 'Usuario'}</div><div className="text-xs text-gray-500">{miembro.perfiles?.email || miembro.user?.email}</div></div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -252,12 +257,12 @@ export default function AdminPanel() {
 
           {activeTab === 'medios-pago' && (
             <div className="space-y-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4"><p className="text-sm text-blue-800 m-0">💡 Agregá, editá o desactivá los medios de pago. Podés asignarlos a uno o varios locales al crearlos.</p></div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4"><p className="text-sm text-blue-800 m-0"> Agregá, editá o desactivá los medios de pago. Podés asignarlos a uno o varios locales al crearlos.</p></div>
               <button onClick={() => openMedioModal(null)} className="w-full p-4 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 mb-4 flex items-center justify-center gap-2"><span className="text-xl">+</span> Agregar Medio de Pago</button>
               {mediosPago.length === 0 ? <p className="text-sm text-gray-500 text-center py-8">No hay medios de pago configurados aún.</p> : mediosPago.map(medio => (
                 <div key={medio.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                   <div className="flex items-center gap-3 flex-1">
-                    <span className="text-2xl">{medio.icono || ICONOS_POR_TIPO[medio.tipo] || '💳'}</span>
+                    <span className="text-2xl">{medio.icono || ICONOS_POR_TIPO[medio.tipo] || ''}</span>
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900 text-sm">{medio.nombre}</div>
                       <div className="text-xs text-gray-500 mt-0.5">
@@ -291,7 +296,6 @@ export default function AdminPanel() {
           )}
         </div>
 
-        {/* Modal de Miembro (simplificado por brevedad, funciona igual que antes) */}
         {showEditModal && editingMember && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
@@ -299,7 +303,7 @@ export default function AdminPanel() {
               <div className="space-y-4">
                 <div><label className="block text-sm font-semibold text-gray-700 mb-2">Nombre:</label><input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm" /></div>
                 <div><label className="block text-sm font-semibold text-gray-700 mb-2">Email:</label><input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm" /></div>
-                <div><label className="block text-sm font-semibold text-gray-700 mb-2">Rol:</label><select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm"><option value="cajero">👨‍💼 Cajero</option><option value="empleado">👷 Empleado</option></select></div>
+                <div><label className="block text-sm font-semibold text-gray-700 mb-2">Rol:</label><select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm"><option value="cajero">👨‍💼 Cajero</option><option value="empleado"> Empleado</option></select></div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => handleEditRole(editingMember.id, editingMember.user_id || editingMember.perfiles?.id, newRole, editName, editEmail)} className="flex-1 p-3 bg-blue-500 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">💾 Guardar</button>
@@ -309,7 +313,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ✅ Modal de Medio de Pago CON ASIGNACIÓN MÚLTIPLE */}
         {showMedioModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -365,7 +368,6 @@ export default function AdminPanel() {
                   </div>
                 )}
 
-                {/* ✅ SECCIÓN DE ASIGNACIÓN A LOCALES */}
                 {misLocales.length > 1 && !editingMedio && (
                   <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">📍 Asignar a locales (seleccioná al menos uno):</label>
@@ -379,7 +381,6 @@ export default function AdminPanel() {
                           <span className="text-sm text-gray-700">{local.nombre}</span>
                         </label>
                       ))}
-                   404
                     </div>
                   </div>
                 )}
