@@ -504,12 +504,9 @@ export default function CajaDelDia() {
                 ➕ Agregar Usuario
               </button>
             </RoleGate>
-            <RoleGate allowedRoles={['owner', 'super_user']}>
-              <button 
-                onClick={() => router.push('/admin')} 
-                className="px-2.5 py-1.5 bg-purple-100 border-none rounded-md text-purple-700 cursor-pointer text-xs font-semibold hover:bg-purple-200"
-              >
-                📋 Auditoría
+            <RoleGate allowedRoles={['owner']}>
+  <button onClick={() => router.push('/admin')} className="px-2.5 py-1
+                📋 Administración
               </button>
             </RoleGate>
             <RoleGate allowedRoles={['owner', 'super_user']}>
