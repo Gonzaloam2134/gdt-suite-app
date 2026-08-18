@@ -5,6 +5,32 @@ import { useUserRole } from '../lib/useUserRole'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 
+// ✅ ICONOS AUTOMÁTICOS POR TIPO
+const ICONOS_POR_TIPO = {
+  efectivo: '💵',
+  debito: '💳',
+  credito: '💳',
+  transferencia: '🏦',
+  qr: '📱',
+  cheque: '',
+  otro: '📦'
+}
+
+// ✅ OPERADORES DE TARJETAS
+const OPERADORES_TARJETA = [
+  'Visa', 'Mastercard', 'American Express', 'Cabal', 'Naranja', 
+  'Nevada', 'Argencard', 'Diners Club', 'Tarjeta Shopping'
+]
+
+// ✅ BANCOS ARGENTINA
+const BANCOS_ARGENTINA = [
+  'Galicia', 'Santander Río', 'BBVA', 'Macro', 'Nación', 'ICBC',
+  'Brubank', 'Supervielle', 'HSBC', 'Citibank', 'Patagonia',
+  'Provincia', 'Ciudad', 'Comafi', 'Hipotecario', 'Itaú',
+  'BMA', 'Credicoop', 'Industrial', 'BICA', 'Banco del Sol',
+  'Banco Ciudad', 'Banco Santa Fe', 'Banco de Corrientes'
+]
+
 export default function AdminPanel() {
   const { role, globalRole, userId, loading: roleLoading } = useUserRole()
   const [activeTab, setActiveTab] = useState('resumen')
@@ -28,15 +54,24 @@ export default function AdminPanel() {
 
   // ✅ NUEVO: Estados para gestión de medios de pago
   const [showMedioModal, setShowMedioModal] = useState(false)
-  const [editingMedio, setEditingMedio] = useState(null) // null = crear nuevo, objeto = editar
+  const [editingMedio, setEditingMedio] = useState(null)
   const [medioForm, setMedioForm] = useState({
     nombre: '',
     tipo: 'efectivo',
-    icono: '💳',
+    operador: '',
+    banco_emisor: '',
     comision_porcentaje: '0',
     plazo_acreditacion_dias: '0',
     habilitado: true
   })
+
+  // ✅ Estados para agregar "Otro" operador/banco
+  const [showNewOperador, setShowNewOperador] = useState(false)
+  const [newOperadorName, setNewOperadorName] = useState('')
+  const [showNewBanco, setShowNewBanco] = useState(false)
+  const [newBancoName, setNewBancoName] = useState('')
+  const [operadoresCustom, setOperadoresCustom] = useState([])
+  const [bancosCustom, setBancosCustom] = useState([])
   
   const router = useRouter()
 
@@ -82,7 +117,6 @@ export default function AdminPanel() {
         const { data: miembrosData } = await supabase.from('miembros_locales').select(`id, rol, activo, aceptado_en, user_id, perfiles (id, email, nombre)`).eq('local_id', activeLocalId).eq('activo', true)
         setMiembros((miembrosData || []).map(m => ({ ...m, user: m.perfiles })))
 
-        // Cargar medios de pago
         const { data: mediosData } = await supabase.from('medios_pago').select('*').eq('local_id', activeLocalId).order('orden', { ascending: true })
         setMediosPago(mediosData || [])
 
@@ -124,28 +158,32 @@ export default function AdminPanel() {
   // ✅ NUEVO: Funciones de Medios de Pago
   const openMedioModal = (medio = null) => {
     if (medio) {
-      // Modo edición
       setEditingMedio(medio)
       setMedioForm({
         nombre: medio.nombre || '',
         tipo: medio.tipo || 'efectivo',
-        icono: medio.icono || '💳',
+        operador: medio.operador || '',
+        banco_emisor: medio.banco_emisor || '',
         comision_porcentaje: String(medio.comision_porcentaje || 0),
         plazo_acreditacion_dias: String(medio.plazo_acreditacion_dias || 0),
         habilitado: medio.habilitado !== false
       })
     } else {
-      // Modo creación
       setEditingMedio(null)
       setMedioForm({
         nombre: '',
         tipo: 'efectivo',
-        icono: '💳',
+        operador: '',
+        banco_emisor: '',
         comision_porcentaje: '0',
         plazo_acreditacion_dias: '0',
         habilitado: true
       })
     }
+    setShowNewOperador(false)
+    setShowNewBanco(false)
+    setNewOperadorName('')
+    setNewBancoName('')
     setShowMedioModal(true)
   }
 
@@ -161,11 +199,19 @@ export default function AdminPanel() {
         return
       }
 
+      // ✅ Generar nombre automático si no se ingresó
+      let nombreFinal = medioForm.nombre.trim()
+      if (!medioForm.nombre.trim() && medioForm.operador) {
+        nombreFinal = `${medioForm.operador} ${medioForm.tipo === 'credito' ? 'Crédito' : 'Débito'}`
+      }
+
       const payload = {
         local_id: activeLocalId,
-        nombre: medioForm.nombre.trim(),
+        nombre: nombreFinal,
         tipo: medioForm.tipo,
-        icono: medioForm.icono || '💳',
+        icono: ICONOS_POR_TIPO[medioForm.tipo] || '💳',
+        operador: medioForm.operador || null,
+        banco_emisor: medioForm.banco_emisor || null,
         comision_porcentaje: parseFloat(medioForm.comision_porcentaje) || 0,
         plazo_acreditacion_dias: parseInt(medioForm.plazo_acreditacion_dias) || 0,
         habilitado: medioForm.habilitado,
@@ -177,12 +223,10 @@ export default function AdminPanel() {
       }
 
       if (editingMedio) {
-        // Actualizar existente
         const { error } = await supabase.from('medios_pago').update(payload).eq('id', editingMedio.id)
         if (error) throw error
         toast.success('✅ Medio de pago actualizado')
       } else {
-        // Crear nuevo
         const { error } = await supabase.from('medios_pago').insert([payload])
         if (error) throw error
         toast.success('✅ Medio de pago creado')
@@ -223,18 +267,44 @@ export default function AdminPanel() {
     } catch (err) { toast.error('Error al actualizar: ' + err.message) }
   }
 
+  // ✅ Agregar nuevo operador
+  const handleAddOperador = () => {
+    if (!newOperadorName.trim()) {
+      toast.error('Ingresá un nombre para el operador')
+      return
+    }
+    setOperadoresCustom([...operadoresCustom, newOperadorName.trim()])
+    setMedioForm({...medioForm, operador: newOperadorName.trim()})
+    setNewOperadorName('')
+    setShowNewOperador(false)
+    toast.success(`Operador "${newOperadorName.trim()}" agregado`)
+  }
+
+  // ✅ Agregar nuevo banco
+  const handleAddBanco = () => {
+    if (!newBancoName.trim()) {
+      toast.error('Ingresá un nombre para el banco')
+      return
+    }
+    setBancosCustom([...bancosCustom, newBancoName.trim()])
+    setMedioForm({...medioForm, banco_emisor: newBancoName.trim()})
+    setNewBancoName('')
+    setShowNewBanco(false)
+    toast.success(`Banco "${newBancoName.trim()}" agregado`)
+  }
+
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/') }
   const formatFecha = (fecha) => fecha ? new Date(fecha).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
 
   const getAccionLabel = (accion) => {
     const labels = {
       'CAJA_ABIERTA': { icono: '🔓', texto: 'Caja Abierta', color: 'bg-blue-100 text-blue-800' },
-      'CAJA_CERRADA': { icono: '🔒', texto: 'Caja Cerrada', color: 'bg-gray-100 text-gray-800' },
+      'CAJA_CERRADA': { icono: '', texto: 'Caja Cerrada', color: 'bg-gray-100 text-gray-800' },
       'VENTA_REGISTRADA': { icono: '💰', texto: 'Venta', color: 'bg-green-100 text-green-800' },
-      'GASTO_REGISTRADO': { icono: '💸', texto: 'Gasto', color: 'bg-red-100 text-red-800' },
+      'GASTO_REGISTRADO': { icono: '', texto: 'Gasto', color: 'bg-red-100 text-red-800' },
       'ROL_CAMBIADO': { icono: '🔄', texto: 'Rol Cambiado', color: 'bg-indigo-100 text-indigo-800' }
     }
-    return labels[accion] || { icono: '📋', texto: accion, color: 'bg-gray-100 text-gray-800' }
+    return labels[accion] || { icono: '', texto: accion, color: 'bg-gray-100 text-gray-800' }
   }
 
   if (roleLoading || loading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando panel...</p></div>
@@ -245,7 +315,7 @@ export default function AdminPanel() {
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
             <div>
-              <h1 className="m-0 text-lg font-bold text-gray-900">👑 Panel de Administración</h1>
+              <h1 className="m-0 text-lg font-bold text-gray-900"> Panel de Administración</h1>
               <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Cargando...'}</p>
             </div>
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
@@ -255,8 +325,8 @@ export default function AdminPanel() {
         <div className="max-w-4xl mx-auto p-4">
           <div className="flex gap-2 mb-4 border-b border-gray-200 overflow-x-auto">
             {[
-              { id: 'resumen', label: '📊 Resumen' },
-              { id: 'miembros', label: ' Miembros' },
+              { id: 'resumen', label: ' Resumen' },
+              { id: 'miembros', label: '👥 Miembros' },
               { id: 'medios-pago', label: '💳 Medios de Pago' },
               { id: 'logs', label: '⚙️ Administración' }
             ].map(tab => (
@@ -318,11 +388,10 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {/* ✅ TAB MEDIOS DE PAGO COMPLETA */}
           {activeTab === 'medios-pago' && (
             <div className="space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-800 m-0">💡 Agregá, editá o desactivá los medios de pago que se muestran en la Caja. Los medios desactivados no aparecerán al registrar ventas.</p>
+                <p className="text-sm text-blue-800 m-0">💡 Agregá, editá o desactivá los medios de pago. El icono se asigna automáticamente según el tipo.</p>
               </div>
               
               <button
@@ -338,13 +407,14 @@ export default function AdminPanel() {
                 mediosPago.map(medio => (
                   <div key={medio.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                     <div className="flex items-center gap-3 flex-1">
-                      <span className="text-2xl">{medio.icono || '💳'}</span>
+                      <span className="text-2xl">{medio.icono || ICONOS_POR_TIPO[medio.tipo] || ''}</span>
                       <div className="flex-1">
                         <div className="font-semibold text-gray-900 text-sm">{medio.nombre}</div>
                         <div className="text-xs text-gray-500 mt-0.5">
+                          {medio.operador && <span className="mr-2">🏷️ {medio.operador}</span>}
+                          {medio.banco_emisor && <span className="mr-2"> {medio.banco_emisor}</span>}
                           {medio.comision_porcentaje > 0 ? `${medio.comision_porcentaje}% comisión` : 'Sin comisión'} · {' '}
                           {medio.plazo_acreditacion_dias === 0 ? 'Acreditación inmediata' : `Se acredita en ${medio.plazo_acreditacion_dias} días`}
-                          {medio.es_default && <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">Default</span>}
                         </div>
                       </div>
                     </div>
@@ -415,7 +485,7 @@ export default function AdminPanel() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Rol:</label>
                   <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm">
-                    <option value="cajero">‍💼 Cajero</option>
+                    <option value="cajero">👨‍ Cajero</option>
                     <option value="empleado">👷 Empleado</option>
                   </select>
                 </div>
@@ -428,18 +498,19 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ✅ Modal de Medio de Pago (Crear/Editar) */}
+        {/* ✅ Modal de Medio de Pago MEJORADO */}
         {showMedioModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-bold text-gray-900 mb-1">
-                {editingMedio ? '✏️ Editar Medio de Pago' : '➕ Nuevo Medio de Pago'}
+                {editingMedio ? '✏️ Editar Medio de Pago' : ' Nuevo Medio de Pago'}
               </h3>
               <p className="text-xs text-gray-500 mb-4">
                 {editingMedio ? 'Modificá los datos del medio de pago.' : 'Configurá un nuevo medio de pago para tu caja.'}
               </p>
               
               <div className="space-y-4">
+                {/* Nombre */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre *</label>
                   <input 
@@ -447,39 +518,139 @@ export default function AdminPanel() {
                     value={medioForm.nombre} 
                     onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
                     className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ej: Mercado Pago QR"
+                    placeholder="Ej: Visa Crédito, Mercado Pago QR"
                   />
                 </div>
 
+                {/* Tipo (con icono automático) */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
-                  <select 
-                    value={medioForm.tipo} 
-                    onChange={(e) => setMedioForm({...medioForm, tipo: e.target.value})} 
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="efectivo"> Efectivo</option>
-                    <option value="debito">💳 Tarjeta de Débito</option>
-                    <option value="credito"> Tarjeta de Crédito</option>
-                    <option value="transferencia">🏦 Transferencia</option>
-                    <option value="qr">📱 QR / Billetera Virtual</option>
-                    <option value="cheque">📄 Cheque</option>
-                    <option value="otro"> Otro</option>
-                  </select>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(ICONOS_POR_TIPO).map(([tipo, icono]) => (
+                      <button
+                        key={tipo}
+                        type="button"
+                        onClick={() => setMedioForm({...medioForm, tipo})}
+                        className={`p-3 rounded-lg border-2 text-center transition-all ${
+                          medioForm.tipo === tipo 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="text-2xl mb-1">{icono}</div>
+                        <div className="text-xs font-medium text-gray-700 capitalize">{tipo}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Icono (emoji)</label>
-                  <input 
-                    type="text" 
-                    value={medioForm.icono} 
-                    onChange={(e) => setMedioForm({...medioForm, icono: e.target.value})} 
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="💳"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Pegá un emoji para identificar visualmente el medio.</p>
-                </div>
+                {/* Operador (solo para tarjetas) */}
+                {(medioForm.tipo === 'debito' || medioForm.tipo === 'credito') && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Operador de tarjeta</label>
+                    {!showNewOperador ? (
+                      <select 
+                        value={medioForm.operador} 
+                        onChange={(e) => { 
+                          if (e.target.value === 'OTRO') {
+                            setShowNewOperador(true)
+                          } else {
+                            setMedioForm({...medioForm, operador: e.target.value})
+                          }
+                        }} 
+                        className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="">Seleccionar operador...</option>
+                        {OPERADORES_TARJETA.map(op => (
+                          <option key={op} value={op}>{op}</option>
+                        ))}
+                        {operadoresCustom.map(op => (
+                          <option key={`custom-${op}`} value={op}>{op} (personalizado)</option>
+                        ))}
+                        <option value="OTRO">➕ Otro (agregar nuevo)</option>
+                      </select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={newOperadorName} 
+                          onChange={(e) => setNewOperadorName(e.target.value)} 
+                          placeholder="Nombre del operador"
+                          className="flex-1 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <button 
+                          type="button"
+                          onClick={handleAddOperador} 
+                          className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-emerald-600"
+                        >
+                          Guardar
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => { setShowNewOperador(false); setNewOperadorName('') }} 
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-300"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
+                {/* Banco (para transferencia y tarjetas) */}
+                {(medioForm.tipo === 'transferencia' || medioForm.tipo === 'debito' || medioForm.tipo === 'credito') && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Banco emisor</label>
+                    {!showNewBanco ? (
+                      <select 
+                        value={medioForm.banco_emisor} 
+                        onChange={(e) => { 
+                          if (e.target.value === 'OTRO') {
+                            setShowNewBanco(true)
+                          } else {
+                            setMedioForm({...medioForm, banco_emisor: e.target.value})
+                          }
+                        }} 
+                        className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="">Seleccionar banco...</option>
+                        {BANCOS_ARGENTINA.map(banco => (
+                          <option key={banco} value={banco}>{banco}</option>
+                        ))}
+                        {bancosCustom.map(banco => (
+                          <option key={`custom-${banco}`} value={banco}>{banco} (personalizado)</option>
+                        ))}
+                        <option value="OTRO">➕ Otro (agregar nuevo)</option>
+                      </select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={newBancoName} 
+                          onChange={(e) => setNewBancoName(e.target.value)} 
+                          placeholder="Nombre del banco"
+                          className="flex-1 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <button 
+                          type="button"
+                          onClick={handleAddBanco} 
+                          className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-emerald-600"
+                        >
+                          Guardar
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => { setShowNewBanco(false); setNewBancoName('') }} 
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-300"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Comisión y Plazo */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Comisión (%)</label>
@@ -508,6 +679,7 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
+                {/* Habilitado */}
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input 
