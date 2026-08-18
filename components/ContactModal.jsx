@@ -5,9 +5,9 @@ import toast from 'react-hot-toast'
 const TIPOS_CONSULTA = [
   { id: 'soporte', label: '🔧 Soporte técnico', desc: 'Reportar un error o bug' },
   { id: 'consulta', label: '❓ Consulta general', desc: 'Dudas sobre el uso' },
-  { id: 'feature', label: '💡 Solicitud de función', desc: 'Proponer una mejora' },
+  { id: 'feature', label: ' Solicitud de función', desc: 'Proponer una mejora' },
   { id: 'facturacion', label: '💰 Facturación', desc: 'Problemas con pagos o suscripción' },
-  { id: 'otro', label: '📝 Otro', desc: 'Cualquier otra consulta' }
+  { id: 'otro', label: ' Otro', desc: 'Cualquier otra consulta' }
 ]
 
 export default function ContactModal({ isOpen, onClose, user, localId, paginaOrigen }) {
@@ -36,7 +36,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
       setEnviando(true)
 
       const { error } = await supabase.from('contactos').insert([{
-        user_id: user.id,
+        user_id: user?.id,
         local_id: localId || null,
         tipo_consulta: tipo,
         asunto: asunto.trim(),
@@ -50,7 +50,6 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
       setEnviado(true)
       toast.success('✅ Consulta enviada correctamente')
       
-      // Cerrar después de 2 segundos
       setTimeout(() => {
         onClose()
       }, 2000)
@@ -72,7 +71,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
         {/* Header */}
         <div className="bg-slate-50 p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-900">💬 Contacto y Soporte</h2>
+            <h2 className="text-xl font-bold text-gray-900"> Contacto y Soporte</h2>
             <button 
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl cursor-pointer bg-none border-none"
@@ -98,7 +97,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
           ) : (
             <div className="space-y-4">
               
-              {/* Info del usuario (solo lectura) */}
+              {/* Info del usuario */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
                 <div className="text-xs text-blue-700 font-semibold mb-1">Tus datos (auto-detectados):</div>
                 <div className="text-blue-900">👤 {user?.email}</div>
@@ -158,7 +157,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
 
               {/* Aviso de privacidad */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
-                 Tu información es confidencial y solo será utilizada para responder tu consulta.
+                ℹ️ Tu información es confidencial y solo será utilizada para responder tu consulta.
               </div>
             </div>
           )}
