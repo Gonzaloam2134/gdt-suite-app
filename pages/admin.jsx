@@ -194,16 +194,34 @@ export default function AdminPanel() {
         toast.error('No hay local activo')
         return
       }
-      if (!medioForm.nombre.trim()) {
-        toast.error('Ingresá un nombre para el medio de pago')
+
         return
       }
 
-      // ✅ Generar nombre automático si no se ingresó
-      let nombreFinal = medioForm.nombre.trim()
-      if (!medioForm.nombre.trim() && medioForm.operador) {
-        nombreFinal = `${medioForm.operador} ${medioForm.tipo === 'credito' ? 'Crédito' : 'Débito'}`
-      }
+      // ✅ Generar nombre automático inteligente
+let nombreFinal = medioForm.nombre.trim()
+
+if (!nombreFinal) {
+  const tipoLabel = {
+    efectivo: 'Efectivo',
+    debito: 'Débito',
+    credito: 'Crédito',
+    transferencia: 'Transferencia',
+    qr: 'QR',
+    cheque: 'Cheque',
+    otro: 'Otro'
+  }[medioForm.tipo] || 'Medio de pago'
+
+  if (medioForm.operador && medioForm.banco_emisor) {
+    nombreFinal = `${medioForm.operador} ${tipoLabel} - ${medioForm.banco_emisor}`
+  } else if (medioForm.operador) {
+    nombreFinal = `${medioForm.operador} ${tipoLabel}`
+  } else if (medioForm.banco_emisor) {
+    nombreFinal = `${tipoLabel} ${medioForm.banco_emisor}`
+  } else {
+    nombreFinal = tipoLabel
+  }
+}
 
       const payload = {
         local_id: activeLocalId,
@@ -512,15 +530,17 @@ export default function AdminPanel() {
               <div className="space-y-4">
                 {/* Nombre */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre *</label>
-                  <input 
-                    type="text" 
-                    value={medioForm.nombre} 
-                    onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ej: Visa Crédito, Mercado Pago QR"
-                  />
-                </div>
+  <label className="block text-sm font-semibold text-gray-700 mb-2">
+    Nombre <span className="text-gray-400 font-normal">(opcional)</span>
+  </label>
+  <input 
+    type="text" 
+    value={medioForm.nombre} 
+    onChange={(e) => setMedioForm({...medioForm, nombre: e.target.value})} 
+    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+    placeholder="Se genera automáticamente si lo dejás vacío"
+  />
+</div>
 
                 {/* Tipo (con icono automático) */}
                 <div>
