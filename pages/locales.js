@@ -14,15 +14,7 @@ export default function Locales() {
 
   const router = useRouter()
 
-    useEffect(() => {
-    // Verificar si hay datos temporales del registro
-    const tempData = localStorage.getItem('onboarding_temp_data')
-    if (tempData) {
-      const parsed = JSON.parse(tempData)
-      // Precargar el nombre del negocio en el onboarding
-      // Esto lo manejaremos pasando props al OnboardingWizard
-    }
-
+  useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
@@ -32,6 +24,7 @@ export default function Locales() {
       setUser(session.user)
 
       try {
+        // 1. Obtener el rol global del usuario
         const { data: perfil, error: perfilError } = await supabase
           .from('perfiles')
           .select('rol_global')
@@ -46,11 +39,13 @@ export default function Locales() {
         console.log('🔍 [Locales] Rol detectado:', rol)
         setUserRole(rol)
 
+        // 2. Si es Super Admin, al panel global directamente
         if (rol === 'super_user') {
           router.push('/admin')
           return
         }
 
+        // 3. Cargar los locales a los que este usuario pertenece
         await loadMisLocales(session.user.id, rol)
 
       } catch (err) {
@@ -65,7 +60,6 @@ export default function Locales() {
   const loadMisLocales = async (userId, currentRole) => {
     console.log('🔍 [loadMisLocales] Iniciando para userId:', userId, 'rol:', currentRole)
     try {
-      // PASO 1: Obtener solo los IDs de los locales a los que pertenece el usuario
       const { data: membresias, error: errorMembresia } = await supabase
         .from('miembros_locales')
         .select('local_id, rol')
@@ -73,29 +67,30 @@ export default function Locales() {
         .eq('activo', true)
 
       if (errorMembresia) {
-        console.error('❌ [loadMisLocales] Error al obtener membresías:', errorMembresia)
+        console.error(' [loadMisLocales] Error al obtener membresías:', errorMembresia)
         throw errorMembresia
       }
 
-      console.log('🔍 [loadMisLocales] Membresías encontradas:', membresias)
+      console.log(' [loadMisLocales] Membresías encontradas:', membresias)
 
-      // Si no tiene membresías
       if (!membresias || membresias.length === 0) {
         setMisLocales([])
 
-        // BUG CRÍTICO CORREGIDO: Solo mostramos onboarding si NO es cajero ni empleado
         if (currentRole !== 'cajero' && currentRole !== 'empleado') {
           console.log('✅ [loadMisLocales] Es owner sin locales. Mostrando onboarding.')
           setShowOnboarding(true)
         } else {
           console.log('✅ [loadMisLocales] Es cajero/empleado sin locales. Mostrando espera.')
-          // No hacemos nada, el JSX de abajo se encargará de mostrar "Esperando asignación"
         }
         return
       }
 
-      // PASO 2: Extraer los IDs y consultar la tabla de locales directamente
       const localIds = membresias.map(m => m.local_id)
+
+      if (localIds.length === 0) {
+        setMisLocales([])
+        return
+      }
 
       const { data: localesData, error: errorLocales } = await supabase
         .from('locales')
@@ -110,15 +105,14 @@ export default function Locales() {
       console.log('✅ [loadMisLocales] Locales cargados:', localesData)
       setMisLocales(localesData || [])
 
-      // BUG CRÍTICO CORREGIDO: Si es cajero o empleado y YA tiene un local asignado,
-      // redirigirlo automáticamente al dashboard de ese local
+      // ✅ CAMBIO: Redirección a /caja en lugar de /dashboard
       if ((currentRole === 'cajero' || currentRole === 'empleado') && localesData && localesData.length > 0) {
         console.log('🚀 [loadMisLocales] Cajero/Empleado con local asignado. Redirigiendo automáticamente...')
         const primerLocalId = localesData[0].id
         localStorage.setItem('activeLocalId', primerLocalId)
         toast.success('Local seleccionado automáticamente')
         setTimeout(() => {
-          router.push('/dashboard')
+          router.push('/caja') // ✅ ANTES ERA '/dashboard'
         }, 500)
         return
       }
@@ -129,15 +123,26 @@ export default function Locales() {
     }
   }
 
-      const handleOnboardingComplete = async (formData) => {
-  // ✅ NUEVA VALIDACIÓN: Evitar duplicación
-  if (misLocales && misLocales.length > 0) {
-    console.warn('⚠️ El usuario ya tiene al menos un local');
-    toast.error('Ya tenés un local registrado. No se pueden crear múltiples locales en esta versión.');
-    setShowOnboarding(false);
-    return;
-  }
+  const handleOnboardingComplete = async (formData) => {
+    console.log('🔍 [TEST 1] Iniciando creación de local...')
+    
+    const { data: { session } } = await supabase.auth.getSession()
+    console.log('🔍 [TEST 2] Sesión:', session ? 'ACTIVA' : 'INACTIVA')
+    console.log(' [TEST 3] User ID:', session?.user?.id)
+    
+    if (!session?.user) {
+      console.error('❌ [TEST 4] No hay sesión activa')
+      toast.error('No hay sesión activa. Por favor, iniciá sesión nuevamente.')
+      router.push('/')
+      return
+    }
 
+    if (userRole === 'cajero' || userRole === 'empleado') {
+      console.error('🚫 [TEST 5] Intento bloqueado por rol')
+      toast.error('⛔ No tenés permisos para crear locales.')
+      setShowOnboarding(false)
+      return
+    }
 
     try {
       setCreating(true)
@@ -146,85 +151,88 @@ export default function Locales() {
         nombre: formData.businessName?.trim() || 'Negocio Sin Nombre',
         rubro: formData.rubro || 'Otro',
         condicion_fiscal: formData.condicionFiscal || 'Consumidor Final',
-        creado_por: session?.user?.id
-      };
+        creado_por: session.user.id
+      }
       
-      console.log('🔍 [DEBUG 4] Payload:', payload);
+      console.log('🔍 [TEST 6] Payload a enviar:', payload)
+      console.log('🔍 [TEST 7] Ejecutando supabase.from(\'locales\').insert()...')
       
-      // PASO A: Insertar en locales
-      console.log('🔍 [DEBUG 5] Intentando INSERT en tabla LOCALES...');
       const { data: localData, error: localError } = await supabase
         .from('locales')
         .insert([payload])
         .select()
-        .single();
-
+        .single()
+      
+      console.log('🔍 [TEST 8] Respuesta de Supabase:', { localData, localError })
+      
       if (localError) {
-        console.error('❌ [DEBUG 6] FALLÓ INSERT EN LOCALES:', localError);
-        throw new Error(`Error en tabla LOCALES: ${localError.message}`);
+        console.error('❌ [TEST 9] ERROR DETALLADO DE SUPABASE:', JSON.stringify(localError, null, 2))
+        throw new Error(`Error en tabla LOCALES: ${localError.message}`)
       }
       
-      console.log('✅ [DEBUG 7] Local creado:', localData.id);
-      
-      // PASO B: Insertar en miembros_locales
-      console.log('🔍 [DEBUG 8] Intentando INSERT en tabla MIEMBROS_LOCALES...');
+      console.log('✅ [TEST 10] Local insertado correctamente:', localData)
+
+      // 2. Registrar al creador como 'owner' en miembros_locales
+      console.log('🔍 [TEST 11] Insertando en miembros_locales...')
       const { error: miembroError } = await supabase
         .from('miembros_locales')
         .insert([{
           local_id: localData.id,
-          user_id: session?.user?.id,
+          user_id: session.user.id,
           rol: 'owner',
           activo: true,
           aceptado_en: new Date().toISOString()
-        }]);
+        }])
 
       if (miembroError) {
-        console.error('❌ [DEBUG 9] FALLÓ INSERT EN MIEMBROS_LOCALES:', miembroError);
-        throw new Error(`Error en tabla MIEMBROS_LOCALES: ${miembroError.message}`);
+        console.error('❌ [TEST 12] Error en miembros_locales:', miembroError)
+        throw new Error(`Error al registrar miembro: ${miembroError.message}`)
       }
       
-      console.log('✅ [DEBUG 10] Miembro creado correctamente');
+      console.log('✅ [TEST 13] Miembro registrado correctamente')
 
-      // PASO C: Insertar invitaciones (si hay)
+      // 3. Crear invitaciones si las hay
       if (formData.invites && formData.invites.length > 0) {
-        console.log(' [DEBUG 11] Intentando INSERT en tabla INVITACIONES...');
+        console.log('🔍 [TEST 14] Procesando invitaciones...')
         const invitaciones = formData.invites.map(inv => ({
           email_invitado: inv.email,
           local_id: localData.id,
           rol: inv.rol,
-          invitado_por: session?.user?.id,
+          invitado_por: session.user.id,
           token: crypto.randomUUID(),
           expira_en: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           estado: 'pendiente'
-        }));
+        }))
 
-        const { error: invitesError } = await supabase.from('invitaciones').insert(invitaciones);
+        const { error: invitesError } = await supabase.from('invitaciones').insert(invitaciones)
         if (invitesError) {
-          console.error('❌ [DEBUG 12] FALLÓ INSERT EN INVITACIONES:', invitesError);
-          toast.success(`✅ Local creado (error en invitaciones: ${invitesError.message})`);
+          console.warn('⚠️ [TEST 15] Error en invitaciones (no crítico):', invitesError)
+          toast.success(`✅ Local creado (hubo un problema con las invitaciones)`)
         } else {
-          console.log('✅ [DEBUG 13] Invitaciones creadas');
-          toast.success(`✅ Local creado y ${formData.invites.length} invitación(es) enviada(s)`);
+          console.log('✅ [TEST 16] Invitaciones creadas')
+          toast.success(`✅ Local creado y ${formData.invites.length} invitación(es) enviada(s)`)
         }
       } else {
-        toast.success('🏪 Local creado correctamente');
+        toast.success('🏪 Local creado correctamente')
       }
 
-      localStorage.setItem('activeLocalId', localData.id);
-      localStorage.removeItem('onboarding_temp_data');
+      localStorage.setItem('activeLocalId', localData.id)
+      localStorage.removeItem('onboarding_temp_data')
+      
+      // ✅ CAMBIO: Redirección a /caja en lugar de /dashboard
       setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
+        router.push('/caja') // ✅ ANTES ERA '/dashboard'
+      }, 1500)
 
     } catch (err) {
-      console.error('❌ [DEBUG 14] Error final:', err);
-      toast.error('Error al crear local: ' + err.message);
+      console.error('❌ [TEST 17] Excepción atrapada en handleOnboardingComplete:', err)
+      toast.error('Error al crear local: ' + err.message)
     } finally {
-      setCreating(false);
+      setCreating(false)
     }
   }
+
   const handleSelectLocal = (localId) => {
-    // Validación adicional: solo owners pueden seleccionar manualmente
     if (userRole === 'cajero' || userRole === 'empleado') {
       toast.error('⛔ Los cajeros y empleados son redirigidos automáticamente')
       return
@@ -232,7 +240,8 @@ export default function Locales() {
 
     localStorage.setItem('activeLocalId', localId)
     toast.success('Local seleccionado')
-    router.push('/dashboard')
+    // ✅ CAMBIO: Redirección a /caja en lugar de /dashboard
+    router.push('/caja') // ✅ ANTES ERA '/dashboard'
   }
 
   const handleSignOut = async () => {
@@ -316,11 +325,12 @@ export default function Locales() {
                 </div>
 
                 <div className="flex flex-col gap-2">
+                  {/* ✅ CAMBIO: Texto del botón actualizado */}
                   <button
                     onClick={() => handleSelectLocal(local.id)}
                     className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 transition-colors"
                   >
-                    → Entrar al Dashboard
+                    → Ir a Caja {/* ✅ ANTES DECÍA 'Entrar al Dashboard' */}
                   </button>
 
                   {/* Solo el owner puede gestionar el equipo */}
@@ -350,16 +360,16 @@ export default function Locales() {
       </div>
 
       {showOnboarding && (
-  <OnboardingWizard 
-    onComplete={handleOnboardingComplete} 
-    onCancel={() => {
-      setShowOnboarding(false)
-      localStorage.removeItem('onboarding_temp_data')
-    }} 
-    userEmail={user?.email}
-    preloadedData={JSON.parse(localStorage.getItem('onboarding_temp_data') || 'null')}
-  />
-)}
+        <OnboardingWizard 
+          onComplete={handleOnboardingComplete} 
+          onCancel={() => {
+            setShowOnboarding(false)
+            localStorage.removeItem('onboarding_temp_data')
+          }} 
+          userEmail={user?.email}
+          preloadedData={JSON.parse(localStorage.getItem('onboarding_temp_data') || 'null')}
+        />
+      )}
     </main>
   )
 }
