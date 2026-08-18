@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useUserRole } from '../lib/useUserRole'
 import { formatCurrency } from '../lib/format'
+import ContactModal from '../components/ContactModal'
 import toast from 'react-hot-toast'
 
 const ICONOS_POR_TIPO = { efectivo: '', debito: '💳', credito: '', transferencia: '🏦', qr: '📱', cheque: '📄', otro: '📦' }
@@ -36,7 +37,16 @@ export default function AdminPanel() {
   const [newBancoName, setNewBancoName] = useState('')
   const [operadoresCustom, setOperadoresCustom] = useState([])
   const [bancosCustom, setBancosCustom] = useState([])
-  
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+
+useEffect(() => {
+  if (userId) {
+    supabase.from('perfiles').select('email').eq('id', userId).single().then(({ data }) => {
+      if (data) setUserEmail(data.email)
+    })
+  }
+}, [userId])
   const router = useRouter()
 
   useEffect(() => {
@@ -219,6 +229,12 @@ export default function AdminPanel() {
                 <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Cargando...'}</p>
               </div>
             </div>
+            <button 
+  onClick={() => setShowContactModal(true)} 
+  className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+>
+  💬 Ayuda
+</button>
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
           </div>
         </header>
@@ -405,6 +421,13 @@ export default function AdminPanel() {
             </div>
           </div>
         )}
+        <ContactModal 
+  isOpen={showContactModal}
+  onClose={() => setShowContactModal(false)}
+  user={{ email: userEmail, id: userId }}
+  localId={typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null}
+  paginaOrigen="Administración"
+/>
       </main>
     )
   }
