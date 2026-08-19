@@ -6,7 +6,7 @@ import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import ContactModal from '../components/ContactModal'
 
-// ✅ FUNCIÓN REUTILIZABLE: Procesa transacciones con los campos REALES de tu BD
+// ✅ FUNCIÓN REUTILIZABLE: Procesa transacciones con campos REALES y datos detallados
 const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
   let totalFacturado = 0, totalNeto = 0, totalIVA = 0, totalComisiones = 0
   let totalGastos = 0, totalGastosNeto = 0, totalGastosIVA = 0
@@ -16,85 +16,77 @@ const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
     const medio = mediosMap.get(t.medio_pago_id) || { 
       nombre: 'Sin Medio', 
       banco_emisor: '', 
+      tipo: 'otro',
       plazo_acreditacion_dias: 0, 
       comision_porcentaje: 0 
     }
     const key = medio.banco_emisor ? `${medio.nombre} (${medio.banco_emisor})` : medio.nombre
 
     if (t.tipo === 'COBRO_RECIBIDO') {
-  const monto = t.monto || 0
-  const comision = (monto * (medio.comision_porcentaje || 0)) / 100
-  const iva = t.monto_iva || (monto - monto / 1.21)
-  const neto = t.monto_neto || (monto - iva)
+      const monto = t.monto || 0
+      const comision = (monto * (medio.comision_porcentaje || 0)) / 100
+      const iva = t.monto_iva || (monto - monto / 1.21)
+      const neto = t.monto_neto || (monto - iva)
 
-  totalFacturado += monto
-  totalNeto += neto
-  totalIVA += iva
-  totalComisiones += comision
+      totalFacturado += monto
+      totalNeto += neto
+      totalIVA += iva
+      totalComisiones += comision
 
-  // ✅ NUEVO: Determinar operador y tipo de medio
-  let operador = '-'
-  let tipoMedio = 'Efectivo'
-  
-  if (medio.tipo === 'efectivo') {
-    tipoMedio = 'Efectivo'
-    operador = 'Efectivo'
-  } else if (medio.tipo === 'transferencia') {
-    tipoMedio = 'Transferencia'
-    operador = medio.banco_emisor || 'Transferencia'
-  } else if (medio.tipo === 'debito' || medio.tipo === 'credito') {
-    tipoMedio = medio.tipo === 'debito' ? 'Débito' : 'Crédito'
-    operador = medio.nombre || '-'
-  } else if (medio.tipo === 'qr') {
-    tipoMedio = 'QR'
-    operador = medio.nombre || 'QR'
-  }
+      // ✅ NUEVO: Determinar operador y tipo de medio
+      let operador = '-'
+      let tipoMedio = 'Otro'
+      
+      if (medio.tipo === 'efectivo') {
+        tipoMedio = 'Efectivo'
+        operador = 'Efectivo'
+      } else if (medio.tipo === 'transferencia') {
+        tipoMedio = 'Transferencia'
+        operador = medio.banco_emisor || 'Transferencia'
+      } else if (medio.tipo === 'debito') {
+        tipoMedio = 'Débito'
+        operador = medio.nombre || 'Débito'
+      } else if (medio.tipo === 'credito') {
+        tipoMedio = 'Crédito'
+        operador = medio.nombre || 'Crédito'
+      } else if (medio.tipo === 'qr') {
+        tipoMedio = 'QR'
+        operador = medio.nombre || 'QR'
+      } else if (medio.tipo === 'cheque') {
+        tipoMedio = 'Cheque'
+        operador = medio.nombre || 'Cheque'
+      }
 
-  // ✅ NUEVO: Calcular fecha de acreditación
-  let fechaAcred = t.fecha_acreditacion_estimada
-  if (!fechaAcred) {
-    const d = new Date(t.creado_en)
-    d.setDate(d.getDate() + (medio.plazo_acreditacion_dias || 0))
-    fechaAcred = d.toISOString().split('T')[0]
-  }
+      // ✅ NUEVO: Calcular fecha de acreditación
+      let fechaAcred = t.fecha_acreditacion_estimada
+      if (!fechaAcred) {
+        const d = new Date(t.creado_en)
+        d.setDate(d.getDate() + (medio.plazo_acreditacion_dias || 0))
+        fechaAcred = d.toISOString().split('T')[0]
+      }
 
-  salesRows.push({
-    fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
-    concepto: t.descripcion || 'Venta',
-    medio: key,
-    tipo_medio: tipoMedio,
-    operador: operador,
-    comision_porcentaje: medio.comision_porcentaje || 0,
-    bruto: monto, 
-    neto, 
-    iva, 
-    comision, 
-    fecha_acreditacion: fechaAcred,
-    netoReal: neto - comision
-  })
+      salesRows.push({
+        fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
+        concepto: t.descripcion || 'Venta',
+        medio: key,
+        tipo_medio: tipoMedio,
+        operador: operador,
+        comision_porcentaje: medio.comision_porcentaje || 0,
+        bruto: monto, 
+        neto, 
+        iva, 
+        comision, 
+        fecha_acreditacion: fechaAcred,
+        netoReal: neto - comision
+      })
 
-  if (!methodsMap[key]) methodsMap[key] = { nombre: key, bruto: 0, neto: 0, iva: 0, comisiones: 0, cantidad: 0 }
-  methodsMap[key].bruto += monto
-  methodsMap[key].neto += neto
-  methodsMap[key].iva += iva
-  methodsMap[key].comisiones += comision
-  methodsMap[key].cantidad++
-
-  if (!calendarMap[fechaAcred]) calendarMap[fechaAcred] = { fecha: fechaAcred, total: 0 }
-  calendarMap[fechaAcred].total += (neto - comision)
+      if (!methodsMap[key]) methodsMap[key] = { nombre: key, bruto: 0, neto: 0, iva: 0, comisiones: 0, cantidad: 0 }
       methodsMap[key].bruto += monto
       methodsMap[key].neto += neto
       methodsMap[key].iva += iva
       methodsMap[key].comisiones += comision
       methodsMap[key].cantidad++
 
-      let fechaAcred = t.fecha_acreditacion_estimada
-      if (!fechaAcred) {
-        const d = new Date(t.creado_en)
-        // ✅ Usamos plazo_acreditacion_dias
-        d.setDate(d.getDate() + (medio.plazo_acreditacion_dias || 0))
-        fechaAcred = d.toISOString().split('T')[0]
-      }
       if (!calendarMap[fechaAcred]) calendarMap[fechaAcred] = { fecha: fechaAcred, total: 0 }
       calendarMap[fechaAcred].total += (neto - comision)
 
@@ -224,10 +216,9 @@ export default function Reportes() {
       
       const { data: transacciones } = await query
       
-      // ✅ Query corregida con los campos REALES de tu tabla medios_pago
       const { data: mediosData } = await supabase
         .from('medios_pago')
-        .select('id, nombre, banco_emisor, plazo_acreditacion_dias, comision_porcentaje')
+        .select('id, nombre, banco_emisor, tipo, plazo_acreditacion_dias, comision_porcentaje')
         .in('local_id', selectedLocalId ? [selectedLocalId] : misLocales.map(l => l.id))
       
       const mediosMap = new Map()
@@ -314,7 +305,7 @@ export default function Reportes() {
 
       const { data: mediosData } = await supabase
         .from('medios_pago')
-        .select('id, nombre, banco_emisor, plazo_acreditacion_dias, comision_porcentaje')
+        .select('id, nombre, banco_emisor, tipo, plazo_acreditacion_dias, comision_porcentaje')
         .in('local_id', selectedLocalId ? [selectedLocalId] : misLocales.map(l => l.id))
       
       const mediosMap = new Map()
@@ -392,40 +383,40 @@ export default function Reportes() {
       
       XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
 
-      // HOJA 2: LIBRO IVA VENTAS
-const ventasData = [['Fecha', 'Concepto', 'Medio de Pago', 'Tipo', 'Operador', 'Com. %', 'Bruto', 'Neto', 'IVA', 'Comisión', 'Acreditación', 'Neto Real']]
-expSales.forEach(row => ventasData.push([
-  row.fecha, 
-  row.concepto, 
-  row.medio, 
-  row.tipo_medio, 
-  row.operador, 
-  row.comision_porcentaje + '%',
-  row.bruto, 
-  row.neto, 
-  row.iva, 
-  row.comision, 
-  row.fecha_acreditacion,
-  row.netoReal
-]))
-ventasData.push(['TOTALES', '', '', '', '', '', expSummary.totalFacturado, expSummary.totalNeto, expSummary.totalIVA, expSummary.totalComisiones, '', expSummary.totalNeto - expSummary.totalComisiones])
-
-const wsVentas = XLSX.utils.aoa_to_sheet(ventasData)
-wsVentas['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }]
-
-for (let col = 0; col < 12; col++) {
-  applyStyle(wsVentas, `${['A','B','C','D','E','F','G','H','I','J','K','L'][col]}1`, { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } })
-}
-applyCurrencyFormat(wsVentas, 2, ventasData.length, 6, 9)
-applyCurrencyFormat(wsVentas, 2, ventasData.length, 11, 11)
-applyDateFormat(wsVentas, 2, ventasData.length - 1, 0)
-applyDateFormat(wsVentas, 2, ventasData.length - 1, 10)
-
-const totalesRowVentas = ventasData.length
-for (let col = 0; col < 12; col++) {
-  applyStyle(wsVentas, `${['A','B','C','D','E','F','G','H','I','J','K','L'][col]}${totalesRowVentas}`, { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } })
-}
-XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
+      // ✅ HOJA 2: LIBRO IVA VENTAS (CON COLUMNAS NUEVAS)
+      const ventasData = [['Fecha', 'Concepto', 'Medio de Pago', 'Tipo', 'Operador', 'Com. %', 'Bruto', 'Neto', 'IVA', 'Comisión', 'Acreditación', 'Neto Real']]
+      expSales.forEach(row => ventasData.push([
+        row.fecha, 
+        row.concepto, 
+        row.medio, 
+        row.tipo_medio, 
+        row.operador, 
+        row.comision_porcentaje + '%',
+        row.bruto, 
+        row.neto, 
+        row.iva, 
+        row.comision, 
+        row.fecha_acreditacion,
+        row.netoReal
+      ]))
+      ventasData.push(['TOTALES', '', '', '', '', '', expSummary.totalFacturado, expSummary.totalNeto, expSummary.totalIVA, expSummary.totalComisiones, '', expSummary.totalNeto - expSummary.totalComisiones])
+      
+      const wsVentas = XLSX.utils.aoa_to_sheet(ventasData)
+      wsVentas['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }]
+      
+      for (let col = 0; col < 12; col++) {
+        applyStyle(wsVentas, `${['A','B','C','D','E','F','G','H','I','J','K','L'][col]}1`, { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'center' } })
+      }
+      applyCurrencyFormat(wsVentas, 2, ventasData.length, 6, 9)
+      applyCurrencyFormat(wsVentas, 2, ventasData.length, 11, 11)
+      applyDateFormat(wsVentas, 2, ventasData.length - 1, 0)
+      applyDateFormat(wsVentas, 2, ventasData.length - 1, 10)
+      
+      const totalesRowVentas = ventasData.length
+      for (let col = 0; col < 12; col++) {
+        applyStyle(wsVentas, `${['A','B','C','D','E','F','G','H','I','J','K','L'][col]}${totalesRowVentas}`, { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'F1F5F9' } }, border: { top: { style: 'double', color: { rgb: '0F172A' } } } })
+      }
+      XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
 
       // HOJA 3: LIBRO IVA COMPRAS
       const comprasData = [['Fecha', 'Concepto', 'Medio de Pago', 'Bruto', 'Neto', 'IVA (Crédito Fiscal)']]
@@ -465,7 +456,7 @@ XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
       expCalendar.forEach(c => {
         const isPast = c.fecha < hoyStr
         const isToday = c.fecha === hoyStr
-        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : ' Pendiente'
+        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
         calendarDataForSheet.push([new Date(c.fecha + 'T12:00:00'), estado, c.total])
       })
       
@@ -536,7 +527,7 @@ XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
 
       <div className="max-w-6xl mx-auto p-4">
         <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2"> Local:</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">📍 Local:</label>
           <select 
             value={selectedLocalId} 
             onChange={(e) => setSelectedLocalId(e.target.value)}
@@ -590,7 +581,7 @@ XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
         ) : (
           <>
             <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
-              <div className="bg-slate-800 p-3 text-white font-bold text-sm">📋 RESUMEN EJECUTIVO</div>
+              <div className="bg-slate-800 p-3 text-white font-bold text-sm"> RESUMEN EJECUTIVO</div>
               <div className="p-4">
                 <table className="w-full text-sm">
                   <tbody>
@@ -625,69 +616,70 @@ XLSX.utils.book_append_sheet(wb, wsVentas, 'Libro IVA Ventas')
               </div>
             </div>
 
+            {/* ✅ LIBRO IVA VENTAS CON COLUMNAS NUEVAS */}
             {salesBook.length > 0 && (
-  <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
-    <div className="bg-slate-800 p-3 text-white font-bold text-sm flex justify-between">
-      <span>📒 LIBRO IVA VENTAS (Débito Fiscal)</span>
-      <span className="text-xs font-normal text-slate-400">{salesBook.length} registros</span>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-slate-50 border-b-2 border-slate-200">
-            <th className="p-2 text-left text-slate-600 font-bold">Fecha</th>
-            <th className="p-2 text-left text-slate-600 font-bold">Concepto</th>
-            <th className="p-2 text-left text-slate-600 font-bold">Medio</th>
-            <th className="p-2 text-left text-slate-600 font-bold">Tipo</th>
-            <th className="p-2 text-left text-slate-600 font-bold">Operador</th>
-            <th className="p-2 text-right text-slate-600 font-bold">Com. %</th>
-            <th className="p-2 text-right text-slate-600 font-bold">Bruto</th>
-            <th className="p-2 text-right text-slate-600 font-bold">Neto</th>
-            <th className="p-2 text-right text-slate-600 font-bold">IVA</th>
-            <th className="p-2 text-right text-slate-600 font-bold">Comisión</th>
-            <th className="p-2 text-left text-slate-600 font-bold">Acreditación</th>
-            <th className="p-2 text-right text-slate-600 font-bold">Neto Real</th>
-          </tr>
-        </thead>
-        <tbody>
-          {salesBook.map((row, i) => (
-            <tr key={i} className="border-b border-slate-100">
-              <td className="p-2 text-gray-900">{row.fecha}</td>
-              <td className="p-2 text-gray-900">{row.concepto}</td>
-              <td className="p-2 text-slate-500 text-[10px]">{row.medio}</td>
-              <td className="p-2 text-slate-700 font-medium">{row.tipo_medio}</td>
-              <td className="p-2 text-slate-700">{row.operador}</td>
-              <td className="p-2 text-right text-slate-600">{row.comision_porcentaje}%</td>
-              <td className="p-2 text-right font-semibold">{formatCurrency(row.bruto)}</td>
-              <td className="p-2 text-right">{formatCurrency(row.neto)}</td>
-              <td className="p-2 text-right text-red-600">{formatCurrency(row.iva)}</td>
-              <td className="p-2 text-right text-red-600">{formatCurrency(row.comision)}</td>
-              <td className="p-2 text-slate-700">
-                {new Date(row.fecha_acreditacion + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-              </td>
-              <td className="p-2 text-right font-bold text-green-700">{formatCurrency(row.netoReal)}</td>
-            </tr>
-          ))}
-          <tr className="bg-slate-50 border-t-2 border-slate-900 font-extrabold">
-            <td colSpan="5" className="p-3 text-right text-gray-900">TOTALES</td>
-            <td className="p-3 text-right text-slate-600">-</td>
-            <td className="p-3 text-right">{formatCurrency(summary.totalFacturado)}</td>
-            <td className="p-3 text-right">{formatCurrency(summary.totalNeto)}</td>
-            <td className="p-3 text-right text-red-600">{formatCurrency(summary.totalIVA)}</td>
-            <td className="p-3 text-right text-red-600">{formatCurrency(summary.totalComisiones)}</td>
-            <td className="p-3 text-right text-slate-600">-</td>
-            <td className="p-3 text-right text-green-700">{formatCurrency(summary.totalNeto - summary.totalComisiones)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-)}
+              <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
+                <div className="bg-slate-800 p-3 text-white font-bold text-sm flex justify-between">
+                  <span>📒 LIBRO IVA VENTAS (Débito Fiscal)</span>
+                  <span className="text-xs font-normal text-slate-400">{salesBook.length} registros</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b-2 border-slate-200">
+                        <th className="p-2 text-left text-slate-600 font-bold">Fecha</th>
+                        <th className="p-2 text-left text-slate-600 font-bold">Concepto</th>
+                        <th className="p-2 text-left text-slate-600 font-bold">Medio</th>
+                        <th className="p-2 text-left text-slate-600 font-bold">Tipo</th>
+                        <th className="p-2 text-left text-slate-600 font-bold">Operador</th>
+                        <th className="p-2 text-right text-slate-600 font-bold">Com. %</th>
+                        <th className="p-2 text-right text-slate-600 font-bold">Bruto</th>
+                        <th className="p-2 text-right text-slate-600 font-bold">Neto</th>
+                        <th className="p-2 text-right text-slate-600 font-bold">IVA</th>
+                        <th className="p-2 text-right text-slate-600 font-bold">Comisión</th>
+                        <th className="p-2 text-left text-slate-600 font-bold">Acreditación</th>
+                        <th className="p-2 text-right text-slate-600 font-bold">Neto Real</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesBook.map((row, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td className="p-2 text-gray-900">{row.fecha}</td>
+                          <td className="p-2 text-gray-900">{row.concepto}</td>
+                          <td className="p-2 text-slate-500 text-[10px]">{row.medio}</td>
+                          <td className="p-2 text-slate-700 font-medium">{row.tipo_medio}</td>
+                          <td className="p-2 text-slate-700">{row.operador}</td>
+                          <td className="p-2 text-right text-slate-600">{row.comision_porcentaje}%</td>
+                          <td className="p-2 text-right font-semibold">{formatCurrency(row.bruto)}</td>
+                          <td className="p-2 text-right">{formatCurrency(row.neto)}</td>
+                          <td className="p-2 text-right text-red-600">{formatCurrency(row.iva)}</td>
+                          <td className="p-2 text-right text-red-600">{formatCurrency(row.comision)}</td>
+                          <td className="p-2 text-slate-700">
+                            {row.fecha_acreditacion ? new Date(row.fecha_acreditacion + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                          </td>
+                          <td className="p-2 text-right font-bold text-green-700">{formatCurrency(row.netoReal)}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-50 border-t-2 border-slate-900 font-extrabold">
+                        <td colSpan="5" className="p-3 text-right text-gray-900">TOTALES</td>
+                        <td className="p-3 text-right text-slate-600">-</td>
+                        <td className="p-3 text-right">{formatCurrency(summary.totalFacturado)}</td>
+                        <td className="p-3 text-right">{formatCurrency(summary.totalNeto)}</td>
+                        <td className="p-3 text-right text-red-600">{formatCurrency(summary.totalIVA)}</td>
+                        <td className="p-3 text-right text-red-600">{formatCurrency(summary.totalComisiones)}</td>
+                        <td className="p-3 text-right text-slate-600">-</td>
+                        <td className="p-3 text-right text-green-700">{formatCurrency(summary.totalNeto - summary.totalComisiones)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {expensesBook.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
                 <div className="bg-slate-800 p-3 text-white font-bold text-sm flex justify-between">
-                  <span> LIBRO IVA COMPRAS (Crédito Fiscal)</span>
+                  <span>📗 LIBRO IVA COMPRAS (Crédito Fiscal)</span>
                   <span className="text-xs font-normal text-slate-400">{expensesBook.length} registros</span>
                 </div>
                 <div className="overflow-x-auto">
