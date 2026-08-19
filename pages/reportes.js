@@ -504,7 +504,7 @@ export default function Reportes() {
               onClick={() => setShowReportGuide(true)} 
               className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
             >
-              ❓ ¿Qué estoy viendo?
+               ¿Qué estoy viendo?
             </button>
             <button 
               onClick={() => setShowExportModal(true)} 
