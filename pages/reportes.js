@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx-js-style'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import ContactModal from '../components/ContactModal'
+import ReportGuide from '../components/ReportGuide'
 
 // ✅ FUNCIÓN REUTILIZABLE: Procesa transacciones con campos REALES y datos detallados
 const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
@@ -143,6 +144,7 @@ export default function Reportes() {
   const [exportEndDate, setExportEndDate] = useState('')
   
   const [showContactModal, setShowContactModal] = useState(false)
+const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR ESTA LÍNEA
   
   const router = useRouter()
   const hoy = new Date()
@@ -497,6 +499,47 @@ export default function Reportes() {
             <p className="mt-0.5 text-xs text-gray-500">{businessName}</p>
           </div>
           <div className="flex gap-2">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+  <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+    <div>
+      <h1 className="m-0 text-lg font-bold text-gray-900">📊 Reportes Contables</h1>
+      <p className="mt-0.5 text-xs text-gray-500">{businessName}</p>
+    </div>
+    <div className="flex gap-2">
+      {/* ✅ NUEVO BOTÓN */}
+      <button 
+        onClick={() => setShowReportGuide(true)} 
+        className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
+      >
+        ❓ ¿Qué estoy viendo?
+      </button>
+      <button 
+        onClick={() => setShowExportModal(true)} 
+        className="px-3 py-1.5 bg-emerald-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-600"
+      >
+        📥 Exportar Excel
+      </button>
+      <button 
+        onClick={() => setShowContactModal(true)} 
+        className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+      >
+        💬 Ayuda
+      </button>
+      <button 
+        onClick={() => router.push('/locales')} 
+        className="px-3 py-1.5 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
+      >
+        ← Volver
+      </button>
+      <button 
+        onClick={handleSignOut} 
+        className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200"
+      >
+        Salir
+      </button>
+    </div>
+  </div>
+</header>
             <button 
               onClick={() => setShowExportModal(true)} 
               className="px-3 py-1.5 bg-emerald-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-600"
@@ -842,6 +885,11 @@ export default function Reportes() {
         localId={selectedLocalId || null}
         paginaOrigen="Reportes"
       />
+                <ReportGuide 
+        isOpen={showReportGuide}
+        onClose={() => setShowReportGuide(false)}
+      />
+    </main>
     </main>
   )
 }
