@@ -21,7 +21,7 @@ export default function Locales() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
-        setLoading(false) // ✅ FIX: Evitar que se quede cargando
+        setLoading(false)
         return
       }
       setUser(session.user)
@@ -31,7 +31,7 @@ export default function Locales() {
         setUserRole(rol)
         if (rol === 'super_user') { 
           router.push('/superadmin')
-          setLoading(false) // ✅ FIX: Evitar que se quede cargando
+          setLoading(false)
           return 
         }
         await loadMisLocales(session.user.id, rol)
@@ -43,7 +43,7 @@ export default function Locales() {
       }
     }).catch(err => {
       console.error('Error de sesión:', err)
-      setLoading(false) // ✅ FIX: Manejar error de sesión
+      setLoading(false)
     })
   }, [router])
 
@@ -124,7 +124,7 @@ export default function Locales() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900"> Mis Locales</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900">🏪 Mis Locales</h1>
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
           <div className="flex gap-2">
@@ -139,7 +139,6 @@ export default function Locales() {
               </button>
             </RoleGate>
             
-            {/* ✅ BOTÓN SUPER ADMIN - Solo para super_user */}
             {userRole === 'super_user' && (
               <button 
                 onClick={() => router.push('/superadmin')} 
@@ -170,7 +169,7 @@ export default function Locales() {
           </div>
         ) : misLocales.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
-            <div className="text-5xl mb-3">🏪</div>
+            <div className="text-5xl mb-3"></div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin locales registrados</h3>
             <p className="m-0 mb-4 text-gray-500 text-sm">Creá tu primer local para empezar a operar</p>
             <button onClick={() => setShowOnboarding(true)} className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">+ Crear mi primer local</button>
@@ -180,7 +179,7 @@ export default function Locales() {
             {misLocales.map((local) => (
               <div key={local.id} className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-lg transition-all">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm">🏪</div>
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm"></div>
                   <div>
                     <h3 className="m-0 text-lg font-bold text-gray-900">{local.nombre}</h3>
                     <div className="flex gap-2 mt-1">
@@ -192,7 +191,7 @@ export default function Locales() {
                 <div className="flex flex-col gap-2">
                   <button onClick={() => handleSelectLocal(local.id)} className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">→ Ir a Caja</button>
                   {userRole === 'owner' && (
-                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100"> Gestionar Medios de Pago</button>
+                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100">💳 Gestionar Medios de Pago</button>
                   )}
                 </div>
               </div>
