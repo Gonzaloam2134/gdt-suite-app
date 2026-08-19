@@ -6,19 +6,25 @@ import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import ContactModal from '../components/ContactModal'
 
-// ✅ FUNCIÓN REUTILIZABLE: Procesa transacciones una sola vez
+// ✅ FUNCIÓN REUTILIZABLE: Procesa transacciones con los campos REALES de tu BD
 const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
   let totalFacturado = 0, totalNeto = 0, totalIVA = 0, totalComisiones = 0
   let totalGastos = 0, totalGastosNeto = 0, totalGastosIVA = 0
   const salesRows = [], expenseRows = [], methodsMap = {}, calendarMap = {}
 
   transacciones.forEach(t => {
-    const medio = mediosMap.get(t.medio_pago_id) || { nombre: 'Sin Medio', banco_emisor: '', dias_acreditacion: 0, tipo_comision: 'NINGUNA', valor_comision: 0 }
+    const medio = mediosMap.get(t.medio_pago_id) || { 
+      nombre: 'Sin Medio', 
+      banco_emisor: '', 
+      plazo_acreditacion_dias: 0, 
+      comision_porcentaje: 0 
+    }
     const key = medio.banco_emisor ? `${medio.nombre} (${medio.banco_emisor})` : medio.nombre
 
     if (t.tipo === 'COBRO_RECIBIDO') {
       const monto = t.monto || 0
-      const comision = medio.tipo_comision === 'PORCENTAJE' ? (monto * (medio.valor_comision || 0)) / 100 : 0
+      // ✅ Usamos comision_porcentaje directamente (asumiendo que es %)
+      const comision = (monto * (medio.comision_porcentaje || 0)) / 100
       const iva = t.monto_iva || (monto - monto / 1.21)
       const neto = t.monto_neto || (monto - iva)
 
@@ -44,7 +50,8 @@ const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
       let fechaAcred = t.fecha_acreditacion_estimada
       if (!fechaAcred) {
         const d = new Date(t.creado_en)
-        d.setDate(d.getDate() + (medio.dias_acreditacion || 0))
+        // ✅ Usamos plazo_acreditacion_dias
+        d.setDate(d.getDate() + (medio.plazo_acreditacion_dias || 0))
         fechaAcred = d.toISOString().split('T')[0]
       }
       if (!calendarMap[fechaAcred]) calendarMap[fechaAcred] = { fecha: fechaAcred, total: 0 }
@@ -85,11 +92,9 @@ export default function Reportes() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   
-  // ✅ NUEVO: Selector de local
   const [misLocales, setMisLocales] = useState([])
-  const [selectedLocalId, setSelectedLocalId] = useState('') // '' = todos
+  const [selectedLocalId, setSelectedLocalId] = useState('')
   
-  // ✅ NUEVO: Rango de fechas flexible
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   
@@ -103,6 +108,8 @@ export default function Reportes() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportStartDate, setExportStartDate] = useState('')
   const [exportEndDate, setExportEndDate] = useState('')
+  
+  const [showContactModal, setShowContactModal] = useState(false)
   
   const router = useRouter()
   const hoy = new Date()
@@ -135,11 +142,8 @@ export default function Reportes() {
         .in('id', localIds)
       
       setMisLocales(localesData || [])
-      
-      // Por defecto: todos los locales
       setSelectedLocalId('')
       
-      // Fechas por defecto: mes actual
       const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
       const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split('T')[0]
       setFechaDesde(primerDia)
@@ -164,7 +168,6 @@ export default function Reportes() {
       const start = `${fechaDesde}T00:00:00`
       const end = `${fechaHasta}T23:59:59`
       
-      // Query de transacciones (puede ser de 1 local o varios)
       let query = supabase
         .from('transacciones')
         .select('*')
@@ -180,10 +183,10 @@ export default function Reportes() {
       
       const { data: transacciones } = await query
       
-      // Cargar medios de pago (de todos los locales involucrados)
+      // ✅ Query corregida con los campos REALES de tu tabla medios_pago
       const { data: mediosData } = await supabase
         .from('medios_pago')
-        .select('id, nombre, banco_emisor, dias_acreditacion, tipo_comision, valor_comision')
+        .select('id, nombre, banco_emisor, plazo_acreditacion_dias, comision_porcentaje')
         .in('local_id', selectedLocalId ? [selectedLocalId] : misLocales.map(l => l.id))
       
       const mediosMap = new Map()
@@ -197,7 +200,6 @@ export default function Reportes() {
         setMethodSummary(resultado.methodSummary)
         setCalendar(resultado.calendar)
         
-        // Nombre del local o "Todos"
         if (selectedLocalId) {
           const local = misLocales.find(l => l.id === selectedLocalId)
           setBusinessName(local?.nombre || 'Local')
@@ -213,13 +215,12 @@ export default function Reportes() {
       }
     } catch (err) {
       console.error('Error cargando reportes:', err)
-      toast.error('Error al cargar reportes')
+      toast.error('Error al cargar reportes: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ Botones rápidos de rango
   const handleRangoRapido = (tipo) => {
     const hoy = new Date()
     let desde, hasta
@@ -272,7 +273,7 @@ export default function Reportes() {
 
       const { data: mediosData } = await supabase
         .from('medios_pago')
-        .select('id, nombre, banco_emisor, dias_acreditacion, tipo_comision, valor_comision')
+        .select('id, nombre, banco_emisor, plazo_acreditacion_dias, comision_porcentaje')
         .in('local_id', selectedLocalId ? [selectedLocalId] : misLocales.map(l => l.id))
       
       const mediosMap = new Map()
@@ -284,7 +285,6 @@ export default function Reportes() {
         return
       }
 
-      // ✅ Usamos la misma función reutilizable
       const resultado = procesarTransacciones(transacciones, mediosMap, hoyStr)
       const { summary: expSummary, salesBook: expSales, expensesBook: expExpenses, methodSummary: expMethods, calendar: expCalendar } = resultado
 
@@ -409,10 +409,10 @@ export default function Reportes() {
       expCalendar.forEach(c => {
         const isPast = c.fecha < hoyStr
         const isToday = c.fecha === hoyStr
-        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
+        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : ' Pendiente'
         calendarDataForSheet.push([new Date(c.fecha + 'T12:00:00'), estado, c.total])
       })
-      const [showContactModal, setShowContactModal] = useState(false)
+      
       const wsCalendar = XLSX.utils.aoa_to_sheet(calendarDataForSheet)
       wsCalendar['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 20 }]
       
@@ -443,7 +443,6 @@ export default function Reportes() {
 
   return (
     <main className="min-h-screen bg-slate-100 pb-8">
-      {/* HEADER */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -457,17 +456,16 @@ export default function Reportes() {
             >
               📥 Exportar Excel
             </button>
-                <button 
-  onClick={() => setShowContactModal(true)} 
-  className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
->
-   Ayuda
-</button>
+            <button 
+              onClick={() => setShowContactModal(true)} 
+              className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+            >
+              💬 Ayuda
+            </button>
             <button 
               onClick={() => router.push('/locales')} 
               className="px-3 py-1.5 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
             >
-                
               ← Volver
             </button>
             <button 
@@ -481,9 +479,8 @@ export default function Reportes() {
       </header>
 
       <div className="max-w-6xl mx-auto p-4">
-        {/* ✅ SELECTOR DE LOCAL */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">📍 Local:</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2"> Local:</label>
           <select 
             value={selectedLocalId} 
             onChange={(e) => setSelectedLocalId(e.target.value)}
@@ -496,11 +493,9 @@ export default function Reportes() {
           </select>
         </div>
 
-        {/* ✅ SELECTOR DE RANGO DE FECHAS */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">📅 Período:</label>
           
-          {/* Botones rápidos */}
           <div className="flex flex-wrap gap-2 mb-3">
             <button onClick={() => handleRangoRapido('mes-actual')} className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-100">Este mes</button>
             <button onClick={() => handleRangoRapido('mes-anterior')} className="px-3 py-1.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-100">Mes anterior</button>
@@ -508,7 +503,6 @@ export default function Reportes() {
             <button onClick={() => handleRangoRapido('trimestre')} className="px-3 py-1.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-100">Trimestre</button>
           </div>
 
-          {/* Inputs de fecha */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Desde:</label>
@@ -531,16 +525,14 @@ export default function Reportes() {
           </div>
         </div>
 
-        {/* CONTENIDO DE REPORTES */}
         {!summary ? (
           <div className="bg-white p-12 rounded-xl border border-gray-200 text-center">
-            <div className="text-5xl mb-3">📭</div>
+            <div className="text-5xl mb-3"></div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin datos para este período</h3>
             <p className="m-0 text-gray-500 text-sm">No hay transacciones registradas entre {new Date(fechaDesde).toLocaleDateString('es-AR')} y {new Date(fechaHasta).toLocaleDateString('es-AR')}.</p>
           </div>
         ) : (
           <>
-            {/* RESUMEN EJECUTIVO */}
             <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
               <div className="bg-slate-800 p-3 text-white font-bold text-sm">📋 RESUMEN EJECUTIVO</div>
               <div className="p-4">
@@ -577,11 +569,10 @@ export default function Reportes() {
               </div>
             </div>
 
-            {/* LIBRO IVA VENTAS */}
             {salesBook.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
                 <div className="bg-slate-800 p-3 text-white font-bold text-sm flex justify-between">
-                  <span>📒 LIBRO IVA VENTAS (Débito Fiscal)</span>
+                  <span> LIBRO IVA VENTAS (Débito Fiscal)</span>
                   <span className="text-xs font-normal text-slate-400">{salesBook.length} registros</span>
                 </div>
                 <div className="overflow-x-auto">
@@ -625,11 +616,10 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* LIBRO IVA COMPRAS */}
             {expensesBook.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
                 <div className="bg-slate-800 p-3 text-white font-bold text-sm flex justify-between">
-                  <span>📗 LIBRO IVA COMPRAS (Crédito Fiscal)</span>
+                  <span> LIBRO IVA COMPRAS (Crédito Fiscal)</span>
                   <span className="text-xs font-normal text-slate-400">{expensesBook.length} registros</span>
                 </div>
                 <div className="overflow-x-auto">
@@ -667,10 +657,9 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* MEDIOS DE PAGO */}
             {methodSummary.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
-                <div className="bg-slate-800 p-3 text-white font-bold text-sm"> DESGLOSE POR MEDIO DE PAGO</div>
+                <div className="bg-slate-800 p-3 text-white font-bold text-sm">💳 DESGLOSE POR MEDIO DE PAGO</div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
@@ -700,7 +689,6 @@ export default function Reportes() {
               </div>
             )}
 
-            {/* CALENDARIO DE ACREDITACIONES */}
             {calendar.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
                 <div className="bg-slate-800 p-3 text-white font-bold text-sm flex justify-between">
@@ -743,7 +731,6 @@ export default function Reportes() {
         )}
       </div>
 
-      {/* MODAL DE EXPORTACIÓN */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md rounded-xl p-6">
@@ -787,13 +774,14 @@ export default function Reportes() {
           </div>
         </div>
       )}
-<ContactModal 
-  isOpen={showContactModal}
-  onClose={() => setShowContactModal(false)}
-  user={user}
-  localId={selectedLocalId || null}
-  paginaOrigen="Reportes"
-/>
+
+      <ContactModal 
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        user={user}
+        localId={selectedLocalId || null}
+        paginaOrigen="Reportes"
+      />
     </main>
   )
 }
