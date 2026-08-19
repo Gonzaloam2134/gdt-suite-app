@@ -28,6 +28,10 @@ export default function SuperAdmin() {
   const [todosLosLocales, setTodosLosLocales] = useState([])
   const [filtroLocal, setFiltroLocal] = useState('')
   
+  // Suscripciones
+  const [suscripciones, setSuscripciones] = useState([])
+  const [filtroSuscripcion, setFiltroSuscripcion] = useState('todos')
+  
   // Configuración
   const [config, setConfig] = useState({
     max_locales_por_usuario: 10,
@@ -39,10 +43,6 @@ export default function SuperAdmin() {
   // Anuncios
   const [anuncios, setAnuncios] = useState([])
   const [nuevoAnuncio, setNuevoAnuncio] = useState({ titulo: '', mensaje: '', tipo: 'info' })
-  
-  // Suscripciones
-  const [suscripciones, setSuscripciones] = useState([])
-  const [filtroSuscripcion, setFiltroSuscripcion] = useState('todos')
   
   const router = useRouter()
 
@@ -72,16 +72,43 @@ export default function SuperAdmin() {
       const { count: countTx } = await supabase.from('transacciones').select('*', { count: 'exact', head: true })
       setGlobalStats({ locales: countLocales || 0, usuarios: countUsuarios || 0, transacciones: countTx || 0 })
       
-      // Cargar todas las consultas
-      const { data: contactosData } = await supabase
+      // ==========================================
+      // CARGA DE CONTACTOS (A PRUEBA DE FALLOS)
+      // ==========================================
+      const { data: contactosData, error: contactosError } = await supabase
         .from('contactos')
-        .select(`
-          *,
-          perfiles!contactos_user_id_fkey (email, nombre),
-          locales (nombre)
-        `)
+        .select('*')
         .order('creado_en', { ascending: false })
-      setContactos(contactosData || [])
+      
+      if (contactosError) {
+        console.error('❌ Error cargando contactos:', contactosError)
+        setContactos([])
+      } else {
+        // Obtener los emails de los usuarios por separado (100% seguro, sin depender de FK names)
+        const userIds = [...new Set(contactosData.map(c => c.user_id).filter(Boolean))]
+        let perfilesMap = new Map()
+        
+        if (userIds.length > 0) {
+          const { data: perfilesData } = await supabase
+            .from('perfiles')
+            .select('id, email, nombre')
+            .in('id', userIds)
+          
+          if (perfilesData) {
+            perfilesData.forEach(p => perfilesMap.set(p.id, p))
+          }
+        }
+
+        // Unir los datos manualmente en JS
+        const contactosEnriquecidos = contactosData.map(c => ({
+          ...c,
+          perfiles: perfilesMap.get(c.user_id) || { email: 'Desconocido', nombre: 'Desconocido' },
+          locales: c.local_id ? { nombre: 'Local (ID: ' + c.local_id.substring(0, 8) + '...)' } : null
+        }))
+        
+        setContactos(contactosEnriquecidos)
+      }
+      // ==========================================
       
       // Cargar todos los usuarios
       const { data: usuariosData } = await supabase
@@ -110,15 +137,13 @@ export default function SuperAdmin() {
         `)
         .order('fecha_vencimiento', { ascending: true })
       
-      // Filtrar para quedarnos solo con el miembro 'owner' de cada local para mostrar el email
       const subsConOwner = subsData?.map(sub => {
         const owner = sub.miembros_locales?.find(m => m.rol === 'owner')
         return { ...sub, ownerEmail: owner?.perfiles?.email || 'Sin email' }
       }) || []
-      
       setSuscripciones(subsConOwner)
       
-      // Cargar configuración (si existe la tabla, si no usar defaults)
+      // Cargar configuración
       try {
         const { data: configData } = await supabase.from('configuracion_global').select('*').single()
         if (configData) setConfig(configData)
@@ -278,7 +303,7 @@ export default function SuperAdmin() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900"> Super Admin</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900">👑 Super Admin</h1>
             <p className="mt-0.5 text-xs text-gray-500">Panel de control global de la plataforma</p>
           </div>
           <div className="flex gap-2">
@@ -343,7 +368,7 @@ export default function SuperAdmin() {
                 <div className="text-xs text-gray-400 mt-1">Total en la plataforma</div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2"> USUARIOS ACTIVOS</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2">👥 USUARIOS ACTIVOS</div>
                 <div className="text-3xl font-extrabold text-green-700">{globalStats.usuarios}</div>
                 <div className="text-xs text-gray-400 mt-1">Cuentas registradas</div>
               </div>
@@ -351,28 +376,6 @@ export default function SuperAdmin() {
                 <div className="text-xs text-gray-500 font-semibold mb-2">💳 TRANSACCIONES</div>
                 <div className="text-3xl font-extrabold text-purple-700">{globalStats.transacciones}</div>
                 <div className="text-xs text-gray-400 mt-1">Total procesadas</div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl border border-gray-200">
-              <h3 className="text-base font-bold text-gray-900 mb-3">📈 Resumen de actividad</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{contactos.filter(c => c.estado === 'resuelto').length}</div>
-                  <div className="text-xs text-gray-500">Consultas resueltas</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-amber-600">{contactos.filter(c => c.estado === 'pendiente').length}</div>
-                  <div className="text-xs text-gray-500">Consultas pendientes</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{todosLosLocales.filter(l => l.activo !== false).length}</div>
-                  <div className="text-xs text-gray-500">Locales activos</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{todosLosLocales.filter(l => l.activo === false).length}</div>
-                  <div className="text-xs text-gray-500">Locales suspendidos</div>
-                </div>
               </div>
             </div>
           </div>
@@ -435,9 +438,9 @@ export default function SuperAdmin() {
                         </div>
                         <h4 className="font-bold text-gray-900 text-sm mb-1">{contacto.asunto}</h4>
                         <div className="text-xs text-gray-500 space-y-0.5">
-                          <div> {contacto.perfiles?.email || 'Usuario desconocido'}</div>
-                          {contacto.locales?.nombre && <div> {contacto.locales.nombre}</div>}
-                          <div>📍 Desde: {contacto.pagina_origen}</div>
+                          <div>👤 {contacto.perfiles?.email || 'Usuario desconocido'}</div>
+                          {contacto.locales?.nombre && <div>🏪 {contacto.locales.nombre}</div>}
+                          <div>📍 Desde: {contacto.pagina_origen || 'Web'}</div>
                           <div>🕐 {new Date(contacto.creado_en).toLocaleString('es-AR')}</div>
                         </div>
                       </div>
@@ -482,7 +485,7 @@ export default function SuperAdmin() {
                             onClick={() => handleResponderContacto(contacto.id)}
                             className="px-4 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
                           >
-                             Enviar respuesta
+                            📤 Enviar respuesta
                           </button>
                           <button
                             onClick={() => { setRespondiendoId(null); setRespuestaTexto('') }}
@@ -600,7 +603,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800 m-0">
-                 Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
+                🏪 Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
               </p>
             </div>
 
@@ -792,7 +795,6 @@ export default function SuperAdmin() {
                     onChange={(e) => setConfig({...config, max_locales_por_usuario: parseInt(e.target.value) || 0})}
                     className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Límite de locales que un usuario puede crear</p>
                 </div>
 
                 <div>
@@ -804,7 +806,6 @@ export default function SuperAdmin() {
                     onChange={(e) => setConfig({...config, comision_default: parseFloat(e.target.value) || 0})}
                     className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Comisión default para nuevos medios de pago</p>
                 </div>
 
                 <div>
@@ -815,7 +816,6 @@ export default function SuperAdmin() {
                     onChange={(e) => setConfig({...config, plazo_acreditacion_default: parseInt(e.target.value) || 0})}
                     className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Días default para acreditación de medios de pago</p>
                 </div>
 
                 <div>
@@ -828,7 +828,6 @@ export default function SuperAdmin() {
                     <option value="no">Desactivado</option>
                     <option value="si">Activado (bloquea accesos)</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">Si está activo, los usuarios no podrán ingresar</p>
                 </div>
               </div>
 
@@ -907,7 +906,7 @@ export default function SuperAdmin() {
                   <div className="flex items-start gap-3">
                     <div className="text-2xl">
                       {anuncio.tipo === 'info' ? 'ℹ️' :
-                       anuncio.tipo === 'warning' ? '️' :
+                       anuncio.tipo === 'warning' ? '⚠️' :
                        anuncio.tipo === 'success' ? '✅' : '🚀'}
                     </div>
                     <div className="flex-1">
