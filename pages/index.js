@@ -133,7 +133,6 @@ export default function Locales() {
                 📊 Reportes
               </button>
             </RoleGate>
-            
             <RoleGate allowedRoles={['owner', 'super_user']}>
               <button onClick={() => router.push('/admin')} className="px-3 py-1.5 bg-purple-100 text-purple-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-purple-200">
                 ⚙️ Administración
