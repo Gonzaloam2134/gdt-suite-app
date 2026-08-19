@@ -1,399 +1,354 @@
-import { useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 
-const RUBROS = ['Gastronomía', 'Retail / Tienda', 'Servicios', 'Salud / Estética', 'Educación', 'Otro']
-const CONDICIONES = ['Monotributo', 'Responsable Inscripto', 'Exento', 'Consumidor Final']
-
-const ROLES_INFO = {
-  cajero: {
-    titulo: 'Cajero',
-    icono: '👨‍',
-    descripcion: 'Opera la caja, registra ventas y gastos/pagos. Ve los totales del día.',
-    puede: ['Abrir/cerrar caja', 'Registrar ventas', 'Registrar gastos/pagos', 'Ver resumen diario', 'Ver reportes'],
-    noPuede: ['Crear medios de pago', 'Eliminar ventas registradas', 'Invitar usuarios']
-  },
-  empleado: {
-    titulo: 'Empleado',
-    icono: '👷',
-    descripcion: 'Solo registra ventas del mostrador. No ve totales ni opera la caja.',
-    puede: ['Registrar ventas (cobros a clientes)'],
-    noPuede: ['Registrar gastos/pagos', 'Operar caja', 'Ver totales', 'Ver reportes']
-  }
+// Iconos automáticos por tipo de medio de pago
+const ICONOS_POR_TIPO = {
+  efectivo: '💵',
+  debito: '💳',
+  credito: '',
+  transferencia: '🏦',
+  qr: '📱',
+  cheque: '',
+  otro: '📦'
 }
 
-// ✅ CAMBIO 1: Agregar preloadedData a las props
-export default function OnboardingWizard({ onComplete, onCancel, userEmail, preloadedData }) {
-  const [step, setStep] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [skipTeamInvite, setSkipTeamInvite] = useState(false)
-  
-  // ✅ CAMBIO 2: Precargar businessName desde preloadedData
-  const [formData, setFormData] = useState({
-    businessName: preloadedData?.businessName || '',
-    rubro: '',
-    condicionFiscal: '',
-    numLocales: '1'
+// Medios de pago presets
+const MEDIOS_PRESET = [
+  { nombre: 'Efectivo', tipo: 'efectivo', icono: '', comision: 0, plazo: 0, habilitado: true },
+  { nombre: 'Tarjeta de Débito', tipo: 'debito', icono: '', comision: 0, plazo: 1, habilitado: true },
+  { nombre: 'Tarjeta de Crédito', tipo: 'credito', icono: '', comision: 3.5, plazo: 30, habilitado: true },
+  { nombre: 'Transferencia', tipo: 'transferencia', icono: '🏦', comision: 0, plazo: 0, habilitado: true },
+  { nombre: 'Mercado Pago QR', tipo: 'qr', icono: '📱', comision: 1.99, plazo: 1, habilitado: false },
+]
+
+export default function OnboardingWizard({ onComplete, onCancel, userEmail, preloadedData, skipScaleStep = false }) {
+  const [step, setStep] = useState(skipScaleStep ? 1 : 1) // Si skipScaleStep es true, empezamos en 1 pero saltaremos el 2
+  const [formData, setFormData] = useState(preloadedData || {
+    businessName: '',
+    rubro: 'Gastronomía',
+    condicionFiscal: 'Consumidor Final',
+    escala: '1', // 1, 2-5, 5+
+    mediosPago: MEDIOS_PRESET,
+    invites: []
   })
 
-  const [invites, setInvites] = useState([])
-  const [newInviteEmail, setNewInviteEmail] = useState('')
-  const [newInviteRole, setNewInviteRole] = useState('cajero')
-  const [showRoleInfo, setShowRoleInfo] = useState(null)
+  // Guardar progreso en localStorage
+  useEffect(() => {
+    localStorage.setItem('onboarding_temp_data', JSON.stringify(formData))
+  }, [formData])
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const toggleMedioPago = (index) => {
+    const nuevosMedios = [...formData.mediosPago]
+    nuevosMedios[index].habilitado = !nuevosMedios[index].habilitado
+    updateField('mediosPago', nuevosMedios)
+  }
+
   const handleNext = () => {
-    if (step === 1) {
-      if (!formData.businessName.trim()) {
-        toast.error('El nombre del negocio es obligatorio')
-        return
-      }
-      if (!formData.rubro) {
-        toast.error('Seleccioná un rubro')
-        return
-      }
-    }
-    setStep(step + 1)
-  }
-
-  const addInvite = () => {
-    if (!newInviteEmail || !newInviteEmail.includes('@')) {
-      toast.error('Ingresá un email válido')
+    // Validaciones por paso
+    if (step === 1 && !formData.businessName.trim()) {
+      toast.error('Por favor, ingresá el nombre de tu negocio')
       return
     }
-    if (invites.some(inv => inv.email === newInviteEmail.toLowerCase())) {
-      toast.error('Este email ya fue agregado')
+
+    // ✅ LÓGICA PARA SALTAR EL PASO DE ESCALA
+    if (step === 1 && skipScaleStep) {
+      // Si estamos agregando un local extra, saltamos directamente al paso de medios de pago (paso 3)
+      setStep(3)
       return
     }
-    setInvites([...invites, { email: newInviteEmail.toLowerCase(), rol: newInviteRole }])
-    setNewInviteEmail('')
-    setNewInviteRole('cajero')
-  }
 
-  const removeInvite = (index) => {
-    setInvites(invites.filter((_, i) => i !== index))
-  }
-
-  const handleFinish = async () => {
-    try {
-      setLoading(true)
-      onComplete({ ...formData, invites })
-    } catch (err) {
-      toast.error('Error: ' + err.message)
-    } finally {
-      setLoading(false)
+    if (step === 2 && !formData.escala) {
+      toast.error('Seleccioná una opción de escala')
+      return
     }
+
+    if (step === 3) {
+      const habilitados = formData.mediosPago.filter(m => m.habilitado)
+      if (habilitados.length === 0) {
+        toast.error('Debés habilitar al menos un medio de pago')
+        return
+      }
+    }
+
+    setStep(prev => prev + 1)
+  }
+
+  const handleBack = () => {
+    // Si volvemos del paso 3 y skipScaleStep es true, volvemos al 1 (no al 2)
+    if (step === 3 && skipScaleStep) {
+      setStep(1)
+      return
+    }
+    setStep(prev => prev - 1)
+  }
+
+  const handleSubmit = () => {
+    localStorage.removeItem('onboarding_temp_data')
+    onComplete(formData)
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         
-        {/* HEADER & PROGRESS */}
-        <div className="mb-6">
+        {/* Header con progreso */}
+        <div className="bg-slate-50 p-6 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="m-0 text-xl font-bold text-gray-900">
-              {step === 1 ? '👋 Bienvenido' : step === 2 ? '📏 Tu Escala' : step === 3 ? '🚀 ¡Casi listo!' : '👥 Tu Equipo'}
+            <h2 className="text-xl font-bold text-gray-900">
+              {step === 1 && '🏪 Datos del Negocio'}
+              {step === 2 && '📊 Tu Escala'}
+              {step === 3 && '💳 Medios de Pago'}
+              {step === 4 && '✅ Resumen Final'}
             </h2>
-            <button onClick={onCancel} className="bg-none border-none text-xl cursor-pointer text-gray-400 hover:text-gray-600">✕</button>
+            <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+              Paso {step} de {skipScaleStep ? '3' : '4'}
+            </span>
           </div>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className={`h-2 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-200'}`} />
-            ))}
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+              style={{ width: `${(step / (skipScaleStep ? 3 : 4)) * 100}%` }}
+            ></div>
           </div>
-          <p className="mt-2 text-xs text-gray-500">Paso {step} de 4</p>
         </div>
 
-        {/* PASO 1: DATOS DEL NEGOCIO */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">Contanos un poco sobre tu negocio para personalizar tu experiencia.</p>
-            
-            {/* ✅ CAMBIO 3: Input del nombre con precarga y bloqueo */}
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700 text-sm">
-                Nombre del negocio * {preloadedData && '(ya completado)'}
-              </label>
-              <input
-                type="text"
-                value={formData.businessName}
-                onChange={e => updateField('businessName', e.target.value)}
-                placeholder="Ej: Panadería Los Trigales"
-                disabled={!!preloadedData}
-                className={`w-full p-3 text-base border-2 rounded-lg box-border focus:border-blue-500 focus:outline-none ${
-                  preloadedData ? 'bg-gray-100 cursor-not-allowed border-gray-300' : 'border-gray-200'
-                }`}
-              />
+        {/* Contenido del paso */}
+        <div className="p-6 max-h-[60vh] overflow-y-auto">
+          
+          {/* PASO 1: Datos del negocio */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre del Negocio *</label>
+                <input
+                  type="text"
+                  value={formData.businessName}
+                  onChange={(e) => updateField('businessName', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Ej: Kiosco Don Pepe"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Rubro</label>
+                <select
+                  value={formData.rubro}
+                  onChange={(e) => updateField('rubro', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                >
+                  <option value="Gastronomía">Gastronomía</option>
+                  <option value="Retail">Retail / Tienda</option>
+                  <option value="Servicios">Servicios</option>
+                  <option value="Salud">Salud / Estética</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Condición Fiscal</label>
+                <select
+                  value={formData.condicionFiscal}
+                  onChange={(e) => updateField('condicionFiscal', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                >
+                  <option value="Consumidor Final">Consumidor Final</option>
+                  <option value="Monotributo">Monotributo</option>
+                  <option value="Responsable Inscripto">Responsable Inscripto</option>
+                </select>
+              </div>
             </div>
+          )}
 
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700 text-sm">Rubro principal *</label>
-              <div className="grid grid-cols-2 gap-2">
-                {RUBROS.map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => updateField('rubro', r)}
-                    className={`p-3 rounded-lg border-2 text-sm font-medium cursor-pointer transition-all ${
-                      formData.rubro === r 
-                        ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+          {/* PASO 2: Tu Escala (SOLO si NO es skipScaleStep) */}
+          {step === 2 && !skipScaleStep && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-800 m-0">
+                  💡 Esto nos ayuda a configurar tu cuenta de la mejor manera.
+                </p>
+              </div>
+              <h3 className="text-base font-bold text-gray-900 mb-4">
+                ¿Cuántos locales o sucursales planeas manejar en GDT Suite?
+              </h3>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => updateField('escala', '1')}
+                  className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                    formData.escala === '1' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-bold text-gray-900">1 Local</div>
+                  <div className="text-sm text-gray-600 mt-1">Ideal para emprendedores y negocios unipersonales.</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('escala', '2-5')}
+                  className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                    formData.escala === '2-5' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-bold text-gray-900">2 a 5 Locales</div>
+                  <div className="text-sm text-gray-600 mt-1">Perfecto para cadenas pequeñas o franquicias.</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('escala', '5+')}
+                  className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                    formData.escala === '5+' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-bold text-gray-900">Más de 5 Locales</div>
+                  <div className="text-sm text-gray-600 mt-1">Para empresas en expansión (Plan Enterprise).</div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* PASO 3: Medios de Pago */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Seleccioná los medios de pago que vas a aceptar. Podés cambiar esto después en el Panel de Admin.
+              </p>
+              <div className="space-y-3">
+                {formData.mediosPago.map((medio, index) => (
+                  <div 
+                    key={index} 
+                    className={`flex items-center justify-between p-4 border rounded-lg transition-all ${
+                      medio.habilitado ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50 opacity-70'
                     }`}
                   >
-                    {r}
-                  </button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{medio.icono}</span>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">{medio.nombre}</div>
+                        <div className="text-xs text-gray-500">
+                          {medio.comision > 0 ? `${medio.comision}% comisión` : 'Sin comisión'} · {' '}
+                          {medio.plazo === 0 ? 'Inmediato' : `${medio.plazo} días`}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleMedioPago(index)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        medio.habilitado ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          medio.habilitado ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700 text-sm">Condición Fiscal *</label>
-              <select
-                value={formData.condicionFiscal}
-                onChange={e => updateField('condicionFiscal', e.target.value)}
-                className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border bg-white focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">Seleccionar...</option>
-                {CONDICIONES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* PASO 2: ESCALA */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">¿Cuántos locales o sucursales planeas manejar en GDT Suite?</p>
-            <div className="grid grid-cols-1 gap-3">
-              {[
-                { val: '1', label: '1 Local', desc: 'Ideal para emprendedores y negocios unipersonales.' },
-                { val: '2-5', label: '2 a 5 Locales', desc: 'Perfecto para cadenas pequeñas o franquicias.' },
-                { val: '+5', label: 'Más de 5 Locales', desc: 'Para empresas en expansión (Plan Enterprise).' }
-              ].map(opt => (
-                <button
-                  key={opt.val}
-                  type="button"
-                  onClick={() => updateField('numLocales', opt.val)}
-                  className={`p-4 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                    formData.numLocales === opt.val 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-bold text-gray-900">{opt.label}</div>
-                  <div className="text-xs text-gray-500 mt-1">{opt.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* PASO 3: RESUMEN */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">Revisá que todo esté correcto antes de empezar.</p>
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Negocio:</span>
-                <span className="text-sm font-bold text-gray-900">{formData.businessName}</span>
+          {/* PASO 4: Resumen Final */}
+          {step === 4 && (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-green-800 m-0 font-medium">
+                  ✅ ¡Todo listo! Revisá tu configuración.
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Rubro:</span>
-                <span className="text-sm font-bold text-gray-900">{formData.rubro}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Condición Fiscal:</span>
-                <span className="text-sm font-bold text-gray-900">{formData.condicionFiscal}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Escala:</span>
-                <span className="text-sm font-bold text-gray-900">{formData.numLocales} local(es)</span>
-              </div>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <p className="text-xs text-blue-800 m-0">
-                💡 <strong>Tip:</strong> Podrás cambiar estos datos y agregar más locales en cualquier momento desde la configuración.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* PASO 4: INVITAR EQUIPO */}
-        {step === 4 && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-base font-bold text-gray-900 mb-1">¿Querés invitar a tu equipo ahora?</h3>
-              <p className="text-sm text-gray-600">
-                Podés agregar cajeros o empleados que necesiten acceso al sistema. 
-                <strong> Esto es opcional</strong>, podés hacerlo después desde el dashboard.
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setSkipTeamInvite(true); handleFinish(); }}
-                className="flex-1 p-3 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200 transition-colors"
-              >
-                Saltar, lo hago después
-              </button>
-              <button
-                type="button"
-                onClick={() => setSkipTeamInvite(false)}
-                className={`flex-1 p-3 border-none rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
-                  !skipTeamInvite ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                Agregar ahora
-              </button>
-            </div>
-
-            {!skipTeamInvite && (
-              <>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <div className="mb-3">
-                    <label className="block mb-2 font-semibold text-gray-700 text-sm">Email del usuario</label>
-                    <input
-                      type="email"
-                      value={newInviteEmail}
-                      onChange={e => setNewInviteEmail(e.target.value)}
-                      placeholder="usuario@ejemplo.com"
-                      className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="block mb-2 font-semibold text-gray-700 text-sm">Rol</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(ROLES_INFO).map(([key, info]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setNewInviteRole(key)}
-                          className={`p-3 rounded-lg border-2 text-left cursor-pointer transition-all ${
-                            newInviteRole === key 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 bg-white hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xl">{info.icono}</span>
-                            <span className="font-bold text-sm text-gray-900">{info.titulo}</span>
-                          </div>
-                          <div className="text-xs text-gray-600">{info.descripcion}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addInvite}
-                    className="w-full p-3 bg-emerald-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-emerald-600 transition-colors"
-                  >
-                    + Agregar a la lista
-                  </button>
+              
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Negocio:</span>
+                  <span className="font-semibold text-gray-900">{formData.businessName}</span>
                 </div>
-
-                <div className="space-y-2">
-                  {Object.entries(ROLES_INFO).map(([key, info]) => (
-                    <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setShowRoleInfo(showRoleInfo === key ? null : key)}
-                        className="w-full p-3 bg-white text-left cursor-pointer hover:bg-gray-50 flex justify-between items-center"
-                      >
-                        <span className="text-sm font-semibold text-gray-700">
-                          {info.icono} ¿Qué puede hacer un {info.titulo.toLowerCase()}?
-                        </span>
-                        <span className="text-gray-400">{showRoleInfo === key ? '▼' : '▶'}</span>
-                      </button>
-                      {showRoleInfo === key && (
-                        <div className="p-3 bg-gray-50 border-t border-gray-200">
-                          <div className="mb-2">
-                            <div className="text-xs font-semibold text-green-700 mb-1">✅ Puede:</div>
-                            <ul className="text-xs text-gray-700 space-y-1 ml-4">
-                              {info.puede.map((item, i) => <li key={i}>• {item}</li>)}
-                            </ul>
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-red-700 mb-1">❌ No puede:</div>
-                            <ul className="text-xs text-gray-700 space-y-1 ml-4">
-                              {info.noPuede.map((item, i) => <li key={i}>• {item}</li>)}
-                            </ul>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Rubro:</span>
+                  <span className="font-semibold text-gray-900">{formData.rubro}</span>
                 </div>
-
-                {invites.length > 0 && (
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-                    <div className="text-sm font-bold text-blue-900 mb-2">
-                      📧 {invites.length} usuario{invites.length > 1 ? 's' : ''} para invitar:
-                    </div>
-                    <div className="space-y-2">
-                      {invites.map((inv, index) => (
-                        <div key={index} className="flex justify-between items-center bg-white p-2 rounded-md">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{ROLES_INFO[inv.rol].icono}</span>
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900">{inv.email}</div>
-                              <div className="text-xs text-gray-500">{ROLES_INFO[inv.rol].titulo}</div>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeInvite(index)}
-                            className="text-red-500 hover:text-red-700 bg-none border-none cursor-pointer text-sm"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Condición Fiscal:</span>
+                  <span className="font-semibold text-gray-900">{formData.condicionFiscal}</span>
+                </div>
+                {!skipScaleStep && (
+                  <div className="flex justify-between border-b border-gray-100 pb-2">
+                    <span className="text-gray-500">Escala:</span>
+                    <span className="font-semibold text-gray-900">
+                      {formData.escala === '1' && '1 Local'}
+                      {formData.escala === '2-5' && '2 a 5 Locales'}
+                      {formData.escala === '5+' && 'Más de 5 Locales'}
+                    </span>
                   </div>
                 )}
-              </>
-            )}
-          </div>
-        )}
+                
+                <div className="pt-2">
+                  <span className="text-gray-500 block mb-2">Medios de pago configurados:</span>
+                  <div className="space-y-2">
+                    {formData.mediosPago.map((medio, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm">
+                        <span>{medio.habilitado ? '✅' : '❌'}</span>
+                        <span className="text-lg">{medio.icono}</span>
+                        <span className={medio.habilitado ? 'text-gray-900 font-medium' : 'text-gray-400 line-through'}>
+                          {medio.nombre}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-        {/* FOOTER / BOTONES */}
-        <div className="mt-8 flex gap-3">
-          {step > 1 && step < 4 && (
-            <button
-              onClick={() => setStep(step - 1)}
-              className="flex-1 p-3 bg-gray-100 text-gray-700 border-none rounded-lg font-semibold cursor-pointer hover:bg-gray-200"
-            >
-              Atrás
-            </button>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
+                  <p className="text-xs text-amber-800 m-0 flex items-start gap-2">
+                    <span>ℹ️</span>
+                    <span>
+                      Podés agregar o modificar medios de pago en cualquier momento desde el <strong>Panel de Administración</strong>.
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
-          
-          {step < 3 ? (
+        </div>
+
+        {/* Footer con botones */}
+        <div className="p-6 bg-slate-50 border-t border-gray-200 flex justify-between">
+          {step > 1 ? (
             <button
-              onClick={handleNext}
-              className="flex-1 p-3 bg-blue-500 text-white border-none rounded-lg font-bold cursor-pointer hover:bg-blue-600"
+              onClick={handleBack}
+              className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
             >
-              Continuar
-            </button>
-          ) : step === 3 ? (
-            <button
-              onClick={() => setStep(4)}
-              className="flex-1 p-3 bg-blue-500 text-white border-none rounded-lg font-bold cursor-pointer hover:bg-blue-600"
-            >
-              Siguiente: Equipo
+              ← Atrás
             </button>
           ) : (
             <button
-              onClick={handleFinish}
-              disabled={loading}
-              className="flex-1 p-3 bg-green-600 text-white border-none rounded-lg font-bold cursor-pointer hover:bg-green-700 disabled:opacity-50"
+              onClick={onCancel}
+              className="px-6 py-3 bg-white border border-gray-300 text-gray-500 rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
             >
-              {loading ? 'Configurando...' : '¡Empezar a usar GDT!'}
+              Cancelar
+            </button>
+          )}
+          
+          {step < 4 ? (
+            <button
+              onClick={handleNext}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              Continuar →
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2"
+            >
+              🚀 Crear mi Local
             </button>
           )}
         </div>
