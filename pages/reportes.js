@@ -1,7 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import * as XLSX from 'xlsx-js-style'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import ContactModal from '../components/ContactModal'
@@ -78,7 +77,10 @@ const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
         iva, 
         comision, 
         fecha_acreditacion: fechaAcred,
-        netoReal: neto - comision
+        netoReal: neto - comision,
+        es_reversa: t.es_reversa || false,
+        reversa_de: t.reversa_de,
+        motivo_reversa: t.motivo_reversa
       })
 
       if (!methodsMap[key]) methodsMap[key] = { nombre: key, bruto: 0, neto: 0, iva: 0, comisiones: 0, cantidad: 0 }
@@ -103,7 +105,8 @@ const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
         fecha: new Date(t.creado_en).toLocaleDateString('es-AR'),
         concepto: t.descripcion || 'Gasto',
         medio: key,
-        bruto: monto, neto, iva
+        bruto: monto, neto, iva,
+        es_reversa: t.es_reversa || false
       })
     }
   })
@@ -113,7 +116,8 @@ const procesarTransacciones = (transacciones, mediosMap, hoyStr) => {
       totalFacturado, totalNeto, totalIVA, totalComisiones,
       totalGastos, totalGastosNeto, totalGastosIVA,
       resultado: totalNeto - totalComisiones - totalGastos,
-      cantVentas: salesRows.length, cantGastos: expenseRows.length
+      cantVentas: salesRows.length, cantGastos: expenseRows.length,
+      cantReversas: salesRows.filter(s => s.es_reversa).length + expenseRows.filter(e => e.es_reversa).length
     },
     salesBook: salesRows.sort((a, b) => a.fecha.localeCompare(b.fecha)),
     expensesBook: expenseRows.sort((a, b) => a.fecha.localeCompare(b.fecha)),
@@ -366,6 +370,7 @@ export default function Reportes() {
         ['', ''],
         ['Ventas registradas', expSales.length],
         ['Gastos registrados', expExpenses.length],
+        ['Reversas contables', expSummary.cantReversas],
         ['IVA a pagar (neto)', expSummary.totalIVA - expSummary.totalGastosIVA]
       ]
       const wsResumen = XLSX.utils.aoa_to_sheet(resumenData, { sheetStubs: true })
@@ -504,7 +509,7 @@ export default function Reportes() {
               onClick={() => setShowReportGuide(true)} 
               className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
             >
-               ¿Qué estoy viendo?
+              ❓ ¿Qué estoy viendo?
             </button>
             <button 
               onClick={() => setShowExportModal(true)} 
@@ -544,7 +549,7 @@ export default function Reportes() {
           >
             <option value="">📊 Todos los locales (Consolidado)</option>
             {misLocales.map(local => (
-              <option key={local.id} value={local.id}>🏪 {local.nombre}</option>
+              <option key={local.id} value={local.id}> {local.nombre}</option>
             ))}
           </select>
         </div>
@@ -618,10 +623,18 @@ export default function Reportes() {
                     <div className="font-extrabold text-gray-900 text-lg">{summary.cantGastos}</div>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg text-center">
-                    <div className="text-xs text-gray-500">IVA a pagar</div>
-                    <div className="font-extrabold text-red-600 text-lg">{formatCurrency(summary.totalIVA - summary.totalGastosIVA)}</div>
+                    <div className="text-xs text-gray-500">Reversas</div>
+                    <div className="font-extrabold text-amber-600 text-lg">{summary.cantReversas}</div>
                   </div>
                 </div>
+                
+                {summary.cantReversas > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
+                    <div className="text-xs text-amber-900">
+                      <strong>↩️ {summary.cantReversas} reversa(s) contable(s)</strong> incluidas en los totales
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -652,32 +665,42 @@ export default function Reportes() {
                     </thead>
                     <tbody>
                       {salesBook.map((row, i) => {
-  const esReversa = row.es_reversa || row.monto < 0 // Detectar si es reversa
-  
-  return (
-    <tr 
-      key={i} 
-      className={`border-b border-slate-100 ${
-        esReversa ? 'bg-red-50 opacity-75' : ''
-      }`}
-    >
-      <td className="p-2 text-gray-900">
-        {row.fecha}
-        {esReversa && <span className="ml-1 text-xs text-red-600">↩️</span>}
-      </td>
-      <td className={`p-2 ${esReversa ? 'line-through text-red-600' : 'text-gray-900'}`}>
-        {row.concepto}
-      </td>
-      {/* ... resto de las columnas ... */}
-      <td className={`p-2 text-right font-semibold ${
-        esReversa ? 'text-red-600' : ''
-      }`}>
-        {formatCurrency(row.bruto)}
-      </td>
-      {/* ... resto de las columnas ... */}
-    </tr>
-  )
-})}
+                        const esReversa = row.es_reversa || row.bruto < 0
+                        
+                        return (
+                          <tr 
+                            key={i} 
+                            className={`border-b border-slate-100 ${esReversa ? 'bg-red-50 opacity-75' : ''}`}
+                          >
+                            <td className="p-2 text-gray-900">
+                              {row.fecha}
+                              {esReversa && <span className="ml-1 text-xs text-red-600">↩️</span>}
+                            </td>
+                            <td className={`p-2 ${esReversa ? 'line-through text-red-600' : 'text-gray-900'}`}>
+                              {row.concepto}
+                              {esReversa && row.motivo_reversa && (
+                                <div className="text-xs text-red-600 mt-1">
+                                  Motivo: {row.motivo_reversa}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2 text-slate-500 text-[10px]">{row.medio}</td>
+                            <td className="p-2 text-slate-700 font-medium">{row.tipo_medio}</td>
+                            <td className="p-2 text-slate-700">{row.operador}</td>
+                            <td className="p-2 text-right text-slate-600">{row.comision_porcentaje}%</td>
+                            <td className={`p-2 text-right font-semibold ${esReversa ? 'text-red-600' : ''}`}>
+                              {formatCurrency(row.bruto)}
+                            </td>
+                            <td className="p-2 text-right">{formatCurrency(row.neto)}</td>
+                            <td className="p-2 text-right text-red-600">{formatCurrency(row.iva)}</td>
+                            <td className="p-2 text-right text-red-600">{formatCurrency(row.comision)}</td>
+                            <td className="p-2 text-slate-700">
+                              {row.fecha_acreditacion ? new Date(row.fecha_acreditacion + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                            </td>
+                            <td className="p-2 text-right font-bold text-green-700">{formatCurrency(row.netoReal)}</td>
+                          </tr>
+                        )
+                      })}
                       <tr className="bg-slate-50 border-t-2 border-slate-900 font-extrabold">
                         <td colSpan="5" className="p-3 text-right text-gray-900">TOTALES</td>
                         <td className="p-3 text-right text-slate-600">-</td>
@@ -713,16 +736,30 @@ export default function Reportes() {
                       </tr>
                     </thead>
                     <tbody>
-                      {expensesBook.map((row, i) => (
-                        <tr key={i} className="border-b border-slate-100">
-                          <td className="p-2 text-gray-900">{row.fecha}</td>
-                          <td className="p-2 text-gray-900">{row.concepto}</td>
-                          <td className="p-2 text-slate-500 text-[10px]">{row.medio}</td>
-                          <td className="p-2 text-right font-semibold">{formatCurrency(row.bruto)}</td>
-                          <td className="p-2 text-right">{formatCurrency(row.neto)}</td>
-                          <td className="p-2 text-right text-blue-600">{formatCurrency(row.iva)}</td>
-                        </tr>
-                      ))}
+                      {expensesBook.map((row, i) => {
+                        const esReversa = row.es_reversa || row.bruto < 0
+                        
+                        return (
+                          <tr 
+                            key={i} 
+                            className={`border-b border-slate-100 ${esReversa ? 'bg-red-50 opacity-75' : ''}`}
+                          >
+                            <td className="p-2 text-gray-900">
+                              {row.fecha}
+                              {esReversa && <span className="ml-1 text-xs text-red-600">↩️</span>}
+                            </td>
+                            <td className={`p-2 ${esReversa ? 'line-through text-red-600' : 'text-gray-900'}`}>
+                              {row.concepto}
+                            </td>
+                            <td className="p-2 text-slate-500 text-[10px]">{row.medio}</td>
+                            <td className={`p-2 text-right font-semibold ${esReversa ? 'text-green-600' : ''}`}>
+                              {formatCurrency(row.bruto)}
+                            </td>
+                            <td className="p-2 text-right">{formatCurrency(row.neto)}</td>
+                            <td className="p-2 text-right text-blue-600">{formatCurrency(row.iva)}</td>
+                          </tr>
+                        )
+                      })}
                       <tr className="bg-slate-50 border-t-2 border-slate-900 font-extrabold">
                         <td colSpan="3" className="p-3 text-right text-gray-900">TOTALES</td>
                         <td className="p-3 text-right">{formatCurrency(summary.totalGastos)}</td>
