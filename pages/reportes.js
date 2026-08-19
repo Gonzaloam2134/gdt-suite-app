@@ -889,7 +889,6 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
         isOpen={showReportGuide}
         onClose={() => setShowReportGuide(false)}
       />
-    </main>
-    </main>
+   </main>
   )
 }
