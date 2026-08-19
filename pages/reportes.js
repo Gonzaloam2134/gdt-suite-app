@@ -144,7 +144,7 @@ export default function Reportes() {
   const [exportEndDate, setExportEndDate] = useState('')
   
   const [showContactModal, setShowContactModal] = useState(false)
-const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR ESTA LÍNEA
+  const [showReportGuide, setShowReportGuide] = useState(false)
   
   const router = useRouter()
   const hoy = new Date()
@@ -458,7 +458,7 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
       expCalendar.forEach(c => {
         const isPast = c.fecha < hoyStr
         const isToday = c.fecha === hoyStr
-        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : '⏳ Pendiente'
+        const estado = isPast ? '✅ Acreditado' : isToday ? '📍 Hoy' : ' Pendiente'
         calendarDataForSheet.push([new Date(c.fecha + 'T12:00:00'), estado, c.total])
       })
       
@@ -492,6 +492,7 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
 
   return (
     <main className="min-h-screen bg-slate-100 pb-8">
+      {/* HEADER ÚNICO */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -499,47 +500,12 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
             <p className="mt-0.5 text-xs text-gray-500">{businessName}</p>
           </div>
           <div className="flex gap-2">
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-  <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-    <div>
-      <h1 className="m-0 text-lg font-bold text-gray-900">📊 Reportes Contables</h1>
-      <p className="mt-0.5 text-xs text-gray-500">{businessName}</p>
-    </div>
-    <div className="flex gap-2">
-      {/* ✅ NUEVO BOTÓN */}
-      <button 
-        onClick={() => setShowReportGuide(true)} 
-        className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
-      >
-        ❓ ¿Qué estoy viendo?
-      </button>
-      <button 
-        onClick={() => setShowExportModal(true)} 
-        className="px-3 py-1.5 bg-emerald-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-600"
-      >
-        📥 Exportar Excel
-      </button>
-      <button 
-        onClick={() => setShowContactModal(true)} 
-        className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
-      >
-        💬 Ayuda
-      </button>
-      <button 
-        onClick={() => router.push('/locales')} 
-        className="px-3 py-1.5 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
-      >
-        ← Volver
-      </button>
-      <button 
-        onClick={handleSignOut} 
-        className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200"
-      >
-        Salir
-      </button>
-    </div>
-  </div>
-</header>
+            <button 
+              onClick={() => setShowReportGuide(true)} 
+              className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
+            >
+              ❓ ¿Qué estoy viendo?
+            </button>
             <button 
               onClick={() => setShowExportModal(true)} 
               className="px-3 py-1.5 bg-emerald-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-600"
@@ -617,14 +583,14 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
 
         {!summary ? (
           <div className="bg-white p-12 rounded-xl border border-gray-200 text-center">
-            <div className="text-5xl mb-3"></div>
+            <div className="text-5xl mb-3">📭</div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin datos para este período</h3>
             <p className="m-0 text-gray-500 text-sm">No hay transacciones registradas entre {new Date(fechaDesde).toLocaleDateString('es-AR')} y {new Date(fechaHasta).toLocaleDateString('es-AR')}.</p>
           </div>
         ) : (
           <>
             <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
-              <div className="bg-slate-800 p-3 text-white font-bold text-sm"> RESUMEN EJECUTIVO</div>
+              <div className="bg-slate-800 p-3 text-white font-bold text-sm">📋 RESUMEN EJECUTIVO</div>
               <div className="p-4">
                 <table className="w-full text-sm">
                   <tbody>
@@ -818,7 +784,7 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
                             </td>
                             <td className="p-2">
                               {isPast ? <span className="text-green-600 font-bold">✅ Acreditado</span> : 
-                               isToday ? <span className="text-blue-600 font-bold">📍 Hoy</span> : 
+                               isToday ? <span className="text-blue-600 font-bold"> Hoy</span> : 
                                <span className="text-amber-600 font-bold">⏳ Pendiente</span>}
                             </td>
                             <td className="p-2 text-right font-bold text-green-700">{formatCurrency(day.total)}</td>
@@ -871,7 +837,7 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
                 onClick={handleExportExcel}
                 className="flex-1 p-3 bg-emerald-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-emerald-600"
               >
-                📥 Exportar
+                 Exportar
               </button>
             </div>
           </div>
@@ -885,10 +851,11 @@ const [showReportGuide, setShowReportGuide] = useState(false) // ← AGREGAR EST
         localId={selectedLocalId || null}
         paginaOrigen="Reportes"
       />
-                <ReportGuide 
+
+      <ReportGuide 
         isOpen={showReportGuide}
         onClose={() => setShowReportGuide(false)}
       />
-   </main>
+    </main>
   )
 }
