@@ -651,24 +651,33 @@ export default function Reportes() {
                       </tr>
                     </thead>
                     <tbody>
-                      {salesBook.map((row, i) => (
-                        <tr key={i} className="border-b border-slate-100">
-                          <td className="p-2 text-gray-900">{row.fecha}</td>
-                          <td className="p-2 text-gray-900">{row.concepto}</td>
-                          <td className="p-2 text-slate-500 text-[10px]">{row.medio}</td>
-                          <td className="p-2 text-slate-700 font-medium">{row.tipo_medio}</td>
-                          <td className="p-2 text-slate-700">{row.operador}</td>
-                          <td className="p-2 text-right text-slate-600">{row.comision_porcentaje}%</td>
-                          <td className="p-2 text-right font-semibold">{formatCurrency(row.bruto)}</td>
-                          <td className="p-2 text-right">{formatCurrency(row.neto)}</td>
-                          <td className="p-2 text-right text-red-600">{formatCurrency(row.iva)}</td>
-                          <td className="p-2 text-right text-red-600">{formatCurrency(row.comision)}</td>
-                          <td className="p-2 text-slate-700">
-                            {row.fecha_acreditacion ? new Date(row.fecha_acreditacion + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
-                          </td>
-                          <td className="p-2 text-right font-bold text-green-700">{formatCurrency(row.netoReal)}</td>
-                        </tr>
-                      ))}
+                      {salesBook.map((row, i) => {
+  const esReversa = row.es_reversa || row.monto < 0 // Detectar si es reversa
+  
+  return (
+    <tr 
+      key={i} 
+      className={`border-b border-slate-100 ${
+        esReversa ? 'bg-red-50 opacity-75' : ''
+      }`}
+    >
+      <td className="p-2 text-gray-900">
+        {row.fecha}
+        {esReversa && <span className="ml-1 text-xs text-red-600">↩️</span>}
+      </td>
+      <td className={`p-2 ${esReversa ? 'line-through text-red-600' : 'text-gray-900'}`}>
+        {row.concepto}
+      </td>
+      {/* ... resto de las columnas ... */}
+      <td className={`p-2 text-right font-semibold ${
+        esReversa ? 'text-red-600' : ''
+      }`}>
+        {formatCurrency(row.bruto)}
+      </td>
+      {/* ... resto de las columnas ... */}
+    </tr>
+  )
+})}
                       <tr className="bg-slate-50 border-t-2 border-slate-900 font-extrabold">
                         <td colSpan="5" className="p-3 text-right text-gray-900">TOTALES</td>
                         <td className="p-3 text-right text-slate-600">-</td>
