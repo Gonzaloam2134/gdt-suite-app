@@ -22,11 +22,27 @@ export default function SuperAdmin() {
   const [usuarios, setUsuarios] = useState([])
   const [editandoUsuario, setEditandoUsuario] = useState(null)
   const [nuevoRol, setNuevoRol] = useState('')
-  const [nuevoEstado, setNuevoEstado] = useState('')
+  const [nuevoEmail, setNuevoEmail] = useState('')
   
   // Locales
   const [todosLosLocales, setTodosLosLocales] = useState([])
   const [filtroLocal, setFiltroLocal] = useState('')
+  
+  // Configuración
+  const [config, setConfig] = useState({
+    max_locales_por_usuario: 10,
+    comision_default: 2.5,
+    plazo_acreditacion_default: 30,
+    mantenimiento_activo: false
+  })
+  
+  // Anuncios
+  const [anuncios, setAnuncios] = useState([])
+  const [nuevoAnuncio, setNuevoAnuncio] = useState({ titulo: '', mensaje: '', tipo: 'info' })
+  
+  // Suscripciones
+  const [suscripciones, setSuscripciones] = useState([])
+  const [filtroSuscripcion, setFiltroSuscripcion] = useState('todos')
   
   const router = useRouter()
 
@@ -34,7 +50,6 @@ export default function SuperAdmin() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) { router.push('/'); return }
       
-      // Verificar que sea super_user
       const { data: perfil } = await supabase.from('perfiles').select('rol_global').eq('id', session.user.id).maybeSingle()
       if (perfil?.rol_global !== 'super_user') {
         toast.error('No tenés permisos de super administrador')
@@ -71,14 +86,11 @@ export default function SuperAdmin() {
       // Cargar todos los usuarios
       const { data: usuariosData } = await supabase
         .from('perfiles')
-        .select(`
-          *,
-          miembros_locales!inner (local_id, rol, activo, locales(nombre))
-        `)
+        .select('*')
         .order('creado_en', { ascending: false })
       setUsuarios(usuariosData || [])
       
-      // Cargar todos los locales
+      // Cargar todos los locales con métricas
       const { data: localesData } = await supabase
         .from('locales')
         .select(`
@@ -87,6 +99,39 @@ export default function SuperAdmin() {
         `)
         .order('creado_en', { ascending: false })
       setTodosLosLocales(localesData || [])
+      
+      // Cargar suscripciones con datos del local y owner
+      const { data: subsData } = await supabase
+        .from('suscripciones')
+        .select(`
+          *,
+          locales (nombre, rubro),
+          miembros_locales!inner (user_id, rol, perfiles(email, nombre))
+        `)
+        .order('fecha_vencimiento', { ascending: true })
+      
+      // Filtrar para quedarnos solo con el miembro 'owner' de cada local para mostrar el email
+      const subsConOwner = subsData?.map(sub => {
+        const owner = sub.miembros_locales?.find(m => m.rol === 'owner')
+        return { ...sub, ownerEmail: owner?.perfiles?.email || 'Sin email' }
+      }) || []
+      
+      setSuscripciones(subsConOwner)
+      
+      // Cargar configuración (si existe la tabla, si no usar defaults)
+      try {
+        const { data: configData } = await supabase.from('configuracion_global').select('*').single()
+        if (configData) setConfig(configData)
+      } catch (err) {
+        // Tabla no existe, usar defaults
+      }
+      
+      // Cargar anuncios
+      const { data: anunciosData } = await supabase
+        .from('anuncios')
+        .select('*')
+        .order('creado_en', { ascending: false })
+      setAnuncios(anunciosData || [])
       
     } catch (err) {
       console.error('Error cargando super admin:', err)
@@ -122,16 +167,10 @@ export default function SuperAdmin() {
   }
 
   const handleActualizarUsuario = async (userId) => {
-    if (!nuevoRol && !nuevoEstado) {
-      toast.error('Seleccioná al menos un cambio (rol o estado)')
-      return
-    }
-    
     try {
       const updates = {}
       if (nuevoRol) updates.rol_global = nuevoRol
-      if (nuevoEstado === 'activo') updates.activo = true
-      if (nuevoEstado === 'inactivo') updates.activo = false
+      if (nuevoEmail) updates.email = nuevoEmail
       
       const { error } = await supabase.from('perfiles').update(updates).eq('id', userId)
       if (error) throw error
@@ -139,7 +178,7 @@ export default function SuperAdmin() {
       toast.success('✅ Usuario actualizado')
       setEditandoUsuario(null)
       setNuevoRol('')
-      setNuevoEstado('')
+      setNuevoEmail('')
       await loadData()
     } catch (err) {
       toast.error('Error: ' + err.message)
@@ -153,7 +192,6 @@ export default function SuperAdmin() {
     if (!confirm(`¿Estás seguro de ${accion} este local?`)) return
     
     try {
-      // Actualizar todos los miembros de ese local
       const { error } = await supabase
         .from('miembros_locales')
         .update({ activo: nuevoEstado === 'activo' })
@@ -161,6 +199,69 @@ export default function SuperAdmin() {
       
       if (error) throw error
       toast.success(`✅ Local ${accion === 'activar' ? 'activado' : 'suspendido'} correctamente`)
+      await loadData()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleCambiarEstadoSuscripcion = async (localId, nuevoEstado) => {
+    if (!confirm(`¿Estás seguro de cambiar el estado a "${nuevoEstado.toUpperCase()}"?`)) return
+    
+    try {
+      const { error } = await supabase
+        .from('suscripciones')
+        .update({ 
+          estado: nuevoEstado,
+          actualizado_en: new Date().toISOString()
+        })
+        .eq('local_id', localId)
+      
+      if (error) throw error
+      toast.success(`✅ Estado actualizado a ${nuevoEstado}`)
+      await loadData()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleGuardarConfig = async () => {
+    try {
+      const { error } = await supabase
+        .from('configuracion_global')
+        .upsert({ id: 1, ...config })
+      
+      if (error) {
+        await supabase.rpc('create_configuracion_table')
+        await supabase.from('configuracion_global').insert([{ id: 1, ...config }])
+      }
+      
+      toast.success('✅ Configuración guardada')
+      await loadData()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleCrearAnuncio = async () => {
+    if (!nuevoAnuncio.titulo.trim() || !nuevoAnuncio.mensaje.trim()) {
+      toast.error('Completá título y mensaje')
+      return
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('anuncios')
+        .insert([{
+          titulo: nuevoAnuncio.titulo.trim(),
+          mensaje: nuevoAnuncio.mensaje.trim(),
+          tipo: nuevoAnuncio.tipo,
+          creado_por: user.id
+        }])
+      
+      if (error) throw error
+      toast.success('✅ Anuncio publicado')
+      setNuevoAnuncio({ titulo: '', mensaje: '', tipo: 'info' })
       await loadData()
     } catch (err) {
       toast.error('Error: ' + err.message)
@@ -177,7 +278,7 @@ export default function SuperAdmin() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900">👑 Super Admin</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900"> Super Admin</h1>
             <p className="mt-0.5 text-xs text-gray-500">Panel de control global de la plataforma</p>
           </div>
           <div className="flex gap-2">
@@ -204,7 +305,10 @@ export default function SuperAdmin() {
             { id: 'dashboard', label: '📊 Dashboard Global' },
             { id: 'contactos', label: '📬 Consultas' },
             { id: 'usuarios', label: '👥 Usuarios' },
-            { id: 'locales', label: '🏪 Locales' }
+            { id: 'locales', label: '🏪 Locales' },
+            { id: 'suscripciones', label: '💳 Suscripciones' },
+            { id: 'config', label: '⚙️ Configuración' },
+            { id: 'anuncios', label: '📢 Anuncios' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -234,19 +338,41 @@ export default function SuperAdmin() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2"> LOCALES REGISTRADOS</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2">🏪 LOCALES REGISTRADOS</div>
                 <div className="text-3xl font-extrabold text-blue-700">{globalStats.locales}</div>
                 <div className="text-xs text-gray-400 mt-1">Total en la plataforma</div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2">👥 USUARIOS ACTIVOS</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2"> USUARIOS ACTIVOS</div>
                 <div className="text-3xl font-extrabold text-green-700">{globalStats.usuarios}</div>
                 <div className="text-xs text-gray-400 mt-1">Cuentas registradas</div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2"> TRANSACCIONES</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2">💳 TRANSACCIONES</div>
                 <div className="text-3xl font-extrabold text-purple-700">{globalStats.transacciones}</div>
                 <div className="text-xs text-gray-400 mt-1">Total procesadas</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-base font-bold text-gray-900 mb-3">📈 Resumen de actividad</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{contactos.filter(c => c.estado === 'resuelto').length}</div>
+                  <div className="text-xs text-gray-500">Consultas resueltas</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-amber-600">{contactos.filter(c => c.estado === 'pendiente').length}</div>
+                  <div className="text-xs text-gray-500">Consultas pendientes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{todosLosLocales.filter(l => l.activo !== false).length}</div>
+                  <div className="text-xs text-gray-500">Locales activos</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{todosLosLocales.filter(l => l.activo === false).length}</div>
+                  <div className="text-xs text-gray-500">Locales suspendidos</div>
+                </div>
               </div>
             </div>
           </div>
@@ -261,7 +387,6 @@ export default function SuperAdmin() {
               </p>
             </div>
 
-            {/* Filtros */}
             <div className="flex gap-2 flex-wrap">
               {['todos', 'pendiente', 'resuelto', 'cerrado'].map(estado => (
                 <button
@@ -279,7 +404,6 @@ export default function SuperAdmin() {
               ))}
             </div>
 
-            {/* Lista de consultas */}
             {contactos
               .filter(c => filtroEstado === 'todos' || c.estado === filtroEstado)
               .map(contacto => {
@@ -300,7 +424,7 @@ export default function SuperAdmin() {
                             contacto.tipo_consulta === 'facturacion' ? 'bg-amber-100 text-amber-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
-                            {contacto.tipo_consulta.toUpperCase()}
+                            {contacto.tipo_consulta?.toUpperCase() || 'GENERAL'}
                           </span>
                           <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                             esPendiente ? 'bg-amber-100 text-amber-700' : 
@@ -311,8 +435,8 @@ export default function SuperAdmin() {
                         </div>
                         <h4 className="font-bold text-gray-900 text-sm mb-1">{contacto.asunto}</h4>
                         <div className="text-xs text-gray-500 space-y-0.5">
-                          <div>👤 {contacto.perfiles?.email || 'Usuario desconocido'}</div>
-                          {contacto.locales?.nombre && <div>🏪 {contacto.locales.nombre}</div>}
+                          <div> {contacto.perfiles?.email || 'Usuario desconocido'}</div>
+                          {contacto.locales?.nombre && <div> {contacto.locales.nombre}</div>}
                           <div>📍 Desde: {contacto.pagina_origen}</div>
                           <div>🕐 {new Date(contacto.creado_en).toLocaleString('es-AR')}</div>
                         </div>
@@ -358,7 +482,7 @@ export default function SuperAdmin() {
                             onClick={() => handleResponderContacto(contacto.id)}
                             className="px-4 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
                           >
-                            📤 Enviar respuesta
+                             Enviar respuesta
                           </button>
                           <button
                             onClick={() => { setRespondiendoId(null); setRespuestaTexto('') }}
@@ -387,7 +511,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800 m-0">
-                👥 Gestioná todos los usuarios de la plataforma. Podés cambiar roles y activar/desactivar cuentas.
+                👥 Gestioná todos los usuarios de la plataforma. Podés cambiar roles y emails.
               </p>
             </div>
 
@@ -415,17 +539,6 @@ export default function SuperAdmin() {
                           {!esActivo && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">INACTIVO</span>}
                         </div>
                         <div className="text-xs text-gray-500 mb-2">{usuario.email}</div>
-                        
-                        {/* Locales asociados */}
-                        {usuario.miembros_locales && usuario.miembros_locales.length > 0 && (
-                          <div className="text-xs text-gray-600 space-y-1">
-                            {usuario.miembros_locales.map((m, idx) => (
-                              <div key={idx}>
-                                 {m.locales?.nombre} - <span className="font-semibold">{m.rol.toUpperCase()}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -444,15 +557,13 @@ export default function SuperAdmin() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Estado de la cuenta:</label>
-                          <select 
-                            value={nuevoEstado || (esActivo ? 'activo' : 'inactivo')} 
-                            onChange={(e) => setNuevoEstado(e.target.value)}
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Cambiar email:</label>
+                          <input
+                            type="email"
+                            value={nuevoEmail || usuario.email}
+                            onChange={(e) => setNuevoEmail(e.target.value)}
                             className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                          >
-                            <option value="activo">Activo</option>
-                            <option value="inactivo">Inactivo (suspendido)</option>
-                          </select>
+                          />
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -462,7 +573,7 @@ export default function SuperAdmin() {
                             💾 Guardar cambios
                           </button>
                           <button
-                            onClick={() => { setEditandoUsuario(null); setNuevoRol(''); setNuevoEstado('') }}
+                            onClick={() => { setEditandoUsuario(null); setNuevoRol(''); setNuevoEmail('') }}
                             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-300"
                           >
                             Cancelar
@@ -471,7 +582,7 @@ export default function SuperAdmin() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => { setEditandoUsuario(usuario.id); setNuevoRol(usuario.rol_global); setNuevoEstado(esActivo ? 'activo' : 'inactivo') }}
+                        onClick={() => { setEditandoUsuario(usuario.id); setNuevoRol(usuario.rol_global); setNuevoEmail(usuario.email) }}
                         className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600"
                       >
                         ✏️ Editar usuario
@@ -493,7 +604,6 @@ export default function SuperAdmin() {
               </p>
             </div>
 
-            {/* Buscador */}
             <input
               type="text"
               placeholder="Buscar local por nombre..."
@@ -527,7 +637,6 @@ export default function SuperAdmin() {
                         </div>
                       </div>
 
-                      {/* Miembros del local */}
                       {local.miembros_locales && local.miembros_locales.length > 0 && (
                         <div className="mb-3 text-xs text-gray-600">
                           <div className="font-semibold mb-1">👥 Miembros ({miembrosActivos} activos):</div>
@@ -561,10 +670,263 @@ export default function SuperAdmin() {
 
             {todosLosLocales.filter(l => l.nombre.toLowerCase().includes(filtroLocal.toLowerCase())).length === 0 && (
               <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-                <div className="text-5xl mb-3"></div>
+                <div className="text-5xl mb-3">🔍</div>
                 <p className="text-gray-500 text-sm">No se encontraron locales.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB: SUSCRIPCIONES Y PAGOS */}
+        {activeTab === 'suscripciones' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800 m-0">
+                💳 Gestioná el estado de pago de cada local. Podés restringir funcionalidades o suspender el acceso si no pagan.
+              </p>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {['todos', 'active', 'restricted', 'suspended'].map(estado => (
+                <button
+                  key={estado}
+                  onClick={() => setFiltroSuscripcion(estado)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
+                    filtroSuscripcion === estado 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {estado === 'todos' ? 'Todos' : estado === 'active' ? '🟢 Activos' : estado === 'restricted' ? '🟡 Restringidos' : '🔴 Suspendidos'}
+                  {estado !== 'todos' && ` (${suscripciones.filter(s => s.estado === estado).length})`}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              {suscripciones
+                .filter(s => filtroSuscripcion === 'todos' || s.estado === filtroSuscripcion)
+                .map(sub => {
+                  const isVencido = sub.fecha_vencimiento && new Date(sub.fecha_vencimiento) < new Date()
+                  
+                  return (
+                    <div key={sub.id} className={`bg-white rounded-lg border-2 p-4 ${
+                      sub.estado === 'active' ? 'border-green-200' : 
+                      sub.estado === 'restricted' ? 'border-amber-200 bg-amber-50' : 
+                      'border-red-200 bg-red-50'
+                    }`}>
+                      <div className="flex flex-col md:flex-row justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-bold text-gray-900">{sub.locales?.nombre}</h4>
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                              sub.estado === 'active' ? 'bg-green-100 text-green-700' : 
+                              sub.estado === 'restricted' ? 'bg-amber-100 text-amber-700' : 
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {sub.estado === 'active' ? 'ACTIVO' : sub.estado === 'restricted' ? 'RESTRINGIDO (Solo lectura)' : 'SUSPENDIDO'}
+                            </span>
+                            {isVencido && sub.estado === 'active' && (
+                              <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">VENCIDO</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>👤 Owner: {sub.ownerEmail}</div>
+                            <div>📦 Plan: <span className="font-semibold uppercase">{sub.plan}</span></div>
+                            <div>📅 Vencimiento: {sub.fecha_vencimiento ? new Date(sub.fecha_vencimiento).toLocaleDateString('es-AR') : 'Sin fecha'}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 min-w-[200px]">
+                          {sub.estado !== 'active' && (
+                            <button
+                              onClick={() => handleCambiarEstadoSuscripcion(sub.local_id, 'active')}
+                              className="px-3 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
+                            >
+                              ✅ Activar / Desbloquear
+                            </button>
+                          )}
+                          {sub.estado !== 'restricted' && (
+                            <button
+                              onClick={() => handleCambiarEstadoSuscripcion(sub.local_id, 'restricted')}
+                              className="px-3 py-2 bg-amber-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-600"
+                            >
+                              🟡 Restringir (Solo Reportes)
+                            </button>
+                          )}
+                          {sub.estado !== 'suspended' && (
+                            <button
+                              onClick={() => handleCambiarEstadoSuscripcion(sub.local_id, 'suspended')}
+                              className="px-3 py-2 bg-red-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-red-600"
+                            >
+                              🔴 Suspender Acceso Total
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: CONFIGURACIÓN */}
+        {activeTab === 'config' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800 m-0">
+                ⚙️ Configuración global de la plataforma. Estos valores afectan a todos los usuarios y locales.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-base font-bold text-gray-900 mb-4">Parámetros globales</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Máximo de locales por usuario:</label>
+                  <input
+                    type="number"
+                    value={config.max_locales_por_usuario}
+                    onChange={(e) => setConfig({...config, max_locales_por_usuario: parseInt(e.target.value) || 0})}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Límite de locales que un usuario puede crear</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Comisión por defecto (%):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={config.comision_default}
+                    onChange={(e) => setConfig({...config, comision_default: parseFloat(e.target.value) || 0})}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Comisión default para nuevos medios de pago</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Plazo de acreditación default (días):</label>
+                  <input
+                    type="number"
+                    value={config.plazo_acreditacion_default}
+                    onChange={(e) => setConfig({...config, plazo_acreditacion_default: parseInt(e.target.value) || 0})}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Días default para acreditación de medios de pago</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Modo mantenimiento:</label>
+                  <select
+                    value={config.mantenimiento_activo ? 'si' : 'no'}
+                    onChange={(e) => setConfig({...config, mantenimiento_activo: e.target.value === 'si'})}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="no">Desactivado</option>
+                    <option value="si">Activado (bloquea accesos)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Si está activo, los usuarios no podrán ingresar</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleGuardarConfig}
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600"
+              >
+                💾 Guardar configuración
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: ANUNCIOS */}
+        {activeTab === 'anuncios' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800 m-0">
+                📢 Publicá anuncios que todos los usuarios verán al iniciar sesión.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-base font-bold text-gray-900 mb-4">Crear nuevo anuncio</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Título:</label>
+                  <input
+                    type="text"
+                    value={nuevoAnuncio.titulo}
+                    onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, titulo: e.target.value})}
+                    placeholder="Ej: Nueva funcionalidad disponible"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mensaje:</label>
+                  <textarea
+                    value={nuevoAnuncio.mensaje}
+                    onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, mensaje: e.target.value})}
+                    placeholder="Escribí el mensaje del anuncio..."
+                    rows={4}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-vertical"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo:</label>
+                  <select
+                    value={nuevoAnuncio.tipo}
+                    onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, tipo: e.target.value})}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="info">ℹ️ Información</option>
+                    <option value="warning">⚠️ Advertencia</option>
+                    <option value="success">✅ Éxito</option>
+                    <option value="feature">🚀 Nueva feature</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleCrearAnuncio}
+                  className="px-6 py-3 bg-green-500 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-green-600"
+                >
+                  📤 Publicar anuncio
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-base font-bold text-gray-900">Anuncios publicados ({anuncios.length})</h3>
+              {anuncios.map(anuncio => (
+                <div key={anuncio.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-2xl">
+                      {anuncio.tipo === 'info' ? 'ℹ️' :
+                       anuncio.tipo === 'warning' ? '️' :
+                       anuncio.tipo === 'success' ? '✅' : '🚀'}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-gray-900 text-sm mb-1">{anuncio.titulo}</h4>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{anuncio.mensaje}</p>
+                      <div className="text-xs text-gray-500 mt-2">
+                        Publicado: {new Date(anuncio.creado_en).toLocaleString('es-AR')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {anuncios.length === 0 && (
+                <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p className="text-gray-500 text-sm">No hay anuncios publicados</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
