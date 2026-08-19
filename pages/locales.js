@@ -15,6 +15,11 @@ export default function Locales() {
   const [skipScaleStep, setSkipScaleStep] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
   const [subEstado, setSubEstado] = useState('active')
+  
+  // NUEVO: Estado para anuncios
+  const [anuncios, setAnuncios] = useState([])
+  const [anuncioActual, setAnuncioActual] = useState(0)
+  const [showAnuncioModal, setShowAnuncioModal] = useState(false)
 
   const router = useRouter()
 
@@ -36,6 +41,7 @@ export default function Locales() {
           return 
         }
         await loadMisLocales(session.user.id, rol)
+        await cargarAnuncios() // NUEVO: Cargar anuncios
       } catch (err) {
         console.error('Error al cargar datos:', err)
         toast.error('Error al cargar datos del usuario')
@@ -47,6 +53,26 @@ export default function Locales() {
       setLoading(false)
     })
   }, [router])
+
+  // NUEVO: Función para cargar anuncios
+  const cargarAnuncios = async () => {
+    try {
+      const { data: anunciosData } = await supabase
+        .from('anuncios')
+        .select('*')
+        .eq('activo', true)
+        .order('creado_en', { ascending: false })
+        .limit(5) // Mostrar máximo 5 anuncios
+      
+      if (anunciosData && anunciosData.length > 0) {
+        setAnuncios(anunciosData)
+        setAnuncioActual(0)
+        setShowAnuncioModal(true)
+      }
+    } catch (err) {
+      console.error('Error cargando anuncios:', err)
+    }
+  }
 
   const loadMisLocales = async (userId, currentRole) => {
     try {
@@ -122,7 +148,7 @@ export default function Locales() {
         if (mediosAInsertar.length > 0) await supabase.from('medios_pago').insert(mediosAInsertar)
       }
 
-      toast.success(' Local creado correctamente')
+      toast.success('🏪 Local creado correctamente')
       localStorage.setItem('activeLocalId', localData.id)
       localStorage.setItem('subEstado', 'active')
       setSubEstado('active')
@@ -145,7 +171,7 @@ export default function Locales() {
     }
     
     if (subEstado === 'restricted') {
-      toast.warning('⚠️ Acceso restringido. Redirigiendo a Reportes...')
+      toast.warning('️ Acceso restringido. Redirigiendo a Reportes...')
       localStorage.setItem('activeLocalId', localId)
       setTimeout(() => router.push('/reportes'), 1000)
       return
@@ -163,10 +189,85 @@ export default function Locales() {
     setShowOnboarding(true)
   }
 
+  // NUEVO: Navegación entre anuncios
+  const handleSiguienteAnuncio = () => {
+    if (anuncioActual < anuncios.length - 1) {
+      setAnuncioActual(anuncioActual + 1)
+    } else {
+      setShowAnuncioModal(false)
+    }
+  }
+
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-100"><p>Cargando...</p></div>
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20">
+      {/* MODAL DE ANUNCIOS */}
+      {showAnuncioModal && anuncios.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Header según tipo */}
+            <div className={`p-5 text-white ${
+              anuncios[anuncioActual].tipo === 'warning' ? 'bg-amber-500' :
+              anuncios[anuncioActual].tipo === 'success' ? 'bg-green-500' :
+              anuncios[anuncioActual].tipo === 'feature' ? 'bg-purple-500' :
+              anuncios[anuncioActual].tipo === 'urgent' ? 'bg-red-500' :
+              'bg-blue-500'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold m-0">
+                  {anuncios[anuncioActual].tipo === 'warning' ? '⚠️' :
+                   anuncios[anuncioActual].tipo === 'success' ? '✅' :
+                   anuncios[anuncioActual].tipo === 'feature' ? '🚀' :
+                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : ''}{' '}
+                  {anuncios[anuncioActual].titulo}
+                </h2>
+                <button
+                  onClick={() => setShowAnuncioModal(false)}
+                  className="text-white hover:text-gray-200 text-2xl font-bold cursor-pointer bg-none border-none"
+                >
+                  ×
+                </button>
+              </div>
+              {anuncios.length > 1 && (
+                <div className="text-xs text-white/80 mt-1">
+                  Anuncio {anuncioActual + 1} de {anuncios.length}
+                </div>
+              )}
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6">
+              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {anuncios[anuncioActual].mensaje}
+              </p>
+              <div className="text-xs text-gray-500 mt-4">
+                Publicado: {new Date(anuncios[anuncioActual].creado_en).toLocaleDateString('es-AR')}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 bg-gray-50 border-t border-gray-200 flex gap-2">
+              {anuncioActual < anuncios.length - 1 ? (
+                <button
+                  onClick={handleSiguienteAnuncio}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-blue-600"
+                >
+                  Siguiente →
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAnuncioModal(false)}
+                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-green-600"
+                >
+                  ✓ Entendido
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -223,7 +324,7 @@ export default function Locales() {
                   onClick={() => setShowContactModal(true)}
                   className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-red-700"
                 >
-                  💬 Contactar a Soporte para Pagar
+                   Contactar a Soporte para Pagar
                 </button>
               </div>
             </div>
@@ -232,7 +333,7 @@ export default function Locales() {
           {subEstado === 'restricted' && (
             <div className="max-w-2xl mx-auto p-4">
               <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center">
-                <div className="text-4xl mb-3">️</div>
+                <div className="text-4xl mb-3">⚠️</div>
                 <h3 className="text-lg font-bold text-amber-900 mb-2">Modo Solo Lectura</h3>
                 <p className="text-sm text-amber-800 mb-4">
                   Tu cuenta está restringida. Podés ver tus <strong>Reportes</strong> históricos, pero no podés registrar nuevas ventas ni cambiar configuraciones.
@@ -260,14 +361,14 @@ export default function Locales() {
       <div className="max-w-2xl mx-auto p-4">
         {misLocales.length === 0 && (userRole === 'cajero' || userRole === 'empleado') ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-amber-300">
-            <div className="text-5xl mb-3">⏳</div>
+            <div className="text-5xl mb-3"></div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Esperando asignación</h3>
             <p className="m-0 mb-6 text-gray-500 text-sm">Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local.</p>
             <button onClick={handleSignOut} className="px-6 py-3 bg-gray-200 text-gray-700 border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-gray-300">Volver al inicio</button>
           </div>
         ) : misLocales.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
-            <div className="text-5xl mb-3"></div>
+            <div className="text-5xl mb-3">🏪</div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin locales registrados</h3>
             <p className="m-0 mb-4 text-gray-500 text-sm">Creá tu primer local para empezar a operar</p>
             <button onClick={() => setShowOnboarding(true)} className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">+ Crear mi primer local</button>
@@ -277,7 +378,7 @@ export default function Locales() {
             {misLocales.map((local) => (
               <div key={local.id} className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-lg transition-all">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm"></div>
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm">🏪</div>
                   <div>
                     <h3 className="m-0 text-lg font-bold text-gray-900">{local.nombre}</h3>
                     <div className="flex gap-2 mt-1">
@@ -299,7 +400,7 @@ export default function Locales() {
                     {subEstado === 'suspended' ? '🚫 Acceso Suspendido' : subEstado === 'restricted' ? '⚠️ Solo Reportes' : '→ Ir a Caja'}
                   </button>
                   {userRole === 'owner' && subEstado === 'active' && (
-                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100"> Gestionar Medios de Pago</button>
+                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100">💳 Gestionar Medios de Pago</button>
                   )}
                 </div>
               </div>
