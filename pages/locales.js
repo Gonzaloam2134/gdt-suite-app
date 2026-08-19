@@ -14,6 +14,7 @@ export default function Locales() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [skipScaleStep, setSkipScaleStep] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
+  const [subEstado, setSubEstado] = useState('active')
 
   const router = useRouter()
 
@@ -59,6 +60,28 @@ export default function Locales() {
       const { data: localesData } = await supabase.from('locales').select('id, nombre, rubro, condicion_fiscal').in('id', localIds)
       setMisLocales(localesData || [])
 
+      // VERIFICAR SUSCRIPCIÓN DEL PRIMER LOCAL
+      if (localesData && localesData.length > 0) {
+        const localId = localesData[0].id
+        const { data: subData } = await supabase
+          .from('suscripciones')
+          .select('estado')
+          .eq('local_id', localId)
+          .single()
+
+        const estado = subData?.estado || 'active'
+        setSubEstado(estado)
+        localStorage.setItem('subEstado', estado)
+
+        if (currentRole === 'owner') {
+          if (estado === 'suspended') {
+            toast.error('⛔ Tu cuenta está suspendida. Contactá a soporte para regularizar tu pago.')
+          } else if (estado === 'restricted') {
+            toast.warning('⚠️ Tu cuenta está restringida. Solo podés acceder a Reportes.')
+          }
+        }
+      }
+
       if ((currentRole === 'cajero' || currentRole === 'empleado') && localesData && localesData.length > 0) {
         localStorage.setItem('activeLocalId', localesData[0].id)
         toast.success('Local seleccionado automáticamente')
@@ -73,7 +96,7 @@ export default function Locales() {
   const handleOnboardingComplete = async (formData) => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) { toast.error('No hay sesión activa.'); router.push('/'); return }
-    if (userRole === 'cajero' || userRole === 'empleado') { toast.error(' No tenés permisos para crear locales.'); setShowOnboarding(false); return }
+    if (userRole === 'cajero' || userRole === 'empleado') { toast.error('⛔ No tenés permisos para crear locales.'); setShowOnboarding(false); return }
 
     try {
       const payload = { nombre: formData.businessName?.trim() || 'Negocio', rubro: formData.rubro || 'Otro', condicion_fiscal: formData.condicionFiscal || 'Consumidor Final', creado_por: session.user.id }
@@ -81,6 +104,14 @@ export default function Locales() {
       if (localError) throw new Error(`Error en LOCALES: ${localError.message}`)
 
       await supabase.from('miembros_locales').insert([{ local_id: localData.id, user_id: session.user.id, rol: 'owner', activo: true, aceptado_en: new Date().toISOString() }])
+
+      // Crear suscripción default para el nuevo local
+      await supabase.from('suscripciones').insert([{
+        local_id: localData.id,
+        plan: 'free',
+        estado: 'active',
+        fecha_vencimiento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      }])
 
       if (formData.mediosPago && formData.mediosPago.length > 0) {
         const mediosAInsertar = formData.mediosPago.filter(m => m.habilitado).map((m, i) => ({
@@ -91,8 +122,10 @@ export default function Locales() {
         if (mediosAInsertar.length > 0) await supabase.from('medios_pago').insert(mediosAInsertar)
       }
 
-      toast.success('🏪 Local creado correctamente')
+      toast.success(' Local creado correctamente')
       localStorage.setItem('activeLocalId', localData.id)
+      localStorage.setItem('subEstado', 'active')
+      setSubEstado('active')
       localStorage.removeItem('onboarding_temp_data')
       
       await loadMisLocales(session.user.id, userRole)
@@ -105,6 +138,19 @@ export default function Locales() {
 
   const handleSelectLocal = (localId) => {
     if (userRole === 'cajero' || userRole === 'empleado') return
+    
+    if (subEstado === 'suspended') {
+      toast.error('⛔ Local suspendido. Regularizá tu pago para acceder.')
+      return
+    }
+    
+    if (subEstado === 'restricted') {
+      toast.warning('⚠️ Acceso restringido. Redirigiendo a Reportes...')
+      localStorage.setItem('activeLocalId', localId)
+      setTimeout(() => router.push('/reportes'), 1000)
+      return
+    }
+
     localStorage.setItem('activeLocalId', localId)
     toast.success('Local seleccionado')
     router.push('/dashboard')
@@ -133,7 +179,6 @@ export default function Locales() {
                 📊 Reportes
               </button>
             </RoleGate>
-            
             <RoleGate allowedRoles={['owner', 'super_user']}>
               <button onClick={() => router.push('/admin')} className="px-3 py-1.5 bg-purple-100 text-purple-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-purple-200">
                 ⚙️ Administración
@@ -163,17 +208,66 @@ export default function Locales() {
         </div>
       </header>
 
+      {/* BANNERS DE SUSCRIPCIÓN */}
+      {userRole === 'owner' && (
+        <>
+          {subEstado === 'suspended' && (
+            <div className="max-w-2xl mx-auto p-4">
+              <div className="bg-red-50 border-2 border-red-300 rounded-xl p-6 text-center">
+                <div className="text-4xl mb-3">🚫</div>
+                <h3 className="text-lg font-bold text-red-900 mb-2">Acceso Suspendido</h3>
+                <p className="text-sm text-red-700 mb-4">
+                  Tu suscripción está vencida o suspendida. No podés acceder a la Caja ni a la Administración hasta regularizar tu pago.
+                </p>
+                <button 
+                  onClick={() => setShowContactModal(true)}
+                  className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-red-700"
+                >
+                  💬 Contactar a Soporte para Pagar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {subEstado === 'restricted' && (
+            <div className="max-w-2xl mx-auto p-4">
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center">
+                <div className="text-4xl mb-3">️</div>
+                <h3 className="text-lg font-bold text-amber-900 mb-2">Modo Solo Lectura</h3>
+                <p className="text-sm text-amber-800 mb-4">
+                  Tu cuenta está restringida. Podés ver tus <strong>Reportes</strong> históricos, pero no podés registrar nuevas ventas ni cambiar configuraciones.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <button 
+                    onClick={() => router.push('/reportes')}
+                    className="px-6 py-2 bg-amber-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-amber-700"
+                  >
+                    📊 Ir a mis Reportes
+                  </button>
+                  <button 
+                    onClick={() => setShowContactModal(true)}
+                    className="px-6 py-2 bg-white border border-amber-600 text-amber-700 rounded-lg text-sm font-bold cursor-pointer hover:bg-amber-50"
+                  >
+                    💬 Regularizar Pago
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       <div className="max-w-2xl mx-auto p-4">
         {misLocales.length === 0 && (userRole === 'cajero' || userRole === 'empleado') ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-amber-300">
-            <div className="text-5xl mb-3"></div>
+            <div className="text-5xl mb-3">⏳</div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Esperando asignación</h3>
             <p className="m-0 mb-6 text-gray-500 text-sm">Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local.</p>
             <button onClick={handleSignOut} className="px-6 py-3 bg-gray-200 text-gray-700 border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-gray-300">Volver al inicio</button>
           </div>
         ) : misLocales.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
-            <div className="text-5xl mb-3">🏪</div>
+            <div className="text-5xl mb-3"></div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin locales registrados</h3>
             <p className="m-0 mb-4 text-gray-500 text-sm">Creá tu primer local para empezar a operar</p>
             <button onClick={() => setShowOnboarding(true)} className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">+ Crear mi primer local</button>
@@ -183,7 +277,7 @@ export default function Locales() {
             {misLocales.map((local) => (
               <div key={local.id} className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-lg transition-all">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm">🏪</div>
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-3xl shadow-sm"></div>
                   <div>
                     <h3 className="m-0 text-lg font-bold text-gray-900">{local.nombre}</h3>
                     <div className="flex gap-2 mt-1">
@@ -193,14 +287,24 @@ export default function Locales() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => handleSelectLocal(local.id)} className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">→ Ir a Caja</button>
-                  {userRole === 'owner' && (
-                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100">💳 Gestionar Medios de Pago</button>
+                  <button 
+                    onClick={() => handleSelectLocal(local.id)} 
+                    disabled={subEstado === 'suspended' || subEstado === 'restricted'}
+                    className={`w-full p-3 border-none rounded-lg text-sm font-bold cursor-pointer transition-colors ${
+                      subEstado === 'suspended' || subEstado === 'restricted'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    {subEstado === 'suspended' ? '🚫 Acceso Suspendido' : subEstado === 'restricted' ? '⚠️ Solo Reportes' : '→ Ir a Caja'}
+                  </button>
+                  {userRole === 'owner' && subEstado === 'active' && (
+                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100"> Gestionar Medios de Pago</button>
                   )}
                 </div>
               </div>
             ))}
-            {userRole === 'owner' && (
+            {userRole === 'owner' && subEstado === 'active' && (
               <button onClick={handleAddNewLocal} className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-semibold cursor-pointer hover:border-blue-400 hover:text-blue-500">+ Agregar otro local</button>
             )}
           </div>
