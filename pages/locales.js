@@ -130,6 +130,20 @@ export default function Locales() {
                 ⚙️ Administración
               </button>
             </RoleGate>
+          </RoleGate>
+        
+        {/* ✅ BOTÓN SUPER ADMIN - Solo para super_user */}
+        {userRole === 'super_user' && (
+          <button 
+            onClick={() => router.push('/superadmin')} 
+            className="px-3 py-1.5 bg-red-100 text-red-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-red-200"
+          >
+            👑 Super Admin
+          </button>
+        )}
+        
+        <button
+          onClick={() => setShowContactModal(true)}
             <button 
               onClick={() => setShowContactModal(true)} 
               className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
