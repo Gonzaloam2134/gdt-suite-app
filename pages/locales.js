@@ -21,6 +21,7 @@ export default function Locales() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
         router.push('/')
+        setLoading(false)
         return
       }
       setUser(session.user)
@@ -28,7 +29,11 @@ export default function Locales() {
         const { data: perfil } = await supabase.from('perfiles').select('rol_global').eq('id', session.user.id).maybeSingle()
         const rol = perfil?.rol_global || 'owner'
         setUserRole(rol)
-        if (rol === 'super_user') { router.push('/admin'); return }
+        if (rol === 'super_user') { 
+          router.push('/superadmin')
+          setLoading(false)
+          return 
+        }
         await loadMisLocales(session.user.id, rol)
       } catch (err) {
         console.error('Error al cargar datos:', err)
@@ -36,6 +41,9 @@ export default function Locales() {
       } finally {
         setLoading(false)
       }
+    }).catch(err => {
+      console.error('Error de sesión:', err)
+      setLoading(false)
     })
   }, [router])
 
@@ -65,7 +73,7 @@ export default function Locales() {
   const handleOnboardingComplete = async (formData) => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) { toast.error('No hay sesión activa.'); router.push('/'); return }
-    if (userRole === 'cajero' || userRole === 'empleado') { toast.error('⛔ No tenés permisos para crear locales.'); setShowOnboarding(false); return }
+    if (userRole === 'cajero' || userRole === 'empleado') { toast.error(' No tenés permisos para crear locales.'); setShowOnboarding(false); return }
 
     try {
       const payload = { nombre: formData.businessName?.trim() || 'Negocio', rubro: formData.rubro || 'Otro', condicion_fiscal: formData.condicionFiscal || 'Consumidor Final', creado_por: session.user.id }
@@ -116,7 +124,7 @@ export default function Locales() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900"> Mis Locales</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900">🏪 Mis Locales</h1>
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
           <div className="flex gap-2">
@@ -125,32 +133,32 @@ export default function Locales() {
                 📊 Reportes
               </button>
             </RoleGate>
+            
             <RoleGate allowedRoles={['owner', 'super_user']}>
               <button onClick={() => router.push('/admin')} className="px-3 py-1.5 bg-purple-100 text-purple-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-purple-200">
                 ⚙️ Administración
               </button>
             </RoleGate>
-          </RoleGate>
-        
-        {/* ✅ BOTÓN SUPER ADMIN - Solo para super_user */}
-        {userRole === 'super_user' && (
-          <button 
-            onClick={() => router.push('/superadmin')} 
-            className="px-3 py-1.5 bg-red-100 text-red-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-red-200"
-          >
-            👑 Super Admin
-          </button>
-        )}
-        
-        <button
-          onClick={() => setShowContactModal(true)}
+            
+            {userRole === 'super_user' && (
+              <button 
+                onClick={() => router.push('/superadmin')} 
+                className="px-3 py-1.5 bg-red-100 text-red-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-red-200"
+              >
+                👑 Super Admin
+              </button>
+            )}
+            
             <button 
               onClick={() => setShowContactModal(true)} 
               className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
             >
               💬 Ayuda
             </button>
-            <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
+            
+            <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200">
+              Salir
+            </button>
           </div>
         </div>
       </header>
@@ -158,7 +166,7 @@ export default function Locales() {
       <div className="max-w-2xl mx-auto p-4">
         {misLocales.length === 0 && (userRole === 'cajero' || userRole === 'empleado') ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-amber-300">
-            <div className="text-5xl mb-3">⏳</div>
+            <div className="text-5xl mb-3"></div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Esperando asignación</h3>
             <p className="m-0 mb-6 text-gray-500 text-sm">Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local.</p>
             <button onClick={handleSignOut} className="px-6 py-3 bg-gray-200 text-gray-700 border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-gray-300">Volver al inicio</button>
@@ -208,7 +216,6 @@ export default function Locales() {
         />
       )}
 
-      {/* ✅ Modal de Contacto */}
       <ContactModal 
         isOpen={showContactModal}
         onClose={() => setShowContactModal(false)}
