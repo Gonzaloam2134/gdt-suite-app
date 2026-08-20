@@ -15,7 +15,7 @@ export default function Locales() {
   const [skipScaleStep, setSkipScaleStep] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
   const [subEstado, setSubEstado] = useState('active')
-  
+  const [cantAnunciosNuevos, setCantAnunciosNuevos] = useState(0)
   // Estados para anuncios
   const [anuncios, setAnuncios] = useState([])
   const [anuncioActual, setAnuncioActual] = useState(0)
@@ -297,7 +297,24 @@ export default function Locales() {
           </div>
         </div>
       )}
-
+  // NUEVO: Contar anuncios no leídos para el badge
+  const contarAnunciosNuevos = async (userId) => {
+    try {
+      const { data: anunciosData } = await supabase
+        .from('anuncios')
+        .select('id')
+        .eq('activo', true)
+      
+      if (anunciosData) {
+        const leidosKey = `anuncios_leidos_${userId}`
+        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
+        setCantAnunciosNuevos(noLeidos)
+      }
+    } catch (err) {
+      console.error('Error contando anuncios:', err)
+    }
+  }
             <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
