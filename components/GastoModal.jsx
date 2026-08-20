@@ -33,7 +33,7 @@ export default function GastoModal({ isOpen, onClose, localId, onSuccess }) {
     }
   }
 
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault()
     
     if (!medioSeleccionado) {
@@ -56,7 +56,7 @@ export default function GastoModal({ isOpen, onClose, localId, onSuccess }) {
         tipo: 'GASTO_REGISTRADO',
         medio_pago_id: medioSeleccionado,
         monto: parseFloat(monto),
-        monto_neto: parseFloat(monto) / 1.21, // Asumiendo 21% IVA
+        monto_neto: parseFloat(monto) / 1.21,
         monto_iva: parseFloat(monto) - (parseFloat(monto) / 1.21),
         descripcion: descripcion || 'Gasto',
         creado_en: fechaCreado.toISOString(),
@@ -65,9 +65,20 @@ export default function GastoModal({ isOpen, onClose, localId, onSuccess }) {
       
       if (error) throw error
       
+      // 1. Mostrar éxito
       toast.success('✅ Gasto registrado correctamente')
-      resetForm()
+      
+      // 2. Limpiar el formulario
+      setMonto('')
+      setDescripcion('')
+      if (mediosPago.length > 0) setMedioSeleccionado(mediosPago[0].id)
+      
+      // 3. Actualizar el dashboard
       onSuccess()
+      
+      // 4. CERRAR EL MODAL
+      onClose()
+      
     } catch (err) {
       console.error('Error registrando gasto:', err)
       toast.error('Error al registrar gasto: ' + err.message)
