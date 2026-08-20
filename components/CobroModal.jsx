@@ -53,7 +53,6 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
       const comision = (parseFloat(monto) * (medio?.comision_porcentaje || 0)) / 100
       const montoNeto = parseFloat(monto) - comision
       
-      // Calcular fecha de acreditación
       const fechaCreado = new Date()
       const fechaAcred = new Date(fechaCreado)
       fechaAcred.setDate(fechaAcred.getDate() + (medio?.plazo_acreditacion_dias || 0))
@@ -64,7 +63,7 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
         medio_pago_id: medioSeleccionado,
         monto: parseFloat(monto),
         monto_neto: montoNeto,
-        monto_iva: parseFloat(monto) - (parseFloat(monto) / 1.21), // Asumiendo 21% IVA
+        monto_iva: parseFloat(monto) - (parseFloat(monto) / 1.21),
         descripcion: descripcion || 'Cobro',
         fecha_acreditacion_estimada: fechaAcred.toISOString(),
         creado_en: fechaCreado.toISOString(),
@@ -73,9 +72,20 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
       
       if (error) throw error
       
+      // 1. Mostrar éxito
       toast.success('✅ Cobro registrado correctamente')
-      resetForm()
+      
+      // 2. Limpiar el formulario
+      setMonto('')
+      setDescripcion('')
+      if (mediosPago.length > 0) setMedioSeleccionado(mediosPago[0].id)
+      
+      // 3. Actualizar el dashboard
       onSuccess()
+      
+      // 4. CERRAR EL MODAL
+      onClose()
+      
     } catch (err) {
       console.error('Error registrando cobro:', err)
       toast.error('Error al registrar cobro: ' + err.message)
