@@ -15,7 +15,7 @@ export default function Dashboard() {
   
   const [transacciones, setTransacciones] = useState([])
   
-  // NUEVO: Selector de fecha
+  // Selector de fecha
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0])
   const [esHoy, setEsHoy] = useState(true)
   
@@ -79,7 +79,6 @@ export default function Dashboard() {
     })
   }, [router])
 
-  // MODIFICADO: Acepta una fecha específica
   const cargarCaja = async (localId, fecha = null) => {
     try {
       setLoading(true)
@@ -110,7 +109,6 @@ export default function Dashboard() {
     }
   }
 
-  // MODIFICADO: Recibe la fecha base para calcular totales
   const calcularTotales = (transacciones, fechaBase = new Date()) => {
     const diaSeleccionado = fechaBase.toISOString().split('T')[0]
     const ahora = new Date()
@@ -281,7 +279,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* NUEVO: Selector de fecha */}
+            {/* Selector de fecha */}
             <input
               type="date"
               value={fechaSeleccionada}
@@ -320,7 +318,7 @@ export default function Dashboard() {
               onClick={handleRefresh}
               className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
             >
-               Actualizar
+              🔄 Actualizar
             </button>
             <button 
               onClick={() => setShowContactModal(true)}
@@ -360,7 +358,7 @@ export default function Dashboard() {
           </div>
           
           <div className="bg-white rounded-xl border-2 border-blue-300 p-4">
-            <div className="text-xs text-gray-600 font-semibold mb-1">🏦 EFECTIVO EN CAJA</div>
+            <div className="text-xs text-gray-600 font-semibold mb-1"> EFECTIVO EN CAJA</div>
             <div className="text-xl font-extrabold text-blue-700">{formatCurrency(totales.efectivoEnCaja)}</div>
             <div className="text-xs text-gray-500 mt-1">Solo efectivo</div>
           </div>
@@ -692,7 +690,7 @@ export default function Dashboard() {
         )}
       </div>
 
-            {/* Modales */}
+      {/* Modales */}
       <CobroModal
         isOpen={showCobroModal}
         onClose={() => setShowCobroModal(false)}
