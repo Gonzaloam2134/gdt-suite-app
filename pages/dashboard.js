@@ -5,6 +5,8 @@ import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 import ReversaModal from '../components/ReversaModal'
 import ContactModal from '../components/ContactModal'
+import CobroModal from '../components/CobroModal'
+import GastoModal from '../components/GastoModal'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
@@ -690,7 +692,21 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Modales */}
+            {/* Modales */}
+      <CobroModal
+        isOpen={showCobroModal}
+        onClose={() => setShowCobroModal(false)}
+        localId={local.id}
+        onSuccess={handleRefresh}
+      />
+
+      <GastoModal
+        isOpen={showGastoModal}
+        onClose={() => setShowGastoModal(false)}
+        localId={local.id}
+        onSuccess={handleRefresh}
+      />
+
       <ReversaModal
         isOpen={showReversaModal}
         onClose={() => {
