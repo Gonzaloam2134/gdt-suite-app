@@ -405,7 +405,9 @@ export default function AdminPanel() {
   // ==========================================
   // RENDER: Owner
   // ==========================================
-  if (role === 'owner') {
+  const rolEfectivo = role || globalRole
+
+if (rolEfectivo === 'owner') {
     return (
       <main className="min-h-screen bg-slate-100 pb-20">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -682,7 +684,7 @@ export default function AdminPanel() {
   // ==========================================
   // RENDER: Cajero
   // ==========================================
-  if (role === 'cajero') {
+  if (rolEfectivo === 'cajero') {
     return (
       <main className="min-h-screen bg-slate-100 pb-20">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -743,7 +745,7 @@ export default function AdminPanel() {
   // ==========================================
   // RENDER: Empleado
   // ==========================================
-  if (role === 'empleado') {
+  if (rolEfectivo === 'empleado') {
     return (
       <main className="min-h-screen bg-slate-100 pb-20">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
