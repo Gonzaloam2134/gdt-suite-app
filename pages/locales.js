@@ -15,11 +15,14 @@ export default function Locales() {
   const [skipScaleStep, setSkipScaleStep] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
   const [subEstado, setSubEstado] = useState('active')
-  const [cantAnunciosNuevos, setCantAnunciosNuevos] = useState(0)
+  
   // Estados para anuncios
   const [anuncios, setAnuncios] = useState([])
   const [anuncioActual, setAnuncioActual] = useState(0)
   const [showAnuncioModal, setShowAnuncioModal] = useState(false)
+  
+  // NUEVO: Cantidad de anuncios no leídos para el badge
+  const [cantAnunciosNuevos, setCantAnunciosNuevos] = useState(0)
 
   const router = useRouter()
 
@@ -41,7 +44,8 @@ export default function Locales() {
           return 
         }
         await loadMisLocales(session.user.id, rol)
-        await cargarAnuncios(session.user.id) // Pasamos el userId
+        await cargarAnuncios(session.user.id)
+        await contarAnunciosNuevos(session.user.id) // NUEVO: contar para el badge
       } catch (err) {
         console.error('Error al cargar datos:', err)
         toast.error('Error al cargar datos del usuario')
@@ -54,7 +58,7 @@ export default function Locales() {
     })
   }, [router])
 
-  // MODIFICADO: Cargar anuncios y filtrar los ya leídos
+  // Cargar anuncios y filtrar los ya leídos
   const cargarAnuncios = async (userId) => {
     try {
       const { data: anunciosData } = await supabase
@@ -64,11 +68,8 @@ export default function Locales() {
         .order('creado_en', { ascending: false })
       
       if (anunciosData && anunciosData.length > 0) {
-        // Obtener IDs de anuncios ya leídos por este usuario
         const leidosKey = `anuncios_leidos_${userId}`
         const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-        
-        // Filtrar solo los no leídos
         const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
         
         if (noLeidos.length > 0) {
@@ -82,7 +83,26 @@ export default function Locales() {
     }
   }
 
-  // NUEVA: Marcar anuncio como leído
+  // NUEVO: Contar anuncios no leídos para el badge
+  const contarAnunciosNuevos = async (userId) => {
+    try {
+      const { data: anunciosData } = await supabase
+        .from('anuncios')
+        .select('id')
+        .eq('activo', true)
+      
+      if (anunciosData) {
+        const leidosKey = `anuncios_leidos_${userId}`
+        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
+        setCantAnunciosNuevos(noLeidos)
+      }
+    } catch (err) {
+      console.error('Error contando anuncios:', err)
+    }
+  }
+
+  // Marcar anuncio como leído
   const marcarAnuncioLeido = (anuncioId) => {
     if (!user) return
     const leidosKey = `anuncios_leidos_${user.id}`
@@ -93,24 +113,25 @@ export default function Locales() {
     }
   }
 
-  // MODIFICADO: Navegación entre anuncios
+  // Navegación entre anuncios
   const handleSiguienteAnuncio = () => {
-    // Marcar el actual como leído
     marcarAnuncioLeido(anuncios[anuncioActual].id)
     
     if (anuncioActual < anuncios.length - 1) {
       setAnuncioActual(anuncioActual + 1)
     } else {
-      // Último anuncio, cerrar modal
       setShowAnuncioModal(false)
+      // Actualizar el badge después de cerrar
+      if (user) contarAnunciosNuevos(user.id)
     }
   }
 
-  // NUEVO: Cerrar modal y marcar todos como leídos
+  // Cerrar modal y marcar todos como leídos
   const handleCerrarAnuncios = () => {
-    // Marcar todos los anuncios como leídos
     anuncios.forEach(a => marcarAnuncioLeido(a.id))
     setShowAnuncioModal(false)
+    // Actualizar el badge después de cerrar
+    if (user) contarAnunciosNuevos(user.id)
   }
 
   const loadMisLocales = async (userId, currentRole) => {
@@ -210,7 +231,7 @@ export default function Locales() {
     }
     
     if (subEstado === 'restricted') {
-      toast.warning('️ Acceso restringido. Redirigiendo a Reportes...')
+      toast.warning('⚠️ Acceso restringido. Redirigiendo a Reportes...')
       localStorage.setItem('activeLocalId', localId)
       setTimeout(() => router.push('/reportes'), 1000)
       return
@@ -297,46 +318,26 @@ export default function Locales() {
           </div>
         </div>
       )}
-  // NUEVO: Contar anuncios no leídos para el badge
-  const contarAnunciosNuevos = async (userId) => {
-    try {
-      const { data: anunciosData } = await supabase
-        .from('anuncios')
-        .select('id')
-        .eq('activo', true)
-      
-      if (anunciosData) {
-        const leidosKey = `anuncios_leidos_${userId}`
-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
-        setCantAnunciosNuevos(noLeidos)
-      }
-    } catch (err) {
-      console.error('Error contando anuncios:', err)
-    }
-  }
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900"> Mis Locales</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900">🏪 Mis Locales</h1>
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
-          <div className="flex gap-2 items-center">
-            {/* NUEVO: Campana de Centro de Anuncios */}
+          <div className="flex gap-2 items-center flex-wrap">
+            {/* NUEVO: Campana de Centro de Anuncios con badge */}
             <button 
               onClick={() => router.push('/anuncios')} 
               className="relative px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
               title="Centro de Anuncios"
             >
-              🔔 Anuncios
-              {(() => {
-                const leidosKey = `anuncios_leidos_${user?.id}`
-                const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-                // Calculamos los no leídos restando los leídos del total
-                // Como no tenemos el total acá, mostramos el badge si hay algún no leído
-                // (El cálculo real se hace en la página /anuncios)
-                return null
-              })()}
+               Anuncios
+              {cantAnunciosNuevos > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white animate-pulse">
+                  {cantAnunciosNuevos > 9 ? '9+' : cantAnunciosNuevos}
+                </span>
+              )}
             </button>
 
             <RoleGate allowedRoles={['owner', 'super_user']}>
@@ -363,7 +364,7 @@ export default function Locales() {
               onClick={() => setShowContactModal(true)} 
               className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
             >
-               Ayuda
+              💬 Ayuda
             </button>
             
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200">
