@@ -298,13 +298,30 @@ export default function Locales() {
         </div>
       )}
 
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="m-0 text-lg font-bold text-gray-900"> Mis Locales</h1>
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* NUEVO: Campana de Centro de Anuncios */}
+            <button 
+              onClick={() => router.push('/anuncios')} 
+              className="relative px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
+              title="Centro de Anuncios"
+            >
+              🔔 Anuncios
+              {(() => {
+                const leidosKey = `anuncios_leidos_${user?.id}`
+                const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+                // Calculamos los no leídos restando los leídos del total
+                // Como no tenemos el total acá, mostramos el badge si hay algún no leído
+                // (El cálculo real se hace en la página /anuncios)
+                return null
+              })()}
+            </button>
+
             <RoleGate allowedRoles={['owner', 'super_user']}>
               <button onClick={() => router.push('/reportes')} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-200">
                 📊 Reportes
@@ -329,7 +346,7 @@ export default function Locales() {
               onClick={() => setShowContactModal(true)} 
               className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
             >
-              💬 Ayuda
+               Ayuda
             </button>
             
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200">
