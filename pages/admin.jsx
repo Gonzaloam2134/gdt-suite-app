@@ -30,7 +30,7 @@ export default function AdminPanel() {
   
   const router = useRouter()
 
-  useEffect(() => {
+    useEffect(() => {
     if (roleLoading) return
     
     if (!userId) {
@@ -38,19 +38,21 @@ export default function AdminPanel() {
       return
     }
     
-    if (role === 'empleado') {
+    // FIX: Si role es null pero globalRole es owner, usar globalRole
+    const rolEfectivo = role || globalRole
+    
+    if (rolEfectivo === 'empleado') {
       setActiveTab('mis-acciones')
     }
     
-    loadData()
-  }, [roleLoading, role, userId])
-
-  const loadData = async () => {
+    loadData(rolEfectivo)
+  }, [roleLoading, role, globalRole, userId])
+    const loadData = async (rolEfectivo = role || globalRole) => {
     try {
       setLoading(true)
       const activeLocalId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
       
-      console.log('🔍 [Admin] Iniciando carga - role:', role, 'globalRole:', globalRole, 'localId:', activeLocalId)
+      console.log('🔍 [Admin] Iniciando carga - rolEfectivo:', rolEfectivo, 'globalRole:', globalRole, 'localId:', activeLocalId)
 
       // ==========================================
       // SUPER USER: Solo ve estadísticas globales
@@ -77,10 +79,10 @@ export default function AdminPanel() {
       // ==========================================
       // OWNER: Ve SU local completo
       // ==========================================
-      if (role === 'owner') {
+      if (rolEfectivo === 'owner') {
         if (!activeLocalId) {
-          console.warn('️ No hay local activo seleccionado')
-          toast.error('Seleccioná un local primero')
+          console.warn('⚠️ No hay local activo seleccionado')
+          toast.error('Seleccioná un local primero desde "Mis Locales"')
           setLoading(false)
           return
         }
@@ -119,9 +121,7 @@ export default function AdminPanel() {
           transacciones: countTx || 0
         })
 
-        // ==========================================
-        // CORRECCIÓN DEFINITIVA: Cargar miembros
-        // ==========================================
+        // Cargar miembros
         console.log(' [Admin] Cargando miembros del local:', activeLocalId)
         
         const { data: miembrosData, error: miembrosError } = await supabase
@@ -132,13 +132,10 @@ export default function AdminPanel() {
         
         console.log('👥 Miembros (raw):', miembrosData, 'Error:', miembrosError)
         
-        // Obtener los perfiles de esos usuarios
         const userIds = miembrosData?.map(m => m.user_id) || []
         let miembrosConPerfiles = []
         
         if (userIds.length > 0) {
-          console.log('🔍 [Admin] Buscando perfiles para userIds:', userIds)
-          
           const { data: perfilesData, error: perfilesError } = await supabase
             .from('perfiles')
             .select('id, email, nombre, rol_global')
@@ -146,7 +143,6 @@ export default function AdminPanel() {
           
           console.log('📄 Perfiles:', perfilesData, 'Error:', perfilesError)
           
-          // Combinar los datos
           miembrosConPerfiles = (miembrosData || []).map(miembro => {
             const perfil = perfilesData?.find(p => p.id === miembro.user_id)
             return {
@@ -157,7 +153,7 @@ export default function AdminPanel() {
           })
         }
         
-        console.log(' Miembros finales:', miembrosConPerfiles)
+        console.log('👥 Miembros finales:', miembrosConPerfiles)
         setMiembros(miembrosConPerfiles)
 
         // Logs de auditoría del local
@@ -173,7 +169,7 @@ export default function AdminPanel() {
       // ==========================================
       // CAJERO: Ve información limitada
       // ==========================================
-      if (role === 'cajero') {
+      if (rolEfectivo === 'cajero') {
         const activeLocalIdCajero = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
         if (activeLocalIdCajero) {
           const { data: localData } = await supabase
@@ -193,6 +189,14 @@ export default function AdminPanel() {
           setMisAcciones(misLogs || [])
         }
       }
+      
+    } catch (err) {
+      console.error('❌ Error fatal cargando datos del admin:', err)
+      toast.error('Error al cargar el panel: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
       
     } catch (err) {
       console.error('❌ Error fatal cargando datos del admin:', err)
