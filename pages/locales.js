@@ -16,7 +16,7 @@ export default function Locales() {
   const [showContactModal, setShowContactModal] = useState(false)
   const [subEstado, setSubEstado] = useState('active')
   
-  // NUEVO: Estado para anuncios
+  // Estados para anuncios
   const [anuncios, setAnuncios] = useState([])
   const [anuncioActual, setAnuncioActual] = useState(0)
   const [showAnuncioModal, setShowAnuncioModal] = useState(false)
@@ -41,7 +41,7 @@ export default function Locales() {
           return 
         }
         await loadMisLocales(session.user.id, rol)
-        await cargarAnuncios() // NUEVO: Cargar anuncios
+        await cargarAnuncios(session.user.id) // Pasamos el userId
       } catch (err) {
         console.error('Error al cargar datos:', err)
         toast.error('Error al cargar datos del usuario')
@@ -55,7 +55,7 @@ export default function Locales() {
   }, [router])
 
   // MODIFICADO: Cargar anuncios y filtrar los ya leídos
-  const cargarAnuncios = async () => {
+  const cargarAnuncios = async (userId) => {
     try {
       const { data: anunciosData } = await supabase
         .from('anuncios')
@@ -65,7 +65,7 @@ export default function Locales() {
       
       if (anunciosData && anunciosData.length > 0) {
         // Obtener IDs de anuncios ya leídos por este usuario
-        const leidosKey = `anuncios_leidos_${user.id}`
+        const leidosKey = `anuncios_leidos_${userId}`
         const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
         
         // Filtrar solo los no leídos
@@ -84,6 +84,7 @@ export default function Locales() {
 
   // NUEVA: Marcar anuncio como leído
   const marcarAnuncioLeido = (anuncioId) => {
+    if (!user) return
     const leidosKey = `anuncios_leidos_${user.id}`
     const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
     if (!leidos.includes(anuncioId)) {
@@ -107,9 +108,9 @@ export default function Locales() {
 
   // NUEVO: Cerrar modal y marcar todos como leídos
   const handleCerrarAnuncios = () => {
+    // Marcar todos los anuncios como leídos
     anuncios.forEach(a => marcarAnuncioLeido(a.id))
     setShowAnuncioModal(false)
-  }
   }
 
   const loadMisLocales = async (userId, currentRole) => {
@@ -227,15 +228,6 @@ export default function Locales() {
     setShowOnboarding(true)
   }
 
-  // NUEVO: Navegación entre anuncios
-  const handleSiguienteAnuncio = () => {
-    if (anuncioActual < anuncios.length - 1) {
-      setAnuncioActual(anuncioActual + 1)
-    } else {
-      setShowAnuncioModal(false)
-    }
-  }
-
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-100"><p>Cargando...</p></div>
 
   return (
@@ -257,11 +249,11 @@ export default function Locales() {
                   {anuncios[anuncioActual].tipo === 'warning' ? '⚠️' :
                    anuncios[anuncioActual].tipo === 'success' ? '✅' :
                    anuncios[anuncioActual].tipo === 'feature' ? '🚀' :
-                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : ''}{' '}
+                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : 'ℹ️'}{' '}
                   {anuncios[anuncioActual].titulo}
                 </h2>
                 <button
-                  onClick={() => setShowAnuncioModal(false)}
+                  onClick={handleCerrarAnuncios}
                   className="text-white hover:text-gray-200 text-2xl font-bold cursor-pointer bg-none border-none"
                 >
                   ×
@@ -295,7 +287,7 @@ export default function Locales() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setShowAnuncioModal(false)}
+                  onClick={handleCerrarAnuncios}
                   className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-green-600"
                 >
                   ✓ Entendido
@@ -309,7 +301,7 @@ export default function Locales() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900">🏪 Mis Locales</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900"> Mis Locales</h1>
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
           <div className="flex gap-2">
@@ -362,7 +354,7 @@ export default function Locales() {
                   onClick={() => setShowContactModal(true)}
                   className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-red-700"
                 >
-                   Contactar a Soporte para Pagar
+                  💬 Contactar a Soporte para Pagar
                 </button>
               </div>
             </div>
@@ -399,7 +391,7 @@ export default function Locales() {
       <div className="max-w-2xl mx-auto p-4">
         {misLocales.length === 0 && (userRole === 'cajero' || userRole === 'empleado') ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-amber-300">
-            <div className="text-5xl mb-3"></div>
+            <div className="text-5xl mb-3">⏳</div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Esperando asignación</h3>
             <p className="m-0 mb-6 text-gray-500 text-sm">Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local.</p>
             <button onClick={handleSignOut} className="px-6 py-3 bg-gray-200 text-gray-700 border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-gray-300">Volver al inicio</button>
