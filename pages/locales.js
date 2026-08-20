@@ -262,10 +262,16 @@ export default function Locales() {
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20">
-      {/* MODAL DE ANUNCIOS */}
+            {/* MODAL DE ANUNCIOS */}
       {showAnuncioModal && anuncios.length > 0 && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={handleCerrarAnuncios}  // ← NUEVO: clic en el fondo cierra y marca como leído
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}  // ← NUEVO: evita que el clic dentro del modal lo cierre
+          >
             {/* Header según tipo */}
             <div className={`p-5 text-white ${
               anuncios[anuncioActual].tipo === 'warning' ? 'bg-amber-500' :
@@ -279,7 +285,7 @@ export default function Locales() {
                   {anuncios[anuncioActual].tipo === 'warning' ? '⚠️' :
                    anuncios[anuncioActual].tipo === 'success' ? '✅' :
                    anuncios[anuncioActual].tipo === 'feature' ? '🚀' :
-                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : 'ℹ️'}{' '}
+                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : '️'}{' '}
                   {anuncios[anuncioActual].titulo}
                 </h2>
                 <button
