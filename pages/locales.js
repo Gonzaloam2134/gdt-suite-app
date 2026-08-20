@@ -20,8 +20,6 @@ export default function Locales() {
   const [anuncios, setAnuncios] = useState([])
   const [anuncioActual, setAnuncioActual] = useState(0)
   const [showAnuncioModal, setShowAnuncioModal] = useState(false)
-  
-  // NUEVO: Cantidad de anuncios no leídos para el badge
   const [cantAnunciosNuevos, setCantAnunciosNuevos] = useState(0)
 
   const router = useRouter()
@@ -45,7 +43,7 @@ export default function Locales() {
         }
         await loadMisLocales(session.user.id, rol)
         await cargarAnuncios(session.user.id)
-        await contarAnunciosNuevos(session.user.id) // NUEVO: contar para el badge
+        await contarAnunciosNuevos(session.user.id)
       } catch (err) {
         console.error('Error al cargar datos:', err)
         toast.error('Error al cargar datos del usuario')
@@ -58,7 +56,10 @@ export default function Locales() {
     })
   }, [router])
 
-    // Cargar anuncios y filtrar los ya leídos
+  // ==========================================
+  // FUNCIONES DE ANUNCIOS
+  // ==========================================
+  
   const cargarAnuncios = async (userId) => {
     try {
       const { data: anunciosData } = await supabase
@@ -71,11 +72,11 @@ export default function Locales() {
         const leidosKey = `anuncios_leidos_${userId}`
         const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
         
-        console.log(' [Anuncios] Total activos:', anunciosData.length)
+        console.log('📢 [Anuncios] Total activos:', anunciosData.length)
         console.log('📢 [Anuncios] Leídos guardados:', leidos)
         
         const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
-        console.log(' [Anuncios] No leídos a mostrar:', noLeidos.length)
+        console.log('📢 [Anuncios] No leídos a mostrar:', noLeidos.length)
         
         if (noLeidos.length > 0) {
           setAnuncios(noLeidos)
@@ -90,7 +91,25 @@ export default function Locales() {
     }
   }
 
-  // Marcar anuncio como leído
+  const contarAnunciosNuevos = async (userId) => {
+    try {
+      const { data: anunciosData } = await supabase
+        .from('anuncios')
+        .select('id')
+        .eq('activo', true)
+      
+      if (anunciosData) {
+        const leidosKey = `anuncios_leidos_${userId}`
+        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
+        setCantAnunciosNuevos(noLeidos)
+        console.log('🔔 [Anuncios] Cantidad de nuevos:', noLeidos)
+      }
+    } catch (err) {
+      console.error('Error contando anuncios:', err)
+    }
+  }
+
   const marcarAnuncioLeido = (anuncioId) => {
     if (!user) {
       console.warn('⚠️ [Anuncios] No hay user al marcar como leído')
@@ -102,11 +121,9 @@ export default function Locales() {
       leidos.push(anuncioId)
       localStorage.setItem(leidosKey, JSON.stringify(leidos))
       console.log('✅ [Anuncios] Marcado como leído:', anuncioId)
-      console.log('📋 [Anuncios] Lista actualizada:', leidos)
     }
   }
 
-  // Marcar TODOS los anuncios actuales como leídos
   const marcarTodosComoLeidos = () => {
     if (!user) return
     const leidosKey = `anuncios_leidos_${user.id}`
@@ -122,26 +139,27 @@ export default function Locales() {
     console.log('✅ [Anuncios] Todos marcados como leídos:', leidos)
   }
 
-  // Navegación entre anuncios
   const handleSiguienteAnuncio = () => {
     marcarAnuncioLeido(anuncios[anuncioActual].id)
     
     if (anuncioActual < anuncios.length - 1) {
       setAnuncioActual(anuncioActual + 1)
     } else {
-      // Último anuncio, cerrar modal
       setShowAnuncioModal(false)
       if (user) contarAnunciosNuevos(user.id)
     }
   }
 
-  // Cerrar modal y marcar todos como leídos
   const handleCerrarAnuncios = () => {
     console.log('🚪 [Anuncios] Cerrando modal y marcando todos como leídos')
     marcarTodosComoLeidos()
     setShowAnuncioModal(false)
     if (user) contarAnunciosNuevos(user.id)
   }
+
+  // ==========================================
+  // FUNCIONES DE LOCALES
+  // ==========================================
 
   const loadMisLocales = async (userId, currentRole) => {
     try {
@@ -155,7 +173,6 @@ export default function Locales() {
       const { data: localesData } = await supabase.from('locales').select('id, nombre, rubro, condicion_fiscal').in('id', localIds)
       setMisLocales(localesData || [])
 
-      // VERIFICAR SUSCRIPCIÓN DEL PRIMER LOCAL
       if (localesData && localesData.length > 0) {
         const localId = localesData[0].id
         const { data: subData } = await supabase
@@ -200,7 +217,6 @@ export default function Locales() {
 
       await supabase.from('miembros_locales').insert([{ local_id: localData.id, user_id: session.user.id, rol: 'owner', activo: true, aceptado_en: new Date().toISOString() }])
 
-      // Crear suscripción default para el nuevo local
       await supabase.from('suscripciones').insert([{
         local_id: localData.id,
         plan: 'free',
@@ -240,7 +256,7 @@ export default function Locales() {
     }
     
     if (subEstado === 'restricted') {
-      toast.warning('⚠️ Acceso restringido. Redirigiendo a Reportes...')
+      toast.warning('️ Acceso restringido. Redirigiendo a Reportes...')
       localStorage.setItem('activeLocalId', localId)
       setTimeout(() => router.push('/reportes'), 1000)
       return
@@ -262,17 +278,16 @@ export default function Locales() {
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20">
-            {/* MODAL DE ANUNCIOS */}
+      {/* MODAL DE ANUNCIOS */}
       {showAnuncioModal && anuncios.length > 0 && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={handleCerrarAnuncios}  // ← NUEVO: clic en el fondo cierra y marca como leído
+          onClick={handleCerrarAnuncios}
         >
           <div 
             className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()}  // ← NUEVO: evita que el clic dentro del modal lo cierre
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Header según tipo */}
             <div className={`p-5 text-white ${
               anuncios[anuncioActual].tipo === 'warning' ? 'bg-amber-500' :
               anuncios[anuncioActual].tipo === 'success' ? 'bg-green-500' :
@@ -285,7 +300,7 @@ export default function Locales() {
                   {anuncios[anuncioActual].tipo === 'warning' ? '⚠️' :
                    anuncios[anuncioActual].tipo === 'success' ? '✅' :
                    anuncios[anuncioActual].tipo === 'feature' ? '🚀' :
-                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : '️'}{' '}
+                   anuncios[anuncioActual].tipo === 'urgent' ? '🚨' : 'ℹ️'}{' '}
                   {anuncios[anuncioActual].titulo}
                 </h2>
                 <button
@@ -302,7 +317,6 @@ export default function Locales() {
               )}
             </div>
 
-            {/* Contenido */}
             <div className="p-6">
               <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                 {anuncios[anuncioActual].mensaje}
@@ -312,7 +326,6 @@ export default function Locales() {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="p-5 bg-gray-50 border-t border-gray-200 flex gap-2">
               {anuncioActual < anuncios.length - 1 ? (
                 <button
@@ -341,13 +354,12 @@ export default function Locales() {
             <p className="mt-0.5 text-xs text-gray-500">{misLocales.length} {misLocales.length === 1 ? 'local asignado' : 'locales asignados'}</p>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
-            {/* NUEVO: Campana de Centro de Anuncios con badge */}
             <button 
               onClick={() => router.push('/anuncios')} 
               className="relative px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
               title="Centro de Anuncios"
             >
-               Anuncios
+              🔔 Anuncios
               {cantAnunciosNuevos > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white animate-pulse">
                   {cantAnunciosNuevos > 9 ? '9+' : cantAnunciosNuevos}
@@ -379,7 +391,7 @@ export default function Locales() {
               onClick={() => setShowContactModal(true)} 
               className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
             >
-              💬 Ayuda
+               Ayuda
             </button>
             
             <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 text-gray-500 border-none rounded-md text-xs font-medium cursor-pointer hover:bg-gray-200">
@@ -389,7 +401,6 @@ export default function Locales() {
         </div>
       </header>
 
-      {/* BANNERS DE SUSCRIPCIÓN */}
       {userRole === 'owner' && (
         <>
           {subEstado === 'suspended' && (
@@ -441,7 +452,7 @@ export default function Locales() {
       <div className="max-w-2xl mx-auto p-4">
         {misLocales.length === 0 && (userRole === 'cajero' || userRole === 'empleado') ? (
           <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-amber-300">
-            <div className="text-5xl mb-3">⏳</div>
+            <div className="text-5xl mb-3"></div>
             <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Esperando asignación</h3>
             <p className="m-0 mb-6 text-gray-500 text-sm">Tu cuenta ha sido creada, pero el dueño aún no te ha asignado a un local.</p>
             <button onClick={handleSignOut} className="px-6 py-3 bg-gray-200 text-gray-700 border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-gray-300">Volver al inicio</button>
@@ -480,7 +491,7 @@ export default function Locales() {
                     {subEstado === 'suspended' ? '🚫 Acceso Suspendido' : subEstado === 'restricted' ? '⚠️ Solo Reportes' : '→ Ir a Caja'}
                   </button>
                   {userRole === 'owner' && subEstado === 'active' && (
-                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100">💳 Gestionar Medios de Pago</button>
+                    <button onClick={() => { localStorage.setItem('activeLocalId', local.id); router.push('/admin?tab=medios-pago') }} className="w-full p-3 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-purple-100"> Gestionar Medios de Pago</button>
                   )}
                 </div>
               </div>
