@@ -203,9 +203,9 @@ export default function Dashboard() {
       netoReal
     })
     
-    // Ordenar acreditaciones por hora
+        // Ordenar acreditaciones por hora (descendente: más reciente primero)
     const acreditacionesOrdenadas = acreditacionesArray.sort((a, b) => 
-      new Date(a.creado_en) - new Date(b.creado_en)
+      new Date(b.creado_en) - new Date(a.creado_en)
     )
     setAcreditacionesHoy(acreditacionesOrdenadas)
     
@@ -264,8 +264,14 @@ export default function Dashboard() {
   if (loading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando caja...</p></div>
   if (!user || !local) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando...</p></div>
 
-  const cobros = transacciones.filter(t => t.tipo === 'COBRO_RECIBIDO' && !t.es_reversa)
-  const gastos = transacciones.filter(t => t.tipo === 'GASTO_REGISTRADO' && !t.es_reversa)
+    // Forzamos el orden descendente para que lo último registrado quede siempre arriba
+  const cobros = transacciones
+    .filter(t => t.tipo === 'COBRO_RECIBIDO' && !t.es_reversa)
+    .sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
+
+  const gastos = transacciones
+    .filter(t => t.tipo === 'GASTO_REGISTRADO' && !t.es_reversa)
+    .sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
 
   return (
     <main className="min-h-screen bg-slate-100 pb-8">
