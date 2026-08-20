@@ -54,7 +54,7 @@ export default function Locales() {
     })
   }, [router])
 
-  // NUEVO: Función para cargar anuncios
+  // MODIFICADO: Cargar anuncios y filtrar los ya leídos
   const cargarAnuncios = async () => {
     try {
       const { data: anunciosData } = await supabase
@@ -62,16 +62,54 @@ export default function Locales() {
         .select('*')
         .eq('activo', true)
         .order('creado_en', { ascending: false })
-        .limit(5) // Mostrar máximo 5 anuncios
       
       if (anunciosData && anunciosData.length > 0) {
-        setAnuncios(anunciosData)
-        setAnuncioActual(0)
-        setShowAnuncioModal(true)
+        // Obtener IDs de anuncios ya leídos por este usuario
+        const leidosKey = `anuncios_leidos_${user.id}`
+        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+        
+        // Filtrar solo los no leídos
+        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
+        
+        if (noLeidos.length > 0) {
+          setAnuncios(noLeidos)
+          setAnuncioActual(0)
+          setShowAnuncioModal(true)
+        }
       }
     } catch (err) {
       console.error('Error cargando anuncios:', err)
     }
+  }
+
+  // NUEVA: Marcar anuncio como leído
+  const marcarAnuncioLeido = (anuncioId) => {
+    const leidosKey = `anuncios_leidos_${user.id}`
+    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+    if (!leidos.includes(anuncioId)) {
+      leidos.push(anuncioId)
+      localStorage.setItem(leidosKey, JSON.stringify(leidos))
+    }
+  }
+
+  // MODIFICADO: Navegación entre anuncios
+  const handleSiguienteAnuncio = () => {
+    // Marcar el actual como leído
+    marcarAnuncioLeido(anuncios[anuncioActual].id)
+    
+    if (anuncioActual < anuncios.length - 1) {
+      setAnuncioActual(anuncioActual + 1)
+    } else {
+      // Último anuncio, cerrar modal
+      setShowAnuncioModal(false)
+    }
+  }
+
+  // NUEVO: Cerrar modal y marcar todos como leídos
+  const handleCerrarAnuncios = () => {
+    anuncios.forEach(a => marcarAnuncioLeido(a.id))
+    setShowAnuncioModal(false)
+  }
   }
 
   const loadMisLocales = async (userId, currentRole) => {
