@@ -517,4 +517,288 @@ export default function AdminPanel() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 rounded-full
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            miembro.rol === 'owner' ? 'bg-purple-100 text-purple-800' :
+                            miembro.rol === 'cajero' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {miembro.rol === 'owner' ? 'Owner' : miembro.rol === 'cajero' ? 'Cajero' : 'Empleado'}
+                          </span>
+                          {miembro.rol !== 'owner' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingMember(miembro)
+                                  setNewRole(miembro.rol)
+                                  setEditName(miembro.perfiles?.nombre || '')
+                                  setEditEmail(miembro.perfiles?.email || '')
+                                  setShowEditModal(true)
+                                }}
+                                className="px-3 py-1 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200"
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                onClick={() => handleQuitarMiembro(miembro.id)}
+                                className="px-3 py-1 bg-red-100 text-red-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-red-200"
+                              >
+                                Quitar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal de Edición de Miembro */}
+              {showEditModal && editingMember && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">✏️ Editar Miembro</h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Nombre:
+                        </label>
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          placeholder="Nombre completo"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Email:
+                        </label>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          placeholder="email@ejemplo.com"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Rol:
+                        </label>
+                        <select
+                          value={newRole}
+                          onChange={(e) => setNewRole(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                          <option value="cajero">👨‍💼 Cajero - Opera caja y registra ventas</option>
+                          <option value="empleado">👷 Empleado - Solo registra ventas</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={() => handleEditRole(
+                          editingMember.id, 
+                          editingMember.user_id || editingMember.perfiles?.id, 
+                          newRole, 
+                          editName, 
+                          editEmail
+                        )}
+                        className="flex-1 p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600"
+                      >
+                        💾 Guardar Cambios
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowEditModal(false)
+                          setEditingMember(null)
+                        }}
+                        className="flex-1 p-3 bg-gray-200 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-300"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'medios-pago' && (
+            <div className="bg-white p-4 rounded-xl border border-gray-200">
+              <h2 className="m-0 mb-3 text-base font-bold text-gray-900">💳 Medios de Pago</h2>
+              <p className="text-sm text-gray-600">Acá iría la gestión de medios de pago (próximamente)</p>
+            </div>
+          )}
+
+          {activeTab === 'logs' && (
+            <div className="bg-white p-4 rounded-xl border border-gray-200">
+              <h2 className="m-0 mb-3 text-base font-bold text-gray-900">📋 Logs de Auditoría</h2>
+              {logs.length === 0 ? (
+                <p className="text-sm text-gray-500">Sin logs registrados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {logs.map(log => {
+                    const accionInfo = getAccionLabel(log.accion)
+                    return (
+                      <div key={log.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${accionInfo.color}`}>{accionInfo.icono}</div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
+                            <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
+                            {log.detalles && (
+                              <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border border-gray-200">
+                                {log.detalles.descripcion && <div>📝 {log.detalles.descripcion}</div>}
+                                {log.detalles.monto && <div>💵 {formatCurrency(log.detalles.monto)}</div>}
+                                {log.detalles.email && <div>📧 {log.detalles.email}</div>}
+                                {log.detalles.rol_asignado && <div>🎭 Rol asignado: {log.detalles.rol_asignado}</div>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    )
+  }
+
+  // ==========================================
+  // RENDER: Cajero
+  // ==========================================
+  if (rolEfectivo === 'cajero') {
+    return (
+      <main className="min-h-screen bg-slate-100 pb-20">
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="m-0 text-lg font-bold text-gray-900">👨‍💼 Panel de Cajero</h1>
+              <p className="mt-0.5 text-xs text-gray-500">{localInfo?.nombre || 'Mi Local'}</p>
+            </div>
+            <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
+          </div>
+        </header>
+        <div className="max-w-4xl mx-auto p-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-amber-800 m-0">ℹ️ Como cajero, podés ver el resumen del local y tus propias acciones.</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-gray-200 mb-4">
+            <h2 className="m-0 mb-3 text-base font-bold text-gray-900">📊 Resumen del Local</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="text-xs text-green-800 font-bold">Total Ventas</div>
+                <div className="text-lg font-extrabold text-green-700">{formatCurrency(localStats.ventas)}</div>
+              </div>
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                <div className="text-xs text-red-800 font-bold">Total Gastos</div>
+                <div className="text-lg font-extrabold text-red-700">{formatCurrency(localStats.gastos)}</div>
+              </div>
+            </div>
+          </div>
+          <h3 className="text-sm font-bold text-gray-700 mb-3">Mis Acciones Registradas</h3>
+          {misAcciones.length === 0 ? (
+            <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-300">
+              <div className="text-4xl mb-2">📭</div>
+              <p className="text-sm text-gray-500">Sin acciones registradas aún.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {misAcciones.map(log => {
+                const accionInfo = getAccionLabel(log.accion)
+                return (
+                  <div key={log.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg ${accionInfo.color}`}>{accionInfo.icono}</div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
+                        <div className="text-xs text-gray-500">{formatFecha(log.creado_en)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+    )
+  }
+
+  // ==========================================
+  // RENDER: Empleado
+  // ==========================================
+  if (rolEfectivo === 'empleado') {
+    return (
+      <main className="min-h-screen bg-slate-100 pb-20">
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="m-0 text-lg font-bold text-gray-900">👷 Mis Acciones</h1>
+              <p className="mt-0.5 text-xs text-gray-500">Registro de tu actividad</p>
+            </div>
+            <button onClick={handleSignOut} className="px-3 py-1.5 bg-gray-100 border-none rounded-md text-gray-500 text-xs font-medium cursor-pointer hover:bg-gray-200">Salir</button>
+          </div>
+        </header>
+        <div className="max-w-4xl mx-auto p-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800 m-0">ℹ️ Como empleado, solo podés ver el registro de tus propias acciones.</p>
+          </div>
+          {misAcciones.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300">
+              <div className="text-5xl mb-3">📭</div>
+              <h3 className="m-0 mb-2 text-gray-900 text-base font-bold">Sin acciones registradas</h3>
+              <p className="m-0 text-gray-500 text-sm">Aún no tenés acciones en el sistema de auditoría.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {misAcciones.map(log => {
+                const accionInfo = getAccionLabel(log.accion)
+                return (
+                  <div key={log.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${accionInfo.color}`}>{accionInfo.icono}</div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 text-sm">{accionInfo.texto}</div>
+                        <div className="text-xs text-gray-500 mt-1">{formatFecha(log.creado_en)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+    )
+  }
+
+  // ==========================================
+  // RENDER: Acceso Restringido (Fallback)
+  // ==========================================
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+      <div className="bg-white p-8 rounded-xl border border-gray-200 text-center max-w-md">
+        <div className="text-5xl mb-3">🚫</div>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Acceso Restringido</h1>
+        <p className="text-sm text-gray-600 mb-2">No tenés permisos para ver este panel.</p>
+        <p className="text-xs text-red-500 mb-4 font-mono bg-red-50 p-2 rounded border border-red-200">
+          Debug: role=<strong>{role || 'null'}</strong> | globalRole=<strong>{globalRole || 'null'}</strong>
+        </p>
+        <button onClick={() => router.push('/locales')} className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+          Volver a Mis Locales
+        </button>
+      </div>
+    </div>
+  )
+}
