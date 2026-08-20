@@ -58,7 +58,7 @@ export default function Locales() {
     })
   }, [router])
 
-  // Cargar anuncios y filtrar los ya leídos
+    // Cargar anuncios y filtrar los ya leídos
   const cargarAnuncios = async (userId) => {
     try {
       const { data: anunciosData } = await supabase
@@ -70,12 +70,19 @@ export default function Locales() {
       if (anunciosData && anunciosData.length > 0) {
         const leidosKey = `anuncios_leidos_${userId}`
         const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+        
+        console.log(' [Anuncios] Total activos:', anunciosData.length)
+        console.log('📢 [Anuncios] Leídos guardados:', leidos)
+        
         const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
+        console.log(' [Anuncios] No leídos a mostrar:', noLeidos.length)
         
         if (noLeidos.length > 0) {
           setAnuncios(noLeidos)
           setAnuncioActual(0)
           setShowAnuncioModal(true)
+        } else {
+          console.log('✅ [Anuncios] Todos los anuncios ya fueron leídos')
         }
       }
     } catch (err) {
@@ -83,34 +90,36 @@ export default function Locales() {
     }
   }
 
-  // NUEVO: Contar anuncios no leídos para el badge
-  const contarAnunciosNuevos = async (userId) => {
-    try {
-      const { data: anunciosData } = await supabase
-        .from('anuncios')
-        .select('id')
-        .eq('activo', true)
-      
-      if (anunciosData) {
-        const leidosKey = `anuncios_leidos_${userId}`
-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
-        setCantAnunciosNuevos(noLeidos)
-      }
-    } catch (err) {
-      console.error('Error contando anuncios:', err)
-    }
-  }
-
   // Marcar anuncio como leído
   const marcarAnuncioLeido = (anuncioId) => {
-    if (!user) return
+    if (!user) {
+      console.warn('⚠️ [Anuncios] No hay user al marcar como leído')
+      return
+    }
     const leidosKey = `anuncios_leidos_${user.id}`
     const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
     if (!leidos.includes(anuncioId)) {
       leidos.push(anuncioId)
       localStorage.setItem(leidosKey, JSON.stringify(leidos))
+      console.log('✅ [Anuncios] Marcado como leído:', anuncioId)
+      console.log('📋 [Anuncios] Lista actualizada:', leidos)
     }
+  }
+
+  // Marcar TODOS los anuncios actuales como leídos
+  const marcarTodosComoLeidos = () => {
+    if (!user) return
+    const leidosKey = `anuncios_leidos_${user.id}`
+    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+    
+    anuncios.forEach(a => {
+      if (!leidos.includes(a.id)) {
+        leidos.push(a.id)
+      }
+    })
+    
+    localStorage.setItem(leidosKey, JSON.stringify(leidos))
+    console.log('✅ [Anuncios] Todos marcados como leídos:', leidos)
   }
 
   // Navegación entre anuncios
@@ -120,17 +129,17 @@ export default function Locales() {
     if (anuncioActual < anuncios.length - 1) {
       setAnuncioActual(anuncioActual + 1)
     } else {
+      // Último anuncio, cerrar modal
       setShowAnuncioModal(false)
-      // Actualizar el badge después de cerrar
       if (user) contarAnunciosNuevos(user.id)
     }
   }
 
   // Cerrar modal y marcar todos como leídos
   const handleCerrarAnuncios = () => {
-    anuncios.forEach(a => marcarAnuncioLeido(a.id))
+    console.log('🚪 [Anuncios] Cerrando modal y marcando todos como leídos')
+    marcarTodosComoLeidos()
     setShowAnuncioModal(false)
-    // Actualizar el badge después de cerrar
     if (user) contarAnunciosNuevos(user.id)
   }
 
