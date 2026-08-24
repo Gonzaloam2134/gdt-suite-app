@@ -60,7 +60,12 @@ export default function Locales() {
   // FUNCIONES DE ANUNCIOS
   // ==========================================
   
-  const cargarAnuncios = async (userId) => {
+    const cargarAnuncios = async (userId) => {
+    if (!userId) {
+      console.warn('⚠️ [Anuncios] No hay userId, no se cargan anuncios')
+      return
+    }
+    
     try {
       const { data: anunciosData } = await supabase
         .from('anuncios')
@@ -70,20 +75,23 @@ export default function Locales() {
       
       if (anunciosData && anunciosData.length > 0) {
         const leidosKey = `anuncios_leidos_${userId}`
-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+        const leidosRaw = localStorage.getItem(leidosKey)
+        const leidos = leidosRaw ? JSON.parse(leidosRaw) : []
         
-        console.log('📢 [Anuncios] Total activos:', anunciosData.length)
-        console.log('📢 [Anuncios] Leídos guardados:', leidos)
+        console.log('🔍 [Anuncios] UserId:', userId)
+        console.log('🔍 [Anuncios] Key en localStorage:', leidosKey)
+        console.log('🔍 [Anuncios] Leídos encontrados:', leidos)
         
         const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
-        console.log('📢 [Anuncios] No leídos a mostrar:', noLeidos.length)
+        console.log('🔍 [Anuncios] Anuncios NO leídos:', noLeidos.map(a => a.id))
         
         if (noLeidos.length > 0) {
+          console.log('🚨 [Anuncios] Mostrando modal porque hay', noLeidos.length, 'anuncios no leídos')
           setAnuncios(noLeidos)
           setAnuncioActual(0)
           setShowAnuncioModal(true)
         } else {
-          console.log('✅ [Anuncios] Todos los anuncios ya fueron leídos')
+          console.log('✅ [Anuncios] TODOS los anuncios están en la lista de leídos. Modal NO se muestra.')
         }
       }
     } catch (err) {

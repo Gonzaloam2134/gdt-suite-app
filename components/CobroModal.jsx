@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
 
-export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
+export default function CobroModal({ isOpen, onClose, localId, userId, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [mediosPago, setMediosPago] = useState([])
   const [medioSeleccionado, setMedioSeleccionado] = useState('')
@@ -23,7 +23,7 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
         .eq('local_id', localId)
         .eq('habilitado', true)
         .order('orden', { ascending: true })
-      
+
       setMediosPago(data || [])
       if (data && data.length > 0) {
         setMedioSeleccionado(data[0].id)
@@ -35,12 +35,12 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!medioSeleccionado) {
       toast.error('Seleccioná un medio de pago')
       return
     }
-    
+
     if (!monto || parseFloat(monto) <= 0) {
       toast.error('Ingresá un monto válido')
       return
@@ -48,16 +48,17 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
 
     try {
       setLoading(true)
-      
+
       const medio = mediosPago.find(m => m.id === medioSeleccionado)
       const comision = (parseFloat(monto) * (medio?.comision_porcentaje || 0)) / 100
       const montoNeto = parseFloat(monto) - comision
-      
+
       const fechaCreado = new Date()
       const fechaAcred = new Date(fechaCreado)
       fechaAcred.setDate(fechaAcred.getDate() + (medio?.plazo_acreditacion_dias || 0))
-      
-      const { error } = await supabase.from('transacciones').insert([{
+
+      // 1. Insertar transacción
+      const { data: transaccion, error } = await supabase.from('transacciones').insert([{
         local_id: localId,
         tipo: 'COBRO_RECIBIDO',
         medio_pago_id: medioSeleccionado,
@@ -68,37 +69,34 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
         fecha_acreditacion_estimada: fechaAcred.toISOString(),
         creado_en: fechaCreado.toISOString(),
         es_reversa: false
-      }])
-      
+      }]).select().single()
+
       if (error) throw error
-      
-      // 1. Mostrar éxito
+
+      // 2. Crear log de auditoría
+      await supabase.from('logs_auditoria').insert([{
+        local_id: localId,
+        user_id: userId,
+        accion: 'COBRO_REGISTRADO',
+        detalles: {
+          monto: parseFloat(monto),
+          medio: medio.nombre,
+          descripcion: descripcion || 'Cobro',
+          transaccion_id: transaccion.id
+        }
+      }])
+
       toast.success('✅ Cobro registrado correctamente')
-      
-      // 2. Limpiar el formulario
       setMonto('')
       setDescripcion('')
       if (mediosPago.length > 0) setMedioSeleccionado(mediosPago[0].id)
-      
-      // 3. Actualizar el dashboard
       onSuccess()
-      
-      // 4. CERRAR EL MODAL
       onClose()
-      
     } catch (err) {
       console.error('Error registrando cobro:', err)
       toast.error('Error al registrar cobro: ' + err.message)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const resetForm = () => {
-    setMonto('')
-    setDescripcion('')
-    if (mediosPago.length > 0) {
-      setMedioSeleccionado(mediosPago[0].id)
     }
   }
 
@@ -113,11 +111,8 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Medio de Pago */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Medio de Pago *
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Medio de Pago *</label>
             <select
               value={medioSeleccionado}
               onChange={(e) => setMedioSeleccionado(e.target.value)}
@@ -132,11 +127,8 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
             </select>
           </div>
 
-          {/* Monto */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Monto *
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Monto *</label>
             <input
               type="number"
               step="0.01"
@@ -149,11 +141,8 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
             />
           </div>
 
-          {/* Descripción */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Descripción
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Descripción</label>
             <input
               type="text"
               value={descripcion}
@@ -163,14 +152,10 @@ export default function CobroModal({ isOpen, onClose, localId, onSuccess }) {
             />
           </div>
 
-          {/* Botones */}
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={() => {
-                resetForm()
-                onClose()
-              }}
+              onClick={onClose}
               className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200"
             >
               Cancelar
