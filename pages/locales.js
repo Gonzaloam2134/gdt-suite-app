@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import OnboardingWizard from '../components/OnboardingWizard'
+import { useUserRole } from '../lib/UserRoleContext'
 import RoleGate from '../components/RoleGate'
 import ContactModal from '../components/ContactModal'
 
 export default function Locales() {
+  const { cambiarLocal } = useUserRole()
   const [user, setUser] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [misLocales, setMisLocales] = useState([])
@@ -242,7 +244,7 @@ export default function Locales() {
       }
 
       toast.success('🏪 Local creado correctamente')
-      localStorage.setItem('activeLocalId', localData.id)
+      await cambiarLocal(localData.id)
       localStorage.setItem('subEstado', 'active')
       setSubEstado('active')
       localStorage.removeItem('onboarding_temp_data')
@@ -255,7 +257,7 @@ export default function Locales() {
     }
   }
 
-  const handleSelectLocal = (localId) => {
+  const handleSelectLocal = async (localId) => {
     if (userRole === 'cajero' || userRole === 'empleado') return
     
     if (subEstado === 'suspended') {
@@ -265,12 +267,12 @@ export default function Locales() {
     
     if (subEstado === 'restricted') {
       toast('Acceso restringido. Redirigiendo a Reportes...', { icon: '⚠️' })
-      localStorage.setItem('activeLocalId', localId)
+      await cambiarLocal(localId)
       setTimeout(() => router.push('/reportes'), 1000)
       return
     }
 
-    localStorage.setItem('activeLocalId', localId)
+    await cambiarLocal(localId)   // recalcula el rol antes de entrar al dashboard
     toast.success('Local seleccionado')
     router.push('/dashboard')
   }

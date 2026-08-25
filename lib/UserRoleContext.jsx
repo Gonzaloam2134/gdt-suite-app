@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/router'
 import { getSession, getPerfil } from './services/auth'
 import { getRolEnLocal } from './services/miembros'
 import { ROLES_GLOBALES } from './constants/roles'
@@ -12,6 +13,8 @@ const leerLocalActivo = () => (typeof window !== 'undefined' ? localStorage.getI
  * FAIL-CLOSED: si no se puede determinar el rol, role = null y la UI no muestra nada privilegiado.
  */
 export function UserRoleProvider({ children }) {
+  const router = useRouter()
+  const localIdCargado = useRef(null)
   const [userId, setUserId] = useState(null)
   const [perfil, setPerfil] = useState(null)
   const [globalRole, setGlobalRole] = useState(null)
@@ -32,6 +35,7 @@ export function UserRoleProvider({ children }) {
 
       const localId = leerLocalActivo()
       setActiveLocalId(localId)
+      localIdCargado.current = localId
 
       if (p?.rol_global === ROLES_GLOBALES.SUPER_USER) { setRole('super_user'); return }
       if (!localId) { setRole(null); return }
@@ -46,6 +50,25 @@ export function UserRoleProvider({ children }) {
   }, [])
 
   useEffect(() => { cargar() }, [cargar])
+
+  /**
+   * El local activo vive en localStorage y puede cambiar por navegación de cliente
+   * (elegir un local en /locales y entrar al dashboard). Sin esto el provider
+   * conservaría el rol calculado con el local anterior — o sin local — y RoleGate
+   * escondería las acciones aunque el usuario sea owner.
+   */
+  useEffect(() => {
+    const revisar = () => {
+      if (leerLocalActivo() !== localIdCargado.current) cargar()
+    }
+    revisar()
+    router.events.on('routeChangeComplete', revisar)
+    window.addEventListener('focus', revisar)
+    return () => {
+      router.events.off('routeChangeComplete', revisar)
+      window.removeEventListener('focus', revisar)
+    }
+  }, [router.events, cargar])
 
   /** Llamar después de cambiar de local (localStorage) para recargar el rol */
   const cambiarLocal = useCallback((localId) => {

@@ -3,7 +3,7 @@ import { formatCurrency, formatHora } from '../../lib/format'
 import { usePaginacion } from '../../hooks/usePaginacion'
 import SeccionColapsable from '../ui/SeccionColapsable'
 import EmptyState from '../ui/EmptyState'
-import RoleGate from '../RoleGate'
+import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES_OPERAN_CAJA } from '../../lib/constants/roles'
 
 const COLOR = { cobro: 'text-green-700', gasto: 'text-red-700' }
@@ -13,6 +13,8 @@ const COLOR = { cobro: 'text-green-700', gasto: 'text-red-700' }
  * en desktop tabla. Antes eran cuatro bloques de JSX casi idénticos.
  */
 export default function ListaTransacciones({ tipo, items, onReversar }) {
+  const { hasRole } = useUserRole()
+  const puedeReversar = hasRole(ROLES_OPERAN_CAJA)
   const [expandida, setExpandida] = useState(null)
   const paginacion = usePaginacion(items, 15)
   const esCobro = tipo === 'cobro'
@@ -44,11 +46,11 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
                   <div className="flex justify-between"><span className="text-gray-500">Hora</span><span className="font-semibold text-gray-900">{formatHora(t.creado_en)}</span></div>
                   <div className="flex justify-between gap-4"><span className="text-gray-500">Descripción</span><span className="font-semibold text-gray-900 text-right">{t.descripcion || 'Sin descripción'}</span></div>
                   {t.comision > 0 && <div className="flex justify-between"><span className="text-gray-500">Comisión</span><span className="font-semibold text-red-600">-{formatCurrency(t.comision)}</span></div>}
-                  <RoleGate allowedRoles={ROLES_OPERAN_CAJA}>
+                  {puedeReversar && (
                     <div className="pt-2 border-t border-gray-200 flex justify-end">
                       <button onClick={() => onReversar(t)} className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
                     </div>
-                  </RoleGate>
+                  )}
                 </div>
               )}
             </div>
@@ -76,9 +78,9 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
                 <td className="p-2 text-gray-700">{t.descripcion || 'Sin descripción'}</td>
                 <td className={`p-2 text-right font-bold ${COLOR[tipo]}`}>{formatCurrency(t.monto)}</td>
                 <td className="p-2 text-center">
-                  <RoleGate allowedRoles={ROLES_OPERAN_CAJA}>
+                  {puedeReversar && (
                     <button onClick={() => onReversar(t)} className="px-2 py-1 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
-                  </RoleGate>
+                  )}
                 </td>
               </tr>
             ))}
