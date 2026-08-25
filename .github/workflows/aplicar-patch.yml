@@ -1,12 +1,10 @@
-name: Aplicar patch
+name: Fase 2
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - 'refactor/**'
-    paths:
-      - 'fase2.patch'
+      - 'refactor/fase-0-1'
 
 jobs:
   aplicar:
@@ -15,6 +13,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Ver qué hay
+        run: ls -la
 
       - name: Aplicar
         run: |
