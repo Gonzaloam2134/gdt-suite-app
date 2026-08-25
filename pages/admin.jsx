@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useUserRole } from '../lib/useUserRole'
+import { useUserRole } from '../lib/UserRoleContext'
 import { formatCurrency } from '../lib/format'
 import toast from 'react-hot-toast'
 
@@ -298,8 +298,8 @@ export default function AdminPanel() {
 
     const iconos = {
       efectivo: '💵',
-      tarjeta_credito: '💳',
-      tarjeta_debito: '💳',
+      credito: '💳',
+      debito: '💳',
       transferencia: '',
       billetera_virtual: '📱'
     }
@@ -910,8 +910,8 @@ export default function AdminPanel() {
                     />
                     <select className="p-2 border border-gray-300 rounded-lg text-sm" id="mp-tipo">
                       <option value="efectivo">💵 Efectivo</option>
-                      <option value="tarjeta_credito">💳 Tarjeta de Crédito</option>
-                      <option value="tarjeta_debito">💳 Tarjeta de Débito</option>
+                      <option value="credito">💳 Tarjeta de Crédito</option>
+                      <option value="debito">💳 Tarjeta de Débito</option>
                       <option value="transferencia">🏦 Transferencia</option>
                       <option value="billetera_virtual"> Billetera Virtual</option>
                     </select>

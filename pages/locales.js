@@ -197,7 +197,7 @@ export default function Locales() {
           if (estado === 'suspended') {
             toast.error('⛔ Tu cuenta está suspendida. Contactá a soporte para regularizar tu pago.')
           } else if (estado === 'restricted') {
-            toast.warning('⚠️ Tu cuenta está restringida. Solo podés acceder a Reportes.')
+            toast('Tu cuenta está restringida. Solo podés acceder a Reportes.', { icon: '⚠️' })
           }
         }
       }
@@ -264,7 +264,7 @@ export default function Locales() {
     }
     
     if (subEstado === 'restricted') {
-      toast.warning('️ Acceso restringido. Redirigiendo a Reportes...')
+      toast('Acceso restringido. Redirigiendo a Reportes...', { icon: '⚠️' })
       localStorage.setItem('activeLocalId', localId)
       setTimeout(() => router.push('/reportes'), 1000)
       return
