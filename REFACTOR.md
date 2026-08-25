@@ -42,4 +42,35 @@ Las páginas todavía usan su código original. Se corrigen al migrarlas a los c
 - CobroModal/GastoModal: usar services/transacciones.registrarCobro/Gasto (persisten alícuota, comisión, comprobante)
 - locales: anuncios leídos → services/anuncios (tabla anuncios_leidos)
 
-## Próximo: Fase 2 — dashboard.jsx (1640 → ~150)
+## Fase 2 (hecha) — dashboard 1640 → 100 líneas
+```
+pages/dashboard.jsx              100   solo composición
+hooks/useCaja.js                  79   abrir/cerrar/historial
+hooks/useTransaccionesDia.js      35   carga + totales (domain)
+components/caja/
+  CajaHeader.jsx                  64
+  CajaAcciones.jsx                32
+  KpiCards.jsx / KpiCard.jsx      46 / 38
+  ListaTransacciones.jsx          90   cobros y gastos, mobile+desktop
+  AcreditacionesDelDia.jsx        40
+  DesgloseMedios.jsx              55
+  AperturaCajaModal.jsx           28
+  CierreCajaModal.jsx             70
+  HistorialCierresModal.jsx       46
+components/MovimientoModal.jsx   170   reemplaza CobroModal + GastoModal
+components/ReversaModal.jsx       57   reescrito sobre services
+```
+
+Corregido en esta fase:
+- Fechas en hora local (antes UTC): un cobro a las 22:30 ya suma al día correcto
+- Transacciones revertidas dejan de sumar (bug de doble conteo)
+- Cobros/gastos persisten alicuota_iva, monto_iva, monto_neto, comision_monto,
+  fecha_acreditacion_estimada y tipo_comprobante → los reportes leen datos reales
+- Comprobante e IVA por defecto según locales.condicion_fiscal; se ocultan para
+  Monotributo/Exento
+- Cobro y Gasto deshabilitados si la caja no está abierta
+- RoleGate en las acciones de caja (coincide con la RLS: solo owner y cajero)
+- 8 tarjetas KPI duplicadas → 1 componente; 4 listas duplicadas → 1
+- Modales sobre components/ui/Modal (Escape, clic afuera, foco)
+
+## Próximo: Fase 3 — admin.jsx (1162 → ~120)
