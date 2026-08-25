@@ -18,6 +18,8 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
   const [expandida, setExpandida] = useState(null)
   const paginacion = usePaginacion(items, 15)
   const esCobro = tipo === 'cobro'
+  const activos = items.filter(t => !t.anulada).length
+  const anulados = items.length - activos
   const titulo = esCobro ? '💵 Cobros recibidos' : '💸 Gastos registrados'
 
   if (items.length === 0) {
@@ -29,7 +31,8 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
   }
 
   return (
-    <SeccionColapsable titulo={titulo} badge={items.length} paginacion={paginacion}>
+    <SeccionColapsable titulo={titulo} paginacion={paginacion}
+      badge={anulados > 0 ? `${activos} + ${anulados} cancelado${anulados > 1 ? 's' : ''}` : activos}>
       {/* Mobile */}
       <div className="md:hidden divide-y divide-gray-100">
         {paginacion.visibles.map((t) => {
@@ -37,16 +40,26 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
           return (
             <div key={t.id}>
               <button onClick={() => setExpandida(abierta ? null : t.id)} aria-expanded={abierta}
-                className="w-full p-3 flex items-center justify-between hover:bg-gray-50 bg-transparent border-none cursor-pointer text-left">
-                <span className="text-sm font-semibold text-gray-900 truncate">{t.medios_pago?.nombre || 'Sin medio'}</span>
-                <span className={`text-sm font-bold whitespace-nowrap ml-2 ${COLOR[tipo]}`}>{formatCurrency(t.monto)}</span>
+                className={`w-full p-3 flex items-center justify-between bg-transparent border-none cursor-pointer text-left ${t.anulada ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className={`text-sm font-semibold truncate ${t.anulada ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                    {t.medios_pago?.nombre || 'Sin medio'}
+                  </span>
+                  {t.anulada && <span className="shrink-0 px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold uppercase">Cancelado</span>}
+                </span>
+                <span className={`text-sm font-bold whitespace-nowrap ml-2 ${t.anulada ? 'text-gray-400 line-through' : COLOR[tipo]}`}>
+                  {formatCurrency(t.monto)}
+                </span>
               </button>
               {abierta && (
                 <div className="px-3 pb-3 bg-gray-50 border-t border-gray-100 space-y-2 pt-2 text-xs">
                   <div className="flex justify-between"><span className="text-gray-500">Hora</span><span className="font-semibold text-gray-900">{formatHora(t.creado_en)}</span></div>
                   <div className="flex justify-between gap-4"><span className="text-gray-500">Descripción</span><span className="font-semibold text-gray-900 text-right">{t.descripcion || 'Sin descripción'}</span></div>
                   {t.comision > 0 && <div className="flex justify-between"><span className="text-gray-500">Comisión</span><span className="font-semibold text-red-600">-{formatCurrency(t.comision)}</span></div>}
-                  {puedeReversar && (
+                  {t.anulada && t.motivo_reversa && (
+                    <div className="flex justify-between gap-4"><span className="text-gray-500">Motivo</span><span className="font-semibold text-right text-gray-700">{t.motivo_reversa}</span></div>
+                  )}
+                  {puedeReversar && !t.anulada && (
                     <div className="pt-2 border-t border-gray-200 flex justify-end">
                       <button onClick={() => onReversar(t)} className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
                     </div>
@@ -72,13 +85,18 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
           </thead>
           <tbody>
             {paginacion.visibles.map((t) => (
-              <tr key={t.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-2 text-gray-900">{formatHora(t.creado_en)}</td>
-                <td className="p-2 text-gray-700">{t.medios_pago?.nombre || '-'}</td>
-                <td className="p-2 text-gray-700">{t.descripcion || 'Sin descripción'}</td>
-                <td className={`p-2 text-right font-bold ${COLOR[tipo]}`}>{formatCurrency(t.monto)}</td>
+              <tr key={t.id} className={`border-b border-gray-100 ${t.anulada ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'}`}>
+                <td className={`p-2 ${t.anulada ? 'text-gray-400' : 'text-gray-900'}`}>{formatHora(t.creado_en)}</td>
+                <td className={`p-2 ${t.anulada ? 'text-gray-400' : 'text-gray-700'}`}>{t.medios_pago?.nombre || '-'}</td>
+                <td className={`p-2 ${t.anulada ? 'text-gray-400' : 'text-gray-700'}`}>
+                  <span className={t.anulada ? 'line-through' : ''}>{t.descripcion || 'Sin descripción'}</span>
+                  {t.anulada && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold uppercase" title={t.motivo_reversa || ''}>Cancelado</span>
+                  )}
+                </td>
+                <td className={`p-2 text-right font-bold ${t.anulada ? 'text-gray-400 line-through' : COLOR[tipo]}`}>{formatCurrency(t.monto)}</td>
                 <td className="p-2 text-center">
-                  {puedeReversar && (
+                  {puedeReversar && !t.anulada && (
                     <button onClick={() => onReversar(t)} className="px-2 py-1 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
                   )}
                 </td>

@@ -50,12 +50,28 @@ describe('calcularTotalesDia', () => {
     expect(r.gastos).toHaveLength(1)
   })
 
-  it('una transacción revertida NO suma (bug de doble conteo)', () => {
-    const original = tx({ id: 'orig', monto: 10000, revertida: true })
+  it('una transacción cancelada NO suma pero SÍ se lista, marcada', () => {
+    const original = tx({ id: 'orig', monto: 10000, revertida: true, motivo_reversa: 'se cargó dos veces' })
     const reversa = tx({ monto: -10000, es_reversa: true, reversa_de: 'orig' })
     const r = calcularTotalesDia([original, reversa], DIA)
     expect(r.totales.cobros).toBe(0)
+    expect(r.totales.efectivoEnCaja).toBe(0)
+    expect(r.cobros).toHaveLength(1)              // el dueño la ve en la caja
+    expect(r.cobros[0].anulada).toBe(true)
+    expect(r.cobros[0].motivo_reversa).toBe('se cargó dos veces')
+  })
+
+  it('el asiento inverso no se lista como movimiento propio', () => {
+    const r = calcularTotalesDia([tx({ monto: -500, es_reversa: true, reversa_de: 'x' })], DIA)
     expect(r.cobros).toHaveLength(0)
+    expect(r.gastos).toHaveLength(0)
+  })
+
+  it('un gasto cancelado tampoco suma y se lista marcado', () => {
+    const r = calcularTotalesDia([tx({ tipo: 'GASTO_REGISTRADO', monto: 800, revertida: true })], DIA)
+    expect(r.totales.gastos).toBe(0)
+    expect(r.gastos).toHaveLength(1)
+    expect(r.gastos[0].anulada).toBe(true)
   })
 
   it('usa comision_monto guardada si existe', () => {

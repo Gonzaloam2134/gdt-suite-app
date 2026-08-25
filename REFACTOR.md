@@ -99,4 +99,14 @@ Corregido en esta fase:
 - El bloque super_user salió de admin: /admin administra UN local, /superadmin es global
 - Cajero y empleado comparten una vista simple de su propia actividad
 
+## Ajustes post-fase 3
+- Transacciones canceladas: se muestran en la caja tachadas y con etiqueta
+  "Cancelado" (y el motivo al expandir), pero no suman a ningún total.
+  El asiento inverso queda en la DB pero no se lista como movimiento propio:
+  contablemente prolijo por detrás, claro para el dueño adelante.
+- El badge de cada lista muestra "N + M cancelados" cuando hay anulaciones.
+- Anuncios leídos ahora en la tabla anuncios_leidos (antes localStorage):
+  ya no reaparecen al cambiar de dispositivo o limpiar el navegador.
+  Nuevo hooks/useAnuncios.js; se limpiaron los console.log de locales.js.
+
 ## Próximo: Fase 4 — superadmin.jsx (934 → ~100)

@@ -4,12 +4,14 @@ import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import OnboardingWizard from '../components/OnboardingWizard'
 import { useUserRole } from '../lib/UserRoleContext'
+import { useAnuncios } from '../hooks/useAnuncios'
 import RoleGate from '../components/RoleGate'
 import ContactModal from '../components/ContactModal'
 
 export default function Locales() {
   const { cambiarLocal } = useUserRole()
   const [user, setUser] = useState(null)
+  const { pendientes, cantidad: cantAnunciosNuevos, cargado: anunciosCargados, marcarComoLeidos } = useAnuncios(user?.id)
   const [userRole, setUserRole] = useState(null)
   const [misLocales, setMisLocales] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,12 +21,19 @@ export default function Locales() {
   const [subEstado, setSubEstado] = useState('active')
   
   // Estados para anuncios
-  const [anuncios, setAnuncios] = useState([])
+  const anuncios = pendientes
   const [anuncioActual, setAnuncioActual] = useState(0)
   const [showAnuncioModal, setShowAnuncioModal] = useState(false)
-  const [cantAnunciosNuevos, setCantAnunciosNuevos] = useState(0)
 
   const router = useRouter()
+
+  // Mostrar el modal una sola vez, cuando ya sabemos qué anuncios quedan sin leer
+  useEffect(() => {
+    if (anunciosCargados && pendientes.length > 0) {
+      setAnuncioActual(0)
+      setShowAnuncioModal(true)
+    }
+  }, [anunciosCargados, pendientes.length])
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -44,8 +53,6 @@ export default function Locales() {
           return 
         }
         await loadMisLocales(session.user.id, rol)
-        await cargarAnuncios(session.user.id)
-        await contarAnunciosNuevos(session.user.id)
       } catch (err) {
         console.error('Error al cargar datos:', err)
         toast.error('Error al cargar datos del usuario')
@@ -59,112 +66,19 @@ export default function Locales() {
   }, [router])
 
   // ==========================================
-  // FUNCIONES DE ANUNCIOS
+  // ANUNCIOS (leídos en DB, ver hooks/useAnuncios)
   // ==========================================
-  
-    const cargarAnuncios = async (userId) => {
-    if (!userId) {
-      console.warn('⚠️ [Anuncios] No hay userId, no se cargan anuncios')
-      return
-    }
-    
-    try {
-      const { data: anunciosData } = await supabase
-        .from('anuncios')
-        .select('*')
-        .eq('activo', true)
-        .order('creado_en', { ascending: false })
-      
-      if (anunciosData && anunciosData.length > 0) {
-        const leidosKey = `anuncios_leidos_${userId}`
-        const leidosRaw = localStorage.getItem(leidosKey)
-        const leidos = leidosRaw ? JSON.parse(leidosRaw) : []
-        
-        console.log('🔍 [Anuncios] UserId:', userId)
-        console.log('🔍 [Anuncios] Key en localStorage:', leidosKey)
-        console.log('🔍 [Anuncios] Leídos encontrados:', leidos)
-        
-        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
-        console.log('🔍 [Anuncios] Anuncios NO leídos:', noLeidos.map(a => a.id))
-        
-        if (noLeidos.length > 0) {
-          console.log('🚨 [Anuncios] Mostrando modal porque hay', noLeidos.length, 'anuncios no leídos')
-          setAnuncios(noLeidos)
-          setAnuncioActual(0)
-          setShowAnuncioModal(true)
-        } else {
-          console.log('✅ [Anuncios] TODOS los anuncios están en la lista de leídos. Modal NO se muestra.')
-        }
-      }
-    } catch (err) {
-      console.error('Error cargando anuncios:', err)
-    }
+
+  const handleSiguienteAnuncio = async () => {
+    const actual = anuncios[anuncioActual]
+    if (actual) await marcarComoLeidos([actual.id])
+    if (anuncioActual < anuncios.length - 1) setAnuncioActual(anuncioActual + 1)
+    else setShowAnuncioModal(false)
   }
 
-  const contarAnunciosNuevos = async (userId) => {
-    try {
-      const { data: anunciosData } = await supabase
-        .from('anuncios')
-        .select('id')
-        .eq('activo', true)
-      
-      if (anunciosData) {
-        const leidosKey = `anuncios_leidos_${userId}`
-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
-        setCantAnunciosNuevos(noLeidos)
-        console.log('🔔 [Anuncios] Cantidad de nuevos:', noLeidos)
-      }
-    } catch (err) {
-      console.error('Error contando anuncios:', err)
-    }
-  }
-
-  const marcarAnuncioLeido = (anuncioId) => {
-    if (!user) {
-      console.warn('⚠️ [Anuncios] No hay user al marcar como leído')
-      return
-    }
-    const leidosKey = `anuncios_leidos_${user.id}`
-    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-    if (!leidos.includes(anuncioId)) {
-      leidos.push(anuncioId)
-      localStorage.setItem(leidosKey, JSON.stringify(leidos))
-      console.log('✅ [Anuncios] Marcado como leído:', anuncioId)
-    }
-  }
-
-  const marcarTodosComoLeidos = () => {
-    if (!user) return
-    const leidosKey = `anuncios_leidos_${user.id}`
-    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-    
-    anuncios.forEach(a => {
-      if (!leidos.includes(a.id)) {
-        leidos.push(a.id)
-      }
-    })
-    
-    localStorage.setItem(leidosKey, JSON.stringify(leidos))
-    console.log('✅ [Anuncios] Todos marcados como leídos:', leidos)
-  }
-
-  const handleSiguienteAnuncio = () => {
-    marcarAnuncioLeido(anuncios[anuncioActual].id)
-    
-    if (anuncioActual < anuncios.length - 1) {
-      setAnuncioActual(anuncioActual + 1)
-    } else {
-      setShowAnuncioModal(false)
-      if (user) contarAnunciosNuevos(user.id)
-    }
-  }
-
-  const handleCerrarAnuncios = () => {
-    console.log('🚪 [Anuncios] Cerrando modal y marcando todos como leídos')
-    marcarTodosComoLeidos()
+  const handleCerrarAnuncios = async () => {
+    await marcarComoLeidos(anuncios.map(a => a.id))
     setShowAnuncioModal(false)
-    if (user) contarAnunciosNuevos(user.id)
   }
 
   // ==========================================

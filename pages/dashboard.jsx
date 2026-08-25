@@ -64,7 +64,11 @@ export default function Dashboard() {
           <p className="text-center text-sm text-gray-500 py-8">Actualizando movimientos…</p>
         ) : (
           <>
-            <KpiCards totales={totales} cantidadCobros={cobros.length} cantidadGastos={gastos.length} />
+            <KpiCards
+              totales={totales}
+              cantidadCobros={cobros.filter(c => !c.anulada).length}
+              cantidadGastos={gastos.filter(g => !g.anulada).length}
+            />
             <ListaTransacciones tipo="cobro" items={cobros} onReversar={setAReversar} />
             <ListaTransacciones tipo="gasto" items={gastos} onReversar={setAReversar} />
             <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />
