@@ -73,4 +73,30 @@ Corregido en esta fase:
 - 8 tarjetas KPI duplicadas → 1 componente; 4 listas duplicadas → 1
 - Modales sobre components/ui/Modal (Escape, clic afuera, foco)
 
-## Próximo: Fase 3 — admin.jsx (1162 → ~120)
+## Fase 3 (hecha) — admin 1162 → 92 líneas
+```
+pages/admin.jsx                    92
+hooks/useAdminData.js              66   stats del período, miembros, medios, logs
+components/admin/
+  AdminHeader.jsx                  25
+  Tabs.jsx                         13
+  FiltroPeriodo.jsx                59   reutilizable por reportes (Fase 5)
+  ResumenTab.jsx                   25
+  MiembrosTab.jsx                 131
+  EditarMiembroModal.jsx           50
+  MediosPagoTab.jsx               120
+  ListaLogs.jsx                    35
+```
+
+Corregido en esta fase:
+- Editar miembro ya NO pisa perfiles.rol_global (antes podía degradar a un super_user)
+- Invitaciones: se sacó nombre_invitado, columna que no existe → antes fallaba siempre
+- Formularios controlados: se eliminaron los 12 document.getElementById
+- Stats del período usan calcularResumenPeriodo → excluyen reversas y revertidas
+  (antes admin, dashboard y reportes daban tres números distintos para el mismo día)
+- Fechas del filtro en hora local (lib/dates.periodoRapido)
+- confirm() → ConfirmDialog
+- El bloque super_user salió de admin: /admin administra UN local, /superadmin es global
+- Cajero y empleado comparten una vista simple de su propia actividad
+
+## Próximo: Fase 4 — superadmin.jsx (934 → ~100)
