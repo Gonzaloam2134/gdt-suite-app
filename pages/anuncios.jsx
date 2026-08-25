@@ -1,84 +1,29 @@
-import { supabase } from '../lib/supabaseClient'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
+import { useAuthGuard } from '../hooks/useAuthGuard'
+import { useAnuncios } from '../hooks/useAnuncios'
+import { useSignOut } from '../hooks/useSignOut'
 
 export default function CentroAnuncios() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [anuncios, setAnuncios] = useState([])
+  const { user, checking } = useAuthGuard()
+  const { todos: anuncios, cargado, marcarComoLeidos, marcarComoNoLeido } = useAnuncios(user?.id)
   const [filtro, setFiltro] = useState('todos') // todos, no-leidos, leidos
-  
+  const handleSignOut = useSignOut()
+  const loading = checking || !cargado
+
   const router = useRouter()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) {
-        router.push('/')
-        return
-      }
-      setUser(session.user)
-      await cargarAnuncios(session.user.id)
-    })
-  }, [router])
-
-  const cargarAnuncios = async (userId) => {
-    try {
-      setLoading(true)
-      
-      const { data: anunciosData } = await supabase
-        .from('anuncios')
-        .select('*')
-        .eq('activo', true)
-        .order('creado_en', { ascending: false })
-      
-      if (anunciosData) {
-        // Obtener IDs de anuncios leídos
-        const leidosKey = `anuncios_leidos_${userId}`
-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-        
-        // Marcar cada anuncio con su estado de lectura
-        const anunciosConEstado = anunciosData.map(a => ({
-          ...a,
-          leido: leidos.includes(a.id),
-          fechaLeido: null // Podríamos guardar esto en localStorage también si querés
-        }))
-        
-        setAnuncios(anunciosConEstado)
-      }
-    } catch (err) {
-      console.error('Error cargando anuncios:', err)
-      toast.error('Error al cargar anuncios')
-    } finally {
-      setLoading(false)
-    }
+  const handleNoLeido = async (anuncioId) => {
+    await marcarComoNoLeido(anuncioId)
+    toast.success('Marcado como no leído')
   }
 
-  const marcarComoNoLeido = (anuncioId) => {
-    if (!user) return
-    
-    const leidosKey = `anuncios_leidos_${user.id}`
-    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-    const nuevosLeidos = leidos.filter(id => id !== anuncioId)
-    localStorage.setItem(leidosKey, JSON.stringify(nuevosLeidos))
-    
-    // Actualizar el estado local
-    setAnuncios(anuncios.map(a => 
-      a.id === anuncioId ? { ...a, leido: false } : a
-    ))
-    
-    toast.success(' Anuncio marcado como no leído')
-  }
-
-  const marcarTodosComoLeidos = () => {
-    if (!user) return
-    
-    const leidosKey = `anuncios_leidos_${user.id}`
-    const todosIds = anuncios.map(a => a.id)
-    localStorage.setItem(leidosKey, JSON.stringify(todosIds))
-    
-    setAnuncios(anuncios.map(a => ({ ...a, leido: true })))
-    toast.success('✅ Todos los anuncios marcados como leídos')
+  const marcarTodos = async () => {
+    const pendientes = anuncios.filter(a => !a.leido).map(a => a.id)
+    if (pendientes.length === 0) return
+    await marcarComoLeidos(pendientes)
+    toast.success('Todos marcados como leídos')
   }
 
   const getIconoTipo = (tipo) => {
@@ -104,10 +49,6 @@ export default function CentroAnuncios() {
     return colores[tipo] || 'bg-blue-500'
   }
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
 
   if (loading) {
     return (
@@ -199,7 +140,7 @@ export default function CentroAnuncios() {
             {/* Acción masiva */}
             {cantNoLeidos > 0 && (
               <button
-                onClick={marcarTodosComoLeidos}
+                onClick={marcarTodos}
                 className="px-3 py-1.5 bg-green-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
               >
                 ✅ Marcar todos como leídos
@@ -270,18 +211,9 @@ export default function CentroAnuncios() {
                 <div className="px-4 pb-4 flex justify-end">
                   {!anuncio.leido ? (
                     <button
-                      onClick={() => {
-                        // Marcar como leído
-                        const leidosKey = `anuncios_leidos_${user.id}`
-                        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
-                        if (!leidos.includes(anuncio.id)) {
-                          leidos.push(anuncio.id)
-                          localStorage.setItem(leidosKey, JSON.stringify(leidos))
-                        }
-                        setAnuncios(anuncios.map(a => 
-                          a.id === anuncio.id ? { ...a, leido: true } : a
-                        ))
-                        toast.success('✅ Anuncio marcado como leído')
+                      onClick={async () => {
+                        await marcarComoLeidos([anuncio.id])
+                        toast.success('Marcado como leído')
                       }}
                       className="px-4 py-2 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
                     >
@@ -289,7 +221,7 @@ export default function CentroAnuncios() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => marcarComoNoLeido(anuncio.id)}
+                      onClick={() => handleNoLeido(anuncio.id)}
                       className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-200"
                     >
                       📌 Marcar como no leído
