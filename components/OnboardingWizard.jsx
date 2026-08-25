@@ -146,9 +146,9 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   <option value="Salud y Belleza">Salud y Belleza</option>
                   <option value="Servicios Profesionales">Servicios Profesionales</option>
                   <option value="Tecnología y Comunicaciones">Tecnología y Comunicaciones</option>
-                  <option value="Ferreteria"></option>
-                  <option value="Pintureria"></option>
-                  <option value="Materiales Electricos"></option>
+                  <option value="Ferreteria">Ferreteria</option>
+                  <option value="Pintureria">Pintureria</option>
+                  <option value="Materiales Electricos">Materiales Electricos</option>
                   <option value="Hogar y Construcción">Hogar y Construcción</option>
                   <option value="Automotor">Automotor</option>
                   <option value="Educación y Cultura">Educación y Cultura</option>
