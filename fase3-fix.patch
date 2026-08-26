@@ -1,0 +1,691 @@
+From d810823bdde7aaebc559dce0c134ac877e9aa509 Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Tue, 25 Aug 2026 20:59:10 +0000
+Subject: [PATCH 1/2] fix: canceladas visibles en caja con etiqueta y motivo;
+ anuncios leidos en DB
+
+---
+ REFACTOR.md                            |  10 ++
+ components/caja/ListaTransacciones.jsx |  40 +++++---
+ hooks/useAnuncios.js                   |  39 ++++++++
+ lib/domain/transacciones.js            |  20 +++-
+ pages/dashboard.jsx                    |   6 +-
+ pages/locales.js                       | 124 ++++---------------------
+ tests/transacciones.test.js            |  20 +++-
+ 7 files changed, 137 insertions(+), 122 deletions(-)
+ create mode 100644 hooks/useAnuncios.js
+
+diff --git a/REFACTOR.md b/REFACTOR.md
+index 6c42f2a..742ec63 100644
+--- a/REFACTOR.md
++++ b/REFACTOR.md
+@@ -99,4 +99,14 @@ Corregido en esta fase:
+ - El bloque super_user salió de admin: /admin administra UN local, /superadmin es global
+ - Cajero y empleado comparten una vista simple de su propia actividad
+ 
++## Ajustes post-fase 3
++- Transacciones canceladas: se muestran en la caja tachadas y con etiqueta
++  "Cancelado" (y el motivo al expandir), pero no suman a ningún total.
++  El asiento inverso queda en la DB pero no se lista como movimiento propio:
++  contablemente prolijo por detrás, claro para el dueño adelante.
++- El badge de cada lista muestra "N + M cancelados" cuando hay anulaciones.
++- Anuncios leídos ahora en la tabla anuncios_leidos (antes localStorage):
++  ya no reaparecen al cambiar de dispositivo o limpiar el navegador.
++  Nuevo hooks/useAnuncios.js; se limpiaron los console.log de locales.js.
++
+ ## Próximo: Fase 4 — superadmin.jsx (934 → ~100)
+diff --git a/components/caja/ListaTransacciones.jsx b/components/caja/ListaTransacciones.jsx
+index 99003a0..8d3281a 100644
+--- a/components/caja/ListaTransacciones.jsx
++++ b/components/caja/ListaTransacciones.jsx
+@@ -18,6 +18,8 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
+   const [expandida, setExpandida] = useState(null)
+   const paginacion = usePaginacion(items, 15)
+   const esCobro = tipo === 'cobro'
++  const activos = items.filter(t => !t.anulada).length
++  const anulados = items.length - activos
+   const titulo = esCobro ? '💵 Cobros recibidos' : '💸 Gastos registrados'
+ 
+   if (items.length === 0) {
+@@ -29,7 +31,8 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
+   }
+ 
+   return (
+-    <SeccionColapsable titulo={titulo} badge={items.length} paginacion={paginacion}>
++    <SeccionColapsable titulo={titulo} paginacion={paginacion}
++      badge={anulados > 0 ? `${activos} + ${anulados} cancelado${anulados > 1 ? 's' : ''}` : activos}>
+       {/* Mobile */}
+       <div className="md:hidden divide-y divide-gray-100">
+         {paginacion.visibles.map((t) => {
+@@ -37,16 +40,26 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
+           return (
+             <div key={t.id}>
+               <button onClick={() => setExpandida(abierta ? null : t.id)} aria-expanded={abierta}
+-                className="w-full p-3 flex items-center justify-between hover:bg-gray-50 bg-transparent border-none cursor-pointer text-left">
+-                <span className="text-sm font-semibold text-gray-900 truncate">{t.medios_pago?.nombre || 'Sin medio'}</span>
+-                <span className={`text-sm font-bold whitespace-nowrap ml-2 ${COLOR[tipo]}`}>{formatCurrency(t.monto)}</span>
++                className={`w-full p-3 flex items-center justify-between bg-transparent border-none cursor-pointer text-left ${t.anulada ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
++                <span className="flex items-center gap-2 min-w-0">
++                  <span className={`text-sm font-semibold truncate ${t.anulada ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
++                    {t.medios_pago?.nombre || 'Sin medio'}
++                  </span>
++                  {t.anulada && <span className="shrink-0 px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold uppercase">Cancelado</span>}
++                </span>
++                <span className={`text-sm font-bold whitespace-nowrap ml-2 ${t.anulada ? 'text-gray-400 line-through' : COLOR[tipo]}`}>
++                  {formatCurrency(t.monto)}
++                </span>
+               </button>
+               {abierta && (
+                 <div className="px-3 pb-3 bg-gray-50 border-t border-gray-100 space-y-2 pt-2 text-xs">
+                   <div className="flex justify-between"><span className="text-gray-500">Hora</span><span className="font-semibold text-gray-900">{formatHora(t.creado_en)}</span></div>
+                   <div className="flex justify-between gap-4"><span className="text-gray-500">Descripción</span><span className="font-semibold text-gray-900 text-right">{t.descripcion || 'Sin descripción'}</span></div>
+                   {t.comision > 0 && <div className="flex justify-between"><span className="text-gray-500">Comisión</span><span className="font-semibold text-red-600">-{formatCurrency(t.comision)}</span></div>}
+-                  {puedeReversar && (
++                  {t.anulada && t.motivo_reversa && (
++                    <div className="flex justify-between gap-4"><span className="text-gray-500">Motivo</span><span className="font-semibold text-right text-gray-700">{t.motivo_reversa}</span></div>
++                  )}
++                  {puedeReversar && !t.anulada && (
+                     <div className="pt-2 border-t border-gray-200 flex justify-end">
+                       <button onClick={() => onReversar(t)} className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
+                     </div>
+@@ -72,13 +85,18 @@ export default function ListaTransacciones({ tipo, items, onReversar }) {
+           </thead>
+           <tbody>
+             {paginacion.visibles.map((t) => (
+-              <tr key={t.id} className="border-b border-gray-100 hover:bg-gray-50">
+-                <td className="p-2 text-gray-900">{formatHora(t.creado_en)}</td>
+-                <td className="p-2 text-gray-700">{t.medios_pago?.nombre || '-'}</td>
+-                <td className="p-2 text-gray-700">{t.descripcion || 'Sin descripción'}</td>
+-                <td className={`p-2 text-right font-bold ${COLOR[tipo]}`}>{formatCurrency(t.monto)}</td>
++              <tr key={t.id} className={`border-b border-gray-100 ${t.anulada ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'}`}>
++                <td className={`p-2 ${t.anulada ? 'text-gray-400' : 'text-gray-900'}`}>{formatHora(t.creado_en)}</td>
++                <td className={`p-2 ${t.anulada ? 'text-gray-400' : 'text-gray-700'}`}>{t.medios_pago?.nombre || '-'}</td>
++                <td className={`p-2 ${t.anulada ? 'text-gray-400' : 'text-gray-700'}`}>
++                  <span className={t.anulada ? 'line-through' : ''}>{t.descripcion || 'Sin descripción'}</span>
++                  {t.anulada && (
++                    <span className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold uppercase" title={t.motivo_reversa || ''}>Cancelado</span>
++                  )}
++                </td>
++                <td className={`p-2 text-right font-bold ${t.anulada ? 'text-gray-400 line-through' : COLOR[tipo]}`}>{formatCurrency(t.monto)}</td>
+                 <td className="p-2 text-center">
+-                  {puedeReversar && (
++                  {puedeReversar && !t.anulada && (
+                     <button onClick={() => onReversar(t)} className="px-2 py-1 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
+                   )}
+                 </td>
+diff --git a/hooks/useAnuncios.js b/hooks/useAnuncios.js
+new file mode 100644
+index 0000000..c51c656
+--- /dev/null
++++ b/hooks/useAnuncios.js
+@@ -0,0 +1,39 @@
++import { useState, useCallback, useEffect } from 'react'
++import { listarAnuncios, listarLeidos, marcarLeidos } from '../lib/services/anuncios'
++
++/**
++ * Anuncios no leídos del usuario. Los leídos viven en la tabla anuncios_leidos:
++ * antes estaban en localStorage y volvían a aparecer al cambiar de dispositivo
++ * o al limpiar el navegador.
++ */
++export function useAnuncios(userId) {
++  const [pendientes, setPendientes] = useState([])
++  const [cargado, setCargado] = useState(false)
++
++  const cargar = useCallback(async () => {
++    if (!userId) return
++    try {
++      const [todos, leidos] = await Promise.all([listarAnuncios(), listarLeidos(userId)])
++      setPendientes(todos.filter(a => !leidos.includes(a.id)))
++    } catch (err) {
++      console.error('[useAnuncios]', err)
++      setPendientes([])
++    } finally { setCargado(true) }
++  }, [userId])
++
++  useEffect(() => { cargar() }, [cargar])
++
++  /** Marca los anuncios como leídos y los saca de pendientes (optimista). */
++  const marcarComoLeidos = useCallback(async (ids) => {
++    if (!userId || !ids?.length) return
++    setPendientes(prev => prev.filter(a => !ids.includes(a.id)))
++    try {
++      await marcarLeidos(userId, ids)
++    } catch (err) {
++      console.error('[useAnuncios] no se pudieron marcar como leídos', err)
++      cargar()   // si falló, volvemos al estado real
++    }
++  }, [userId, cargar])
++
++  return { pendientes, cantidad: pendientes.length, cargado, marcarComoLeidos, recargar: cargar }
++}
+diff --git a/lib/domain/transacciones.js b/lib/domain/transacciones.js
+index d47588d..eb658bf 100644
+--- a/lib/domain/transacciones.js
++++ b/lib/domain/transacciones.js
+@@ -33,11 +33,17 @@ export const fechaAcreditacion = (creadoEn, plazoDias = 0) =>
+   sumarDias(new Date(creadoEn), num(plazoDias))
+ 
+ /**
+- * Una transacción "cuenta" si no es una reversa y no fue revertida.
+- * (Antes se filtraba solo es_reversa y las anuladas seguían sumando.)
++ * Una transacción SUMA si no es una reversa y no fue revertida.
++ * Las anuladas se siguen mostrando en la caja (marcadas), pero no cuentan.
+  */
+ export const esValida = (t) => !t.es_reversa && !t.revertida
+ 
++/** El asiento inverso: plomería contable, no se muestra como movimiento propio. */
++export const esAsientoInverso = (t) => !!t.es_reversa
++
++/** La original que fue anulada: se muestra tachada, no suma. */
++export const estaAnulada = (t) => !!t.revertida
++
+ export const esCobro = (t) => t.tipo === TIPO_TX.COBRO
+ export const esGasto = (t) => t.tipo === TIPO_TX.GASTO
+ 
+@@ -79,10 +85,18 @@ export const calcularTotalesDia = (transacciones, diaISO) => {
+   const gastos = []
+ 
+   for (const t of transacciones) {
+-    if (!esValida(t)) continue
++    if (esAsientoInverso(t)) continue          // el contrasiento no se lista
+     const monto = num(t.monto)
+     const medio = t.medios_pago || {}
+ 
++    // Las anuladas se listan marcadas pero no entran en ningún total
++    if (estaAnulada(t)) {
++      const fila = { ...t, anulada: true, comision: 0, neto: 0 }
++      if (esGasto(t)) gastos.push(fila)
++      else if (esCobro(t)) cobros.push(fila)
++      continue
++    }
++
+     if (esGasto(t)) {
+       totales.gastos += monto
+       gastos.push(t)
+diff --git a/pages/dashboard.jsx b/pages/dashboard.jsx
+index 80f80d9..199f62f 100644
+--- a/pages/dashboard.jsx
++++ b/pages/dashboard.jsx
+@@ -64,7 +64,11 @@ export default function Dashboard() {
+           <p className="text-center text-sm text-gray-500 py-8">Actualizando movimientos…</p>
+         ) : (
+           <>
+-            <KpiCards totales={totales} cantidadCobros={cobros.length} cantidadGastos={gastos.length} />
++            <KpiCards
++              totales={totales}
++              cantidadCobros={cobros.filter(c => !c.anulada).length}
++              cantidadGastos={gastos.filter(g => !g.anulada).length}
++            />
+             <ListaTransacciones tipo="cobro" items={cobros} onReversar={setAReversar} />
+             <ListaTransacciones tipo="gasto" items={gastos} onReversar={setAReversar} />
+             <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />
+diff --git a/pages/locales.js b/pages/locales.js
+index 2d52f39..33be30b 100644
+--- a/pages/locales.js
++++ b/pages/locales.js
+@@ -4,12 +4,14 @@ import { useRouter } from 'next/router'
+ import toast from 'react-hot-toast'
+ import OnboardingWizard from '../components/OnboardingWizard'
+ import { useUserRole } from '../lib/UserRoleContext'
++import { useAnuncios } from '../hooks/useAnuncios'
+ import RoleGate from '../components/RoleGate'
+ import ContactModal from '../components/ContactModal'
+ 
+ export default function Locales() {
+   const { cambiarLocal } = useUserRole()
+   const [user, setUser] = useState(null)
++  const { pendientes, cantidad: cantAnunciosNuevos, cargado: anunciosCargados, marcarComoLeidos } = useAnuncios(user?.id)
+   const [userRole, setUserRole] = useState(null)
+   const [misLocales, setMisLocales] = useState([])
+   const [loading, setLoading] = useState(true)
+@@ -19,13 +21,20 @@ export default function Locales() {
+   const [subEstado, setSubEstado] = useState('active')
+   
+   // Estados para anuncios
+-  const [anuncios, setAnuncios] = useState([])
++  const anuncios = pendientes
+   const [anuncioActual, setAnuncioActual] = useState(0)
+   const [showAnuncioModal, setShowAnuncioModal] = useState(false)
+-  const [cantAnunciosNuevos, setCantAnunciosNuevos] = useState(0)
+ 
+   const router = useRouter()
+ 
++  // Mostrar el modal una sola vez, cuando ya sabemos qué anuncios quedan sin leer
++  useEffect(() => {
++    if (anunciosCargados && pendientes.length > 0) {
++      setAnuncioActual(0)
++      setShowAnuncioModal(true)
++    }
++  }, [anunciosCargados, pendientes.length])
++
+   useEffect(() => {
+     supabase.auth.getSession().then(async ({ data: { session } }) => {
+       if (!session?.user) {
+@@ -44,8 +53,6 @@ export default function Locales() {
+           return 
+         }
+         await loadMisLocales(session.user.id, rol)
+-        await cargarAnuncios(session.user.id)
+-        await contarAnunciosNuevos(session.user.id)
+       } catch (err) {
+         console.error('Error al cargar datos:', err)
+         toast.error('Error al cargar datos del usuario')
+@@ -59,112 +66,19 @@ export default function Locales() {
+   }, [router])
+ 
+   // ==========================================
+-  // FUNCIONES DE ANUNCIOS
++  // ANUNCIOS (leídos en DB, ver hooks/useAnuncios)
+   // ==========================================
+-  
+-    const cargarAnuncios = async (userId) => {
+-    if (!userId) {
+-      console.warn('⚠️ [Anuncios] No hay userId, no se cargan anuncios')
+-      return
+-    }
+-    
+-    try {
+-      const { data: anunciosData } = await supabase
+-        .from('anuncios')
+-        .select('*')
+-        .eq('activo', true)
+-        .order('creado_en', { ascending: false })
+-      
+-      if (anunciosData && anunciosData.length > 0) {
+-        const leidosKey = `anuncios_leidos_${userId}`
+-        const leidosRaw = localStorage.getItem(leidosKey)
+-        const leidos = leidosRaw ? JSON.parse(leidosRaw) : []
+-        
+-        console.log('🔍 [Anuncios] UserId:', userId)
+-        console.log('🔍 [Anuncios] Key en localStorage:', leidosKey)
+-        console.log('🔍 [Anuncios] Leídos encontrados:', leidos)
+-        
+-        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id))
+-        console.log('🔍 [Anuncios] Anuncios NO leídos:', noLeidos.map(a => a.id))
+-        
+-        if (noLeidos.length > 0) {
+-          console.log('🚨 [Anuncios] Mostrando modal porque hay', noLeidos.length, 'anuncios no leídos')
+-          setAnuncios(noLeidos)
+-          setAnuncioActual(0)
+-          setShowAnuncioModal(true)
+-        } else {
+-          console.log('✅ [Anuncios] TODOS los anuncios están en la lista de leídos. Modal NO se muestra.')
+-        }
+-      }
+-    } catch (err) {
+-      console.error('Error cargando anuncios:', err)
+-    }
+-  }
+-
+-  const contarAnunciosNuevos = async (userId) => {
+-    try {
+-      const { data: anunciosData } = await supabase
+-        .from('anuncios')
+-        .select('id')
+-        .eq('activo', true)
+-      
+-      if (anunciosData) {
+-        const leidosKey = `anuncios_leidos_${userId}`
+-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+-        const noLeidos = anunciosData.filter(a => !leidos.includes(a.id)).length
+-        setCantAnunciosNuevos(noLeidos)
+-        console.log('🔔 [Anuncios] Cantidad de nuevos:', noLeidos)
+-      }
+-    } catch (err) {
+-      console.error('Error contando anuncios:', err)
+-    }
+-  }
+-
+-  const marcarAnuncioLeido = (anuncioId) => {
+-    if (!user) {
+-      console.warn('⚠️ [Anuncios] No hay user al marcar como leído')
+-      return
+-    }
+-    const leidosKey = `anuncios_leidos_${user.id}`
+-    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+-    if (!leidos.includes(anuncioId)) {
+-      leidos.push(anuncioId)
+-      localStorage.setItem(leidosKey, JSON.stringify(leidos))
+-      console.log('✅ [Anuncios] Marcado como leído:', anuncioId)
+-    }
+-  }
+ 
+-  const marcarTodosComoLeidos = () => {
+-    if (!user) return
+-    const leidosKey = `anuncios_leidos_${user.id}`
+-    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+-    
+-    anuncios.forEach(a => {
+-      if (!leidos.includes(a.id)) {
+-        leidos.push(a.id)
+-      }
+-    })
+-    
+-    localStorage.setItem(leidosKey, JSON.stringify(leidos))
+-    console.log('✅ [Anuncios] Todos marcados como leídos:', leidos)
+-  }
+-
+-  const handleSiguienteAnuncio = () => {
+-    marcarAnuncioLeido(anuncios[anuncioActual].id)
+-    
+-    if (anuncioActual < anuncios.length - 1) {
+-      setAnuncioActual(anuncioActual + 1)
+-    } else {
+-      setShowAnuncioModal(false)
+-      if (user) contarAnunciosNuevos(user.id)
+-    }
++  const handleSiguienteAnuncio = async () => {
++    const actual = anuncios[anuncioActual]
++    if (actual) await marcarComoLeidos([actual.id])
++    if (anuncioActual < anuncios.length - 1) setAnuncioActual(anuncioActual + 1)
++    else setShowAnuncioModal(false)
+   }
+ 
+-  const handleCerrarAnuncios = () => {
+-    console.log('🚪 [Anuncios] Cerrando modal y marcando todos como leídos')
+-    marcarTodosComoLeidos()
++  const handleCerrarAnuncios = async () => {
++    await marcarComoLeidos(anuncios.map(a => a.id))
+     setShowAnuncioModal(false)
+-    if (user) contarAnunciosNuevos(user.id)
+   }
+ 
+   // ==========================================
+diff --git a/tests/transacciones.test.js b/tests/transacciones.test.js
+index 0eacd32..60e99ff 100644
+--- a/tests/transacciones.test.js
++++ b/tests/transacciones.test.js
+@@ -50,12 +50,28 @@ describe('calcularTotalesDia', () => {
+     expect(r.gastos).toHaveLength(1)
+   })
+ 
+-  it('una transacción revertida NO suma (bug de doble conteo)', () => {
+-    const original = tx({ id: 'orig', monto: 10000, revertida: true })
++  it('una transacción cancelada NO suma pero SÍ se lista, marcada', () => {
++    const original = tx({ id: 'orig', monto: 10000, revertida: true, motivo_reversa: 'se cargó dos veces' })
+     const reversa = tx({ monto: -10000, es_reversa: true, reversa_de: 'orig' })
+     const r = calcularTotalesDia([original, reversa], DIA)
+     expect(r.totales.cobros).toBe(0)
++    expect(r.totales.efectivoEnCaja).toBe(0)
++    expect(r.cobros).toHaveLength(1)              // el dueño la ve en la caja
++    expect(r.cobros[0].anulada).toBe(true)
++    expect(r.cobros[0].motivo_reversa).toBe('se cargó dos veces')
++  })
++
++  it('el asiento inverso no se lista como movimiento propio', () => {
++    const r = calcularTotalesDia([tx({ monto: -500, es_reversa: true, reversa_de: 'x' })], DIA)
+     expect(r.cobros).toHaveLength(0)
++    expect(r.gastos).toHaveLength(0)
++  })
++
++  it('un gasto cancelado tampoco suma y se lista marcado', () => {
++    const r = calcularTotalesDia([tx({ tipo: 'GASTO_REGISTRADO', monto: 800, revertida: true })], DIA)
++    expect(r.totales.gastos).toBe(0)
++    expect(r.gastos).toHaveLength(1)
++    expect(r.gastos[0].anulada).toBe(true)
+   })
+ 
+   it('usa comision_monto guardada si existe', () => {
+-- 
+2.43.0
+
+From ddecaeee938a4c940eee2d82c017bab1d6a16df0 Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Tue, 25 Aug 2026 22:39:59 +0000
+Subject: [PATCH 2/2] fix: centro de anuncios lee/escribe leidos en DB (no
+ localStorage); poder desmarcar
+
+---
+ hooks/useAnuncios.js     |  42 +++++++++++----
+ lib/services/anuncios.js |   3 ++
+ pages/anuncios.jsx       | 112 ++++++++-------------------------------
+ 3 files changed, 58 insertions(+), 99 deletions(-)
+
+diff --git a/hooks/useAnuncios.js b/hooks/useAnuncios.js
+index c51c656..8af1b8c 100644
+--- a/hooks/useAnuncios.js
++++ b/hooks/useAnuncios.js
+@@ -1,5 +1,5 @@
+ import { useState, useCallback, useEffect } from 'react'
+-import { listarAnuncios, listarLeidos, marcarLeidos } from '../lib/services/anuncios'
++import { listarAnuncios, listarLeidos, marcarLeidos, desmarcarLeido } from '../lib/services/anuncios'
+ 
+ /**
+  * Anuncios no leídos del usuario. Los leídos viven en la tabla anuncios_leidos:
+@@ -7,33 +7,57 @@ import { listarAnuncios, listarLeidos, marcarLeidos } from '../lib/services/anun
+  * o al limpiar el navegador.
+  */
+ export function useAnuncios(userId) {
+-  const [pendientes, setPendientes] = useState([])
++  const [todos, setTodos] = useState([])
++  const [leidos, setLeidos] = useState([])
+   const [cargado, setCargado] = useState(false)
+ 
+   const cargar = useCallback(async () => {
+     if (!userId) return
+     try {
+-      const [todos, leidos] = await Promise.all([listarAnuncios(), listarLeidos(userId)])
+-      setPendientes(todos.filter(a => !leidos.includes(a.id)))
++      const [lista, ids] = await Promise.all([listarAnuncios(), listarLeidos(userId)])
++      setTodos(lista)
++      setLeidos(ids)
+     } catch (err) {
+       console.error('[useAnuncios]', err)
+-      setPendientes([])
++      setTodos([])
++      setLeidos([])
+     } finally { setCargado(true) }
+   }, [userId])
+ 
++  const pendientes = todos.filter(a => !leidos.includes(a.id))
++
+   useEffect(() => { cargar() }, [cargar])
+ 
+   /** Marca los anuncios como leídos y los saca de pendientes (optimista). */
+   const marcarComoLeidos = useCallback(async (ids) => {
+-    if (!userId || !ids?.length) return
+-    setPendientes(prev => prev.filter(a => !ids.includes(a.id)))
++    const nuevos = [].concat(ids || []).filter(Boolean)
++    if (!userId || nuevos.length === 0) return
++    setLeidos(prev => [...new Set([...prev, ...nuevos])])
+     try {
+-      await marcarLeidos(userId, ids)
++      await marcarLeidos(userId, nuevos)
+     } catch (err) {
+       console.error('[useAnuncios] no se pudieron marcar como leídos', err)
+       cargar()   // si falló, volvemos al estado real
+     }
+   }, [userId, cargar])
+ 
+-  return { pendientes, cantidad: pendientes.length, cargado, marcarComoLeidos, recargar: cargar }
++  /** Volver a marcar como no leído (centro de anuncios). */
++  const marcarComoNoLeido = useCallback(async (id) => {
++    if (!userId) return
++    setLeidos(prev => prev.filter(x => x !== id))
++    try {
++      await desmarcarLeido(userId, id)
++    } catch (err) {
++      console.error('[useAnuncios] no se pudo desmarcar', err)
++      cargar()
++    }
++  }, [userId, cargar])
++
++  /** Todos los anuncios con su estado de lectura, para el centro de anuncios. */
++  const conEstado = todos.map(a => ({ ...a, leido: leidos.includes(a.id) }))
++
++  return {
++    todos: conEstado, pendientes, cantidad: pendientes.length, cargado,
++    marcarComoLeidos, marcarComoNoLeido, recargar: cargar,
++  }
+ }
+diff --git a/lib/services/anuncios.js b/lib/services/anuncios.js
+index 75410f0..252a89c 100644
+--- a/lib/services/anuncios.js
++++ b/lib/services/anuncios.js
+@@ -19,3 +19,6 @@ export const marcarLeidos = (userId, anuncioIds) =>
+   supabase.from('anuncios_leidos')
+     .upsert(anuncioIds.map(id => ({ anuncio_id: id, user_id: userId })), { onConflict: 'anuncio_id,user_id' })
+     .then(unwrap)
++
++export const desmarcarLeido = (userId, anuncioId) =>
++  supabase.from('anuncios_leidos').delete().eq('user_id', userId).eq('anuncio_id', anuncioId).then(unwrap)
+diff --git a/pages/anuncios.jsx b/pages/anuncios.jsx
+index c2a9df8..e36f548 100644
+--- a/pages/anuncios.jsx
++++ b/pages/anuncios.jsx
+@@ -1,84 +1,29 @@
+-import { supabase } from '../lib/supabaseClient'
+-import { useState, useEffect } from 'react'
++import { useState } from 'react'
+ import { useRouter } from 'next/router'
+ import toast from 'react-hot-toast'
++import { useAuthGuard } from '../hooks/useAuthGuard'
++import { useAnuncios } from '../hooks/useAnuncios'
++import { useSignOut } from '../hooks/useSignOut'
+ 
+ export default function CentroAnuncios() {
+-  const [user, setUser] = useState(null)
+-  const [loading, setLoading] = useState(true)
+-  const [anuncios, setAnuncios] = useState([])
++  const { user, checking } = useAuthGuard()
++  const { todos: anuncios, cargado, marcarComoLeidos, marcarComoNoLeido } = useAnuncios(user?.id)
+   const [filtro, setFiltro] = useState('todos') // todos, no-leidos, leidos
+-  
+-  const router = useRouter()
+-
+-  useEffect(() => {
+-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+-      if (!session?.user) {
+-        router.push('/')
+-        return
+-      }
+-      setUser(session.user)
+-      await cargarAnuncios(session.user.id)
+-    })
+-  }, [router])
++  const handleSignOut = useSignOut()
++  const loading = checking || !cargado
+ 
+-  const cargarAnuncios = async (userId) => {
+-    try {
+-      setLoading(true)
+-      
+-      const { data: anunciosData } = await supabase
+-        .from('anuncios')
+-        .select('*')
+-        .eq('activo', true)
+-        .order('creado_en', { ascending: false })
+-      
+-      if (anunciosData) {
+-        // Obtener IDs de anuncios leídos
+-        const leidosKey = `anuncios_leidos_${userId}`
+-        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+-        
+-        // Marcar cada anuncio con su estado de lectura
+-        const anunciosConEstado = anunciosData.map(a => ({
+-          ...a,
+-          leido: leidos.includes(a.id),
+-          fechaLeido: null // Podríamos guardar esto en localStorage también si querés
+-        }))
+-        
+-        setAnuncios(anunciosConEstado)
+-      }
+-    } catch (err) {
+-      console.error('Error cargando anuncios:', err)
+-      toast.error('Error al cargar anuncios')
+-    } finally {
+-      setLoading(false)
+-    }
+-  }
++  const router = useRouter()
+ 
+-  const marcarComoNoLeido = (anuncioId) => {
+-    if (!user) return
+-    
+-    const leidosKey = `anuncios_leidos_${user.id}`
+-    const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+-    const nuevosLeidos = leidos.filter(id => id !== anuncioId)
+-    localStorage.setItem(leidosKey, JSON.stringify(nuevosLeidos))
+-    
+-    // Actualizar el estado local
+-    setAnuncios(anuncios.map(a => 
+-      a.id === anuncioId ? { ...a, leido: false } : a
+-    ))
+-    
+-    toast.success(' Anuncio marcado como no leído')
++  const handleNoLeido = async (anuncioId) => {
++    await marcarComoNoLeido(anuncioId)
++    toast.success('Marcado como no leído')
+   }
+ 
+-  const marcarTodosComoLeidos = () => {
+-    if (!user) return
+-    
+-    const leidosKey = `anuncios_leidos_${user.id}`
+-    const todosIds = anuncios.map(a => a.id)
+-    localStorage.setItem(leidosKey, JSON.stringify(todosIds))
+-    
+-    setAnuncios(anuncios.map(a => ({ ...a, leido: true })))
+-    toast.success('✅ Todos los anuncios marcados como leídos')
++  const marcarTodos = async () => {
++    const pendientes = anuncios.filter(a => !a.leido).map(a => a.id)
++    if (pendientes.length === 0) return
++    await marcarComoLeidos(pendientes)
++    toast.success('Todos marcados como leídos')
+   }
+ 
+   const getIconoTipo = (tipo) => {
+@@ -104,10 +49,6 @@ export default function CentroAnuncios() {
+     return colores[tipo] || 'bg-blue-500'
+   }
+ 
+-  const handleSignOut = async () => {
+-    await supabase.auth.signOut()
+-    router.push('/')
+-  }
+ 
+   if (loading) {
+     return (
+@@ -199,7 +140,7 @@ export default function CentroAnuncios() {
+             {/* Acción masiva */}
+             {cantNoLeidos > 0 && (
+               <button
+-                onClick={marcarTodosComoLeidos}
++                onClick={marcarTodos}
+                 className="px-3 py-1.5 bg-green-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
+               >
+                 ✅ Marcar todos como leídos
+@@ -270,18 +211,9 @@ export default function CentroAnuncios() {
+                 <div className="px-4 pb-4 flex justify-end">
+                   {!anuncio.leido ? (
+                     <button
+-                      onClick={() => {
+-                        // Marcar como leído
+-                        const leidosKey = `anuncios_leidos_${user.id}`
+-                        const leidos = JSON.parse(localStorage.getItem(leidosKey) || '[]')
+-                        if (!leidos.includes(anuncio.id)) {
+-                          leidos.push(anuncio.id)
+-                          localStorage.setItem(leidosKey, JSON.stringify(leidos))
+-                        }
+-                        setAnuncios(anuncios.map(a => 
+-                          a.id === anuncio.id ? { ...a, leido: true } : a
+-                        ))
+-                        toast.success('✅ Anuncio marcado como leído')
++                      onClick={async () => {
++                        await marcarComoLeidos([anuncio.id])
++                        toast.success('Marcado como leído')
+                       }}
+                       className="px-4 py-2 bg-blue-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-600"
+                     >
+@@ -289,7 +221,7 @@ export default function CentroAnuncios() {
+                     </button>
+                   ) : (
+                     <button
+-                      onClick={() => marcarComoNoLeido(anuncio.id)}
++                      onClick={() => handleNoLeido(anuncio.id)}
+                       className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-200"
+                     >
+                       📌 Marcar como no leído
+-- 
+2.43.0
+
