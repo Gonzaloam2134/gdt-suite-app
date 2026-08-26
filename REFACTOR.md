@@ -109,4 +109,34 @@ Corregido en esta fase:
   ya no reaparecen al cambiar de dispositivo o limpiar el navegador.
   Nuevo hooks/useAnuncios.js; se limpiaron los console.log de locales.js.
 
-## Próximo: Fase 4 — superadmin.jsx (934 → ~100)
+## Fase 5 (hecha) — reportes 663 + lib/reportes 454 → módulo del contador
+```
+pages/reportes.js                 108
+hooks/useReportes.js               85
+lib/domain/reportes.js            110   agrupaciones puras + calidad del dato
+lib/export/pdf.js                 113   (reemplaza generarReportePDF)
+lib/export/excel.js               119   (reemplaza generarReporteExcel)
+components/reportes/
+  FiltrosReporte.jsx               61
+  AvisosCalidad.jsx                27
+  ResumenEjecutivo.jsx             48
+  ResumenPorAlicuota.jsx           43
+  MediosYConciliacion.jsx          88
+  TablaLibro.jsx                   77
+components/ReportGuide.jsx            reciclado como "¿Cómo leer esto?"
+```
+
+Corregido en esta fase:
+- Se dejaron de inventar datos fiscales: antes TODO salía como "Factura A", punto de
+  venta "0001", número = 8 chars del UUID e IVA 21% calculado al vuelo. Ahora se lee
+  tipo_comprobante, punto_venta, nro_comprobante, alicuota_iva y monto_iva reales
+- locales.condicion_fiscal decide si se discrimina IVA (Monotributo no lo ve)
+- Consolidado de varios locales: solo discrimina IVA si TODOS lo hacen
+- Panel de calidad del dato arriba de los números (cuántos movimientos sin comprobante,
+  sin número, sin alícuota, cuántos anulados)
+- Conciliación de caja real: días que cuadraron, faltantes, sobrantes, cierres sin contar
+- resumen.pendiente que nunca se calculaba y "saldo inicial: 0" hardcodeado: eliminados
+- Excel: montos como números (sumables), nombres de hoja sin emoji (límite 31 chars)
+- PDF: pie aclarando que no reemplaza la liquidación de un profesional
+
+## Próximo: Fase 6 — locales.js + onboarding, y por último Fase 4 — superadmin
