@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'refactor/fase3-fix'
+      - 'refactor/fase5'
 
 jobs:
   aplicar:
@@ -31,4 +31,4 @@ jobs:
           npm test
 
       - name: Push
-        run: git push origin HEAD:refactor/fase5
+        run: git push origin HEAD:refactor/fase6
