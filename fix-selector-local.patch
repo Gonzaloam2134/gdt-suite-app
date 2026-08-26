@@ -1,0 +1,109 @@
+From 45837f9b1797db5cdf0b96011f668915638dbe46 Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Wed, 26 Aug 2026 02:34:46 +0000
+Subject: [PATCH] fix: cambiar de local recarga los datos de la pantalla
+ (useActiveLocal escuchaba localStorage y no el contexto)
+
+---
+ components/layout/SelectorLocal.jsx | 13 ++++++++----
+ hooks/useActiveLocal.js             | 32 ++++++++++++++++++++---------
+ 2 files changed, 31 insertions(+), 14 deletions(-)
+
+diff --git a/components/layout/SelectorLocal.jsx b/components/layout/SelectorLocal.jsx
+index 271c4d4..2269211 100644
+--- a/components/layout/SelectorLocal.jsx
++++ b/components/layout/SelectorLocal.jsx
+@@ -12,6 +12,7 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
+   const router = useRouter()
+   const { cambiarLocal } = useUserRole()
+   const [abierto, setAbierto] = useState(false)
++  const [cambiando, setCambiando] = useState(false)
+   const ref = useRef(null)
+   useClickOutside(ref, () => setAbierto(false), abierto)
+ 
+@@ -24,8 +25,10 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
+   const elegir = async (id) => {
+     setAbierto(false)
+     if (id === localId) return
++    // En reportes el consolidado se maneja en la página; en el resto cambia el local activo
+     if (onCambiar) { onCambiar(id); return }
+-    await cambiarLocal(id)
++    setCambiando(true)
++    try { await cambiarLocal(id) } finally { setCambiando(false) }
+   }
+ 
+   // Con un solo local y sin consolidado, un desplegable sería ruido
+@@ -35,9 +38,11 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
+ 
+   return (
+     <div className="relative" ref={ref}>
+-      <button onClick={() => setAbierto(o => !o)} aria-expanded={abierto} aria-haspopup="listbox"
+-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer max-w-[190px] md:max-w-[260px]">
+-        <span className="text-sm font-semibold text-gray-900 truncate">{actual?.nombre || 'Elegir local'}</span>
++      <button onClick={() => setAbierto(o => !o)} aria-expanded={abierto} aria-haspopup="listbox" disabled={cambiando}
++        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer max-w-[190px] md:max-w-[260px] disabled:opacity-60">
++        <span className="text-sm font-semibold text-gray-900 truncate">
++          {cambiando ? 'Cambiando…' : (actual?.nombre || 'Elegir local')}
++        </span>
+         <span className="text-gray-400 text-xs shrink-0">▾</span>
+       </button>
+ 
+diff --git a/hooks/useActiveLocal.js b/hooks/useActiveLocal.js
+index cd13ced..8981fe6 100644
+--- a/hooks/useActiveLocal.js
++++ b/hooks/useActiveLocal.js
+@@ -1,29 +1,41 @@
+ import { useEffect, useState } from 'react'
+ import { useRouter } from 'next/router'
+ import { getLocal } from '../lib/services/locales'
++import { useUserRole } from '../lib/UserRoleContext'
+ 
+ /**
+- * Lee activeLocalId de localStorage y carga el local. Si no hay, redirige a /locales.
+- * Usar junto con useAuthGuard: `const { user } = useAuthGuard(); const { local } = useActiveLocal(user)`
++ * Local activo, sincronizado con el contexto.
++ *
++ * Lee activeLocalId del contexto y no de localStorage: cuando el usuario cambia
++ * de local con el selector, el contexto se actualiza y esta pantalla recarga sus
++ * datos. Leyendo localStorage directo, el hook solo se enteraba al montar y la
++ * caja seguía mostrando el local anterior.
+  */
+ export function useActiveLocal(user) {
+   const router = useRouter()
++  const { activeLocalId, loading: cargandoRol } = useUserRole()
+   const [local, setLocal] = useState(null)
+-  const [localId, setLocalId] = useState(null)
+   const [loading, setLoading] = useState(true)
+ 
+   useEffect(() => {
+-    if (!user) return
+-    const id = localStorage.getItem('activeLocalId')
+-    if (!id) { router.replace('/locales'); return }
+-    setLocalId(id)
++    if (!user || cargandoRol) return
++
++    if (!activeLocalId) {
++      setLocal(null)
++      setLoading(false)
++      router.replace('/locales')
++      return
++    }
++
+     let cancelado = false
+-    getLocal(id)
++    setLoading(true)
++    getLocal(activeLocalId)
+       .then((l) => { if (!cancelado) setLocal(l) })
+       .catch((e) => console.error('[useActiveLocal]', e))
+       .finally(() => { if (!cancelado) setLoading(false) })
++
+     return () => { cancelado = true }
+-  }, [user, router])
++  }, [user, activeLocalId, cargandoRol, router])
+ 
+-  return { local, localId, loading }
++  return { local, localId: activeLocalId, loading }
+ }
+-- 
+2.43.0
+
