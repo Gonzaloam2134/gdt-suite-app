@@ -172,6 +172,21 @@ Corregido en esta fase:
 - Requiere la migración MIGRACION_INVITACIONES.sql (RPC ver_invitacion y
   aceptar_invitacion, más la columna nombre_invitado).
 
+### Rol único por persona
+- Una persona tiene el MISMO rol en todos sus locales (decisión de producto).
+- Se valida en la base con un trigger, no solo en la interfaz: las membresías se
+  crean desde la invitación, el alta de local y el panel, y todas deben cumplirlo.
+- Al escribir el email en el formulario de invitación, si esa persona ya participa
+  en otro local se fija su rol y se explica por qué.
+- Aceptar una invitación con un rol distinto no falla: se respeta el rol que ya tenía.
+- Requiere MIGRACION_ROL_UNICO.sql.
+
+### Tarjetas de la caja
+- Dos grupos colapsables: "Cómo viene el día" (Cobros, Gastos, Neto) y
+  "Dónde está la plata" (En caja, Disponible, Pendiente).
+- Plegado no es invisible: queda una línea con los tres importes en chico.
+- La elección se recuerda (hooks/usePreferencia).
+
 ### Medios de pago
 - Ahora se pueden editar (nombre, tipo, comisión, plazo).
 - Al cambiar comisión o plazo se avisa que rige de ahí en adelante: cada cobro guarda

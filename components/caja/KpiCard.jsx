@@ -10,7 +10,7 @@ const TONOS = {
 }
 
 /** Tarjeta de métrica con ayuda desplegable. Una sola definición para mobile y desktop. */
-export default function KpiCard({ titulo, valor, detalle, tono = 'azul', ayuda, destacada = false, negativo = false }) {
+export default function KpiCard({ titulo, valor, detalle, tono = 'azul', ayuda, negativo = false }) {
   const [abierta, setAbierta] = useState(false)
   const t = TONOS[tono] ?? TONOS.azul
   const colorValor = negativo ? 'text-red-700' : t.texto
@@ -26,9 +26,7 @@ export default function KpiCard({ titulo, valor, detalle, tono = 'azul', ayuda, 
             className="text-gray-400 hover:text-gray-600 cursor-pointer text-xs p-1 bg-transparent border-none leading-none">ℹ️</button>
         )}
       </div>
-      <div className={`font-extrabold ${colorValor} ${destacada ? 'text-lg md:text-2xl' : 'text-base md:text-2xl'}`}>
-        {formatCurrency(valor)}
-      </div>
+      <div className={`font-extrabold text-base md:text-2xl ${colorValor}`}>{formatCurrency(valor)}</div>
       {detalle && <div className="text-xs text-gray-500 mt-1">{detalle}</div>}
       {abierta && ayuda && (
         <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-gray-700">{ayuda}</div>

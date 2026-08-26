@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { crearInvitacion, cambiarRol, quitarMiembro, reactivarMiembro, linkInvitacion } from '../../lib/services/miembros'
+import { crearInvitacion, cambiarRol, quitarMiembro, reactivarMiembro, linkInvitacion, rolExistenteDe } from '../../lib/services/miembros'
 import { actualizarPerfil } from '../../lib/services/auth'
 import { registrarAccion } from '../../lib/services/auditoria'
 import { ACCIONES } from '../../lib/constants/auditoria'
@@ -25,6 +25,21 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
   const [procesando, setProcesando] = useState(false)
   const [recienCreada, setRecienCreada] = useState(null)
   const [verInactivos, setVerInactivos] = useState(false)
+  const [rolYaAsignado, setRolYaAsignado] = useState(null)
+
+  /**
+   * Una persona tiene el mismo rol en todos sus locales. Si ya participa en otro,
+   * fijamos ese rol acá para no prometer algo que la base va a rechazar.
+   */
+  const revisarRolExistente = async (valor) => {
+    const email = valor.trim()
+    if (!email.includes('@')) { setRolYaAsignado(null); return }
+    try {
+      const existente = await rolExistenteDe(email)
+      setRolYaAsignado(existente || null)
+      if (existente) setRol(existente)
+    } catch { setRolYaAsignado(null) }
+  }
 
   const invitar = async (e) => {
     e.preventDefault()
@@ -98,11 +113,14 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
           <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
             placeholder="Nombre (opcional)" aria-label="Nombre"
             className="p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+          <input type="email" value={email} required
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={(e) => revisarRolExistente(e.target.value)}
             placeholder="Email de la persona" aria-label="Email"
             className="p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
           <select value={rol} onChange={(e) => setRol(e.target.value)} aria-label="Rol"
-            className="p-2.5 border border-gray-300 rounded-lg text-sm">
+            disabled={!!rolYaAsignado}
+            className="p-2.5 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500">
             {ROLES_INVITABLES.map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
           </select>
           <button type="submit" disabled={invitando}
@@ -110,6 +128,12 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
             {invitando ? 'Creando…' : 'Sumar'}
           </button>
         </div>
+        {rolYaAsignado && (
+          <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-2 mt-3 m-0">
+            Esta persona ya trabaja en otro de tus locales como <strong>{LABEL_ROL[rolYaAsignado]}</strong>.
+            Cada persona tiene el mismo rol en todos los locales, así que entra con ese.
+          </p>
+        )}
       </form>
 
       <InvitacionesPendientes invitaciones={invitaciones} onCambio={onCambio} />
