@@ -136,7 +136,15 @@ Corregido en esta fase:
   sin número, sin alícuota, cuántos anulados)
 - Conciliación de caja real: días que cuadraron, faltantes, sobrantes, cierres sin contar
 - resumen.pendiente que nunca se calculaba y "saldo inicial: 0" hardcodeado: eliminados
-- Excel: montos como números (sumables), nombres de hoja sin emoji (límite 31 chars)
-- PDF: pie aclarando que no reemplaza la liquidación de un profesional
+- Exportables listos para entregar al contador (xlsx → exceljs, con formato real):
+  * Excel: 7 hojas (Resumen, IVA Ventas, IVA Compras, Resumen IVA, Medios de pago,
+    Libro caja, Conciliación) con encabezados de color, cebra, bordes, formato de
+    moneda, autofiltro y panel fijo en los libros, y diferencias de caja pintadas
+    según cuadre/faltante/sobrante. Importes como números: se pueden sumar.
+  * PDF: portada con las tres cifras clave, secciones tituladas, tablas con totales,
+    numeración de páginas y pie legal
+  * Nº de comprobante formateado 0001-00000123
+  * Ambos exportadores se cargan bajo demanda (la página pasó de 414 kB a 12 kB)
+  * construirLibro() y construirPDF() separados de la descarga → 14 tests los cubren
 
 ## Próximo: Fase 6 — locales.js + onboarding, y por último Fase 4 — superadmin

@@ -4,8 +4,6 @@ import toast from 'react-hot-toast'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useSignOut } from '../hooks/useSignOut'
 import { useReportes } from '../hooks/useReportes'
-import { generarPDF } from '../lib/export/pdf'
-import { generarExcel } from '../lib/export/excel'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
 import BottomNav from '../components/layout/BottomNav'
@@ -23,22 +21,33 @@ export default function Reportes() {
   const { user, checking } = useAuthGuard()
   const r = useReportes(user?.id)
   const [ayuda, setAyuda] = useState(false)
+  const [exportando, setExportando] = useState(null)
 
   if (checking || r.loading) return <LoadingScreen mensaje="Generando reporte…" icono="📊" />
 
-  const exportar = (fn, formato) => {
-    if (!r.localActual) return
+  /**
+   * jsPDF y ExcelJS pesan bastante y solo hacen falta al exportar,
+   * así que se cargan recién cuando el usuario aprieta el botón.
+   */
+  const exportar = async (formato) => {
+    if (!r.localActual || exportando) return
+    setExportando(formato)
     try {
-      fn({
+      const generar = formato === 'PDF'
+        ? (await import('../lib/export/pdf')).generarPDF
+        : (await import('../lib/export/excel')).generarExcel
+      await generar({
         local: r.localActual, periodo: r.periodo, resumen: r.resumen,
         libroVentas: r.libroVentas, libroCompras: r.libroCompras,
         porAlicuotaVentas: r.porAlicuotaVentas, porAlicuotaCompras: r.porAlicuotaCompras,
-        porMedio: r.porMedio, porDia: r.porDia,
+        porMedio: r.porMedio, porDia: r.porDia, discriminaIva: r.discriminaIva,
         cierres: r.cierres, conciliacion: r.conciliacion, calidad: r.calidad,
       })
       toast.success(`${formato} descargado`)
     } catch (err) {
       toast.error(`No se pudo generar el ${formato}: ${err.message}`)
+    } finally {
+      setExportando(null)
     }
   }
 
@@ -54,10 +63,14 @@ export default function Reportes() {
             <p className="mt-0.5 text-xs text-gray-500 truncate m-0">{r.localActual?.nombre || 'Sin locales'}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={() => exportar(generarPDF, 'PDF')}
-              className="px-3 py-2 bg-amber-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-amber-600">📄 PDF</button>
-            <button onClick={() => exportar(generarExcel, 'Excel')}
-              className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-emerald-600">📗 Excel</button>
+            <button onClick={() => exportar('PDF')} disabled={!!exportando}
+              className="px-3 py-2 bg-amber-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-amber-600 disabled:opacity-50">
+              {exportando === 'PDF' ? 'Generando…' : '📄 PDF'}
+            </button>
+            <button onClick={() => exportar('Excel')} disabled={!!exportando}
+              className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50">
+              {exportando === 'Excel' ? 'Generando…' : '📗 Excel'}
+            </button>
             <button onClick={() => setAyuda(true)}
               className="px-3 py-2 bg-blue-100 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-200">¿Cómo leer esto?</button>
             <button onClick={() => router.push('/dashboard')}
