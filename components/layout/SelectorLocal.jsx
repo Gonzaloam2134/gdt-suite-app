@@ -12,6 +12,7 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
   const router = useRouter()
   const { cambiarLocal } = useUserRole()
   const [abierto, setAbierto] = useState(false)
+  const [cambiando, setCambiando] = useState(false)
   const ref = useRef(null)
   useClickOutside(ref, () => setAbierto(false), abierto)
 
@@ -24,8 +25,10 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
   const elegir = async (id) => {
     setAbierto(false)
     if (id === localId) return
+    // En reportes el consolidado se maneja en la página; en el resto cambia el local activo
     if (onCambiar) { onCambiar(id); return }
-    await cambiarLocal(id)
+    setCambiando(true)
+    try { await cambiarLocal(id) } finally { setCambiando(false) }
   }
 
   // Con un solo local y sin consolidado, un desplegable sería ruido
@@ -35,9 +38,11 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setAbierto(o => !o)} aria-expanded={abierto} aria-haspopup="listbox"
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer max-w-[190px] md:max-w-[260px]">
-        <span className="text-sm font-semibold text-gray-900 truncate">{actual?.nombre || 'Elegir local'}</span>
+      <button onClick={() => setAbierto(o => !o)} aria-expanded={abierto} aria-haspopup="listbox" disabled={cambiando}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer max-w-[190px] md:max-w-[260px] disabled:opacity-60">
+        <span className="text-sm font-semibold text-gray-900 truncate">
+          {cambiando ? 'Cambiando…' : (actual?.nombre || 'Elegir local')}
+        </span>
         <span className="text-gray-400 text-xs shrink-0">▾</span>
       </button>
 
