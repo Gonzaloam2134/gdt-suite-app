@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { useUserRole } from '../lib/UserRoleContext'
 import { getLocal } from '../lib/services/locales'
-import { listarMiembros } from '../lib/services/miembros'
+import { listarMiembros, listarMiembrosInactivos, listarInvitaciones } from '../lib/services/miembros'
 import { listarMediosPago } from '../lib/services/mediosPago'
 import { listarTransaccionesPeriodo } from '../lib/services/transacciones'
 import { listarLogs } from '../lib/services/auditoria'
@@ -20,6 +20,8 @@ export function useAdminData() {
   const [local, setLocal] = useState(null)
   const [stats, setStats] = useState(STATS_VACIAS)
   const [miembros, setMiembros] = useState([])
+  const [inactivos, setInactivos] = useState([])
+  const [invitaciones, setInvitaciones] = useState([])
   const [mediosPago, setMediosPago] = useState([])
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,8 +49,15 @@ export function useAdminData() {
       setLogs(await listarLogs({ localId: activeLocalId, inicio, fin, userId: esOwner ? null : userId }))
 
       if (esOwner) {
-        const [m, mp] = await Promise.all([listarMiembros(activeLocalId), listarMediosPago(activeLocalId)])
+        const [m, inac, inv, mp] = await Promise.all([
+          listarMiembros(activeLocalId),
+          listarMiembrosInactivos(activeLocalId),
+          listarInvitaciones(activeLocalId),
+          listarMediosPago(activeLocalId),
+        ])
         setMiembros(m)
+        setInactivos(inac)
+        setInvitaciones(inv)
         setMediosPago(mp)
       }
     } catch (err) {
@@ -62,5 +71,5 @@ export function useAdminData() {
   const aplicarPreset = (preset) => setPeriodo({ ...periodoRapido(preset), preset })
   const aplicarFechas = (desde, hasta) => setPeriodo({ desde, hasta, preset: 'personalizado' })
 
-  return { local, stats, miembros, mediosPago, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar: cargar }
+  return { local, stats, miembros, inactivos, invitaciones, mediosPago, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar: cargar }
 }

@@ -6,6 +6,7 @@ import { useSignOut } from '../hooks/useSignOut'
 import { useReportes } from '../hooks/useReportes'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
+import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
 import ReportGuide from '../components/ReportGuide'
 import FiltrosReporte from '../components/reportes/FiltrosReporte'
@@ -56,36 +57,32 @@ export default function Reportes() {
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h1 className="m-0 text-base md:text-lg font-bold text-gray-900">📊 Reportes contables</h1>
-            <p className="mt-0.5 text-xs text-gray-500 truncate m-0">{r.localActual?.nombre || 'Sin locales'}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+      <AppHeader
+        titulo="Reportes contables"
+        locales={r.locales}
+        localId={r.localId}
+        onCambiarLocal={r.setLocalId}
+        permiteTodos
+        acciones={
+          <div className="flex items-center gap-1.5">
             <button onClick={() => exportar('PDF')} disabled={!!exportando}
-              className="px-3 py-2 bg-amber-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-amber-600 disabled:opacity-50">
-              {exportando === 'PDF' ? 'Generando…' : '📄 PDF'}
+              className="px-2.5 py-2 bg-amber-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-amber-600 disabled:opacity-50">
+              {exportando === 'PDF' ? '…' : 'PDF'}
             </button>
             <button onClick={() => exportar('Excel')} disabled={!!exportando}
-              className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50">
-              {exportando === 'Excel' ? 'Generando…' : '📗 Excel'}
+              className="px-2.5 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50">
+              {exportando === 'Excel' ? '…' : 'Excel'}
             </button>
-            <button onClick={() => setAyuda(true)}
-              className="px-3 py-2 bg-blue-100 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-200">¿Cómo leer esto?</button>
-            <button onClick={() => router.push('/dashboard')}
-              className="hidden md:block px-3 py-2 bg-gray-100 text-gray-600 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-200">← Caja</button>
-            <button onClick={signOut}
-              className="hidden md:block px-3 py-2 bg-gray-100 text-gray-500 border-none rounded-lg text-xs cursor-pointer hover:bg-gray-200">Salir</button>
+            <button onClick={() => setAyuda(true)} title="¿Cómo leer esto?"
+              className="px-2.5 py-2 bg-blue-50 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-100">
+              ?
+            </button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <div className="max-w-7xl mx-auto p-3 md:p-4 space-y-4">
-        <FiltrosReporte
-          locales={r.locales} localId={r.localId} onLocal={r.setLocalId}
-          periodo={r.periodo} onPreset={r.aplicarPreset} onFechas={r.aplicarFechas}
-        />
+        <FiltrosReporte periodo={r.periodo} onPreset={r.aplicarPreset} onFechas={r.aplicarFechas} />
 
         <AvisosCalidad calidad={r.calidad} />
 

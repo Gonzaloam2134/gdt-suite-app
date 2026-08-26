@@ -3,11 +3,14 @@ import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useActiveLocal } from '../hooks/useActiveLocal'
 import { useCaja } from '../hooks/useCaja'
 import { useTransaccionesDia } from '../hooks/useTransaccionesDia'
-import { hoyISO, esHoy as esHoyFn } from '../lib/dates'
+import { hoyISO } from '../lib/dates'
+import { useMisLocales } from '../hooks/useMisLocales'
+import { formatFechaLarga } from '../lib/format'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
 import BottomNav from '../components/layout/BottomNav'
-import CajaHeader from '../components/caja/CajaHeader'
+import AppHeader from '../components/layout/AppHeader'
+import EstadoCaja from '../components/caja/EstadoCaja'
 import CajaAcciones from '../components/caja/CajaAcciones'
 import KpiCards from '../components/caja/KpiCards'
 import ListaTransacciones from '../components/caja/ListaTransacciones'
@@ -23,6 +26,7 @@ import ContactModal from '../components/ContactModal'
 export default function Dashboard() {
   const { user, checking } = useAuthGuard()
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
+  const { locales } = useMisLocales(user?.id)
   const [fechaISO] = useState(hoyISO())
 
   const { totales, cobros, gastos, acreditacionesHoy, desgloseMedios, transacciones, loading, recargar } =
@@ -41,14 +45,20 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
-      <CajaHeader
-        local={local}
-        fechaISO={fechaISO}
-        cajaAbierta={caja.cajaAbierta}
-        esHoy={esHoyFn(fechaISO)}
-        onRefresh={recargar}
-        onAyuda={() => setModal('ayuda')}
+      <AppHeader
+        titulo="Caja del día"
+        subtitulo={formatFechaLarga(fechaISO + 'T12:00:00')}
+        locales={locales}
+        localId={localId}
+        acciones={
+          <button onClick={recargar} title="Actualizar"
+            className="px-2.5 py-2 bg-blue-50 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-100">
+            ↻
+          </button>
+        }
       />
+
+      <EstadoCaja cajaAbierta={caja.cajaAbierta} onAyuda={() => setModal('ayuda')} />
 
       <CajaAcciones
         cajaAbierta={caja.cajaAbierta}

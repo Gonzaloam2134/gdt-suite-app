@@ -8,23 +8,12 @@ const PRESETS = [
   { id: 'trimestre', label: 'Trimestre' },
 ]
 
-export default function FiltrosReporte({ locales, localId, onLocal, periodo, onPreset, onFechas }) {
+export default function FiltrosReporte({ periodo, onPreset, onFechas }) {
   const [desde, setDesde] = useState(periodo.desde)
   const [hasta, setHasta] = useState(periodo.hasta)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
-      {locales.length > 1 && (
-        <div>
-          <label htmlFor="r-local" className="block text-sm font-semibold text-gray-700 mb-2">Local</label>
-          <select id="r-local" value={localId} onChange={(e) => onLocal(e.target.value)}
-            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-            <option value="todos">Todos los locales (consolidado)</option>
-            {locales.map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}
-          </select>
-        </div>
-      )}
-
       <div>
         <span className="block text-sm font-semibold text-gray-700 mb-2">Período</span>
         <div className="flex gap-2 flex-wrap mb-3">

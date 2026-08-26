@@ -21,8 +21,10 @@ export default function Login() {
 
       if (error) throw error
 
-      toast.success('✅ Bienvenido!')
-      router.push('/locales')
+      toast.success('Bienvenido')
+      // Si llegó desde un link de invitación, lo devolvemos ahí para aceptarla
+      const { invitacion } = router.query
+      router.push(invitacion ? `/invitacion?token=${invitacion}` : '/locales')
     } catch (err) {
       console.error('Error al iniciar sesión:', err)
       toast.error('Error: ' + (err.message || 'Credenciales inválidas'))
@@ -32,7 +34,8 @@ export default function Login() {
   }
 
   const handleSignUp = () => {
-    router.push('/registro')
+    const { invitacion } = router.query
+    router.push(invitacion ? `/registro?invitacion=${invitacion}` : '/registro')
   }
 
   return (

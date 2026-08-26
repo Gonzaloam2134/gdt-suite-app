@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { crearMedioPago, setMedioHabilitado, eliminarMedioPago } from '../../lib/services/mediosPago'
+import { crearMedioPago, setMedioHabilitado, eliminarMedioPago, actualizarMedioPago } from '../../lib/services/mediosPago'
 import { registrarAccion } from '../../lib/services/auditoria'
 import { ACCIONES } from '../../lib/constants/auditoria'
 import { TIPOS_MEDIO, LABEL_TIPO_MEDIO, iconoMedio } from '../../lib/constants/mediosPago'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import EmptyState from '../ui/EmptyState'
+import EditarMedioPagoModal from './EditarMedioPagoModal'
 
 const FORM_VACIO = { nombre: '', tipo: TIPOS_MEDIO.EFECTIVO, comision: '', plazo: '' }
 
@@ -13,6 +14,8 @@ export default function MediosPagoTab({ mediosPago, localId, userId, onCambio })
   const [form, setForm] = useState(FORM_VACIO)
   const [guardando, setGuardando] = useState(false)
   const [aEliminar, setAEliminar] = useState(null)
+  const [aEditar, setAEditar] = useState(null)
+  const [editando, setEditando] = useState(false)
 
   const set = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.value }))
 
@@ -34,6 +37,26 @@ export default function MediosPagoTab({ mediosPago, localId, userId, onCambio })
     } catch (err) {
       toast.error(`No se pudo agregar: ${err.message}`)
     } finally { setGuardando(false) }
+  }
+
+  const guardarEdicion = async (cambios) => {
+    setEditando(true)
+    try {
+      await actualizarMedioPago(aEditar.id, cambios)
+      await registrarAccion({
+        localId, userId, accion: ACCIONES.MEDIO_PAGO_EDITADO, tabla: 'medios_pago', registroId: aEditar.id,
+        detalles: {
+          nombre: cambios.nombre,
+          comision_anterior: aEditar.comision_porcentaje, comision_nueva: cambios.comision_porcentaje,
+          plazo_anterior: aEditar.plazo_acreditacion_dias, plazo_nuevo: cambios.plazo_acreditacion_dias,
+        },
+      })
+      toast.success('Medio de pago actualizado')
+      setAEditar(null)
+      onCambio()
+    } catch (err) {
+      toast.error(`No se pudo actualizar: ${err.message}`)
+    } finally { setEditando(false) }
   }
 
   const alternar = async (medio) => {
@@ -100,6 +123,7 @@ export default function MediosPagoTab({ mediosPago, localId, userId, onCambio })
                   <span className={`px-2 py-1 rounded text-xs font-bold ${m.habilitado ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                     {m.habilitado ? 'Activo' : 'Inactivo'}
                   </span>
+                  <button onClick={() => setAEditar(m)} className="px-3 py-1 bg-blue-100 text-blue-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-blue-200">Editar</button>
                   <button onClick={() => alternar(m)} className="px-3 py-1 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">
                     {m.habilitado ? 'Desactivar' : 'Activar'}
                   </button>
@@ -110,6 +134,9 @@ export default function MediosPagoTab({ mediosPago, localId, userId, onCambio })
           </div>
         )}
       </div>
+
+      <EditarMedioPagoModal isOpen={!!aEditar} onClose={() => setAEditar(null)} medio={aEditar}
+        onGuardar={guardarEdicion} procesando={editando} />
 
       <ConfirmDialog isOpen={!!aEliminar} onClose={() => setAEliminar(null)} onConfirm={confirmarEliminar} danger
         title="Eliminar medio de pago"

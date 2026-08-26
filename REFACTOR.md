@@ -147,4 +147,34 @@ Corregido en esta fase:
   * Ambos exportadores se cargan bajo demanda (la página pasó de 414 kB a 12 kB)
   * construirLibro() y construirPDF() separados de la descarga → 14 tests los cubren
 
-## Próximo: Fase 6 — locales.js + onboarding, y por último Fase 4 — superadmin
+## Fase 6 (hecha) — navegación, invitaciones y medios de pago editables
+
+### Navegación
+- `components/layout/AppHeader.jsx`: cabecera única con selector de local SIEMPRE
+  visible. En desktop lleva los accesos (Caja / Reportes / Admin / Mis locales);
+  en mobile eso lo cubre BottomNav.
+- `components/layout/SelectorLocal.jsx`: cambia de local desde cualquier pantalla.
+  "Todos los locales" solo en Reportes: una caja o un panel de miembros son de un
+  local puntual, consolidarlos no significa nada.
+- BottomNav ahora aparece también en la pantalla de inicio (antes desaparecía) y
+  sus tabs son Inicio / Caja / Reportes / Admin.
+- `pages/locales.js` (448 → 172) es la pantalla de inicio: tarjeta por local con
+  cobros, gastos, movimientos del día y si la caja está abierta, más el consolidado
+  de todos los locales arriba.
+
+### Invitaciones (el flujo nunca había estado completo: no existía dónde aceptarlas)
+- `pages/invitacion.jsx`: pantalla que abre quien recibe el link. Si no tiene cuenta,
+  lo lleva a registrarse y vuelve solo a aceptar.
+- Link copiable y botón "Enviar por WhatsApp" — para un comercio de barrio el mail
+  suele no ser el canal real.
+- Invitaciones pendientes con renovar (si venció) y cancelar.
+- Miembros quitados se pueden reincorporar.
+- Requiere la migración MIGRACION_INVITACIONES.sql (RPC ver_invitacion y
+  aceptar_invitacion, más la columna nombre_invitado).
+
+### Medios de pago
+- Ahora se pueden editar (nombre, tipo, comisión, plazo).
+- Al cambiar comisión o plazo se avisa que rige de ahí en adelante: cada cobro guarda
+  la comisión con la que se hizo, así que los reportes anteriores no cambian.
+
+## Próximo: suscripciones con Mercado Pago, y por último Fase 4 — superadmin (KPIs de triage)

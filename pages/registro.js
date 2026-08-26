@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
@@ -9,6 +9,10 @@ export default function Registro() {
   const [nombre, setNombre] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // Si viene de un link de invitación, precargamos el email y volvemos ahí al terminar
+  const { invitacion, email: emailInvitado } = router.query
+  useEffect(() => { if (emailInvitado) setEmail(String(emailInvitado)) }, [emailInvitado])
 
   const handleRegistro = async (e) => {
     e.preventDefault()
@@ -29,27 +33,15 @@ export default function Registro() {
       if (authError) throw authError
       if (!authData.user) throw new Error('No se pudo crear el usuario')
 
-      // 2. Crear o actualizar perfil en la tabla 'perfiles' (usamos upsert por si el trigger ya lo creó)
-      const { error: perfilError } = await supabase
-        .from('perfiles')
-        .upsert({
-          id: authData.user.id,
-          email: email.trim(),
-          nombre: nombre.trim(),
-          rol_global: 'owner',
-          creado_en: new Date().toISOString(),
-        }, {
-          onConflict: 'id'
-        })
+      // El trigger on_auth_user_created ya crea el perfil; acá solo completamos el nombre.
+      await supabase.from('perfiles').update({ nombre: nombre.trim() }).eq('id', authData.user.id)
 
-      if (perfilError) throw perfilError
+      toast.success('Cuenta creada')
 
-      toast.success('✅ Cuenta creada! Redirigiendo...')
-      
-      // 3. Redirigir a locales (para que cree su primer local)
+      // Si venía de una invitación, vuelve a aceptarla; si no, va a crear su primer local
       setTimeout(() => {
-        router.push('/locales')
-      }, 1500)
+        router.push(invitacion ? `/invitacion?token=${invitacion}` : '/locales')
+      }, 1200)
       
       } catch (err) {
     console.error('Error al registrar:', err)
