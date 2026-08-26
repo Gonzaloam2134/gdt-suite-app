@@ -1,0 +1,2223 @@
+From 9a8705565e4d33bd31f10c0f14756dc75a0a2dea Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Wed, 26 Aug 2026 01:24:01 +0000
+Subject: [PATCH] refactor(fase 5): reportes reconstruidos sobre datos fiscales
+ reales; calidad del dato, conciliacion, PDF y Excel nuevos
+
+---
+ REFACTOR.md                                 |  32 +-
+ components/reportes/AvisosCalidad.jsx       |  27 +
+ components/reportes/FiltrosReporte.jsx      |  61 ++
+ components/reportes/MediosYConciliacion.jsx |  88 +++
+ components/reportes/ResumenEjecutivo.jsx    |  48 ++
+ components/reportes/ResumenPorAlicuota.jsx  |  43 ++
+ components/reportes/TablaLibro.jsx          |  77 +++
+ hooks/useReportes.js                        |  85 +++
+ lib/domain/reportes.js                      | 110 +++
+ lib/export/excel.js                         | 119 ++++
+ lib/export/pdf.js                           | 113 +++
+ lib/reportes.js                             | 455 -------------
+ pages/reportes.js                           | 716 +++-----------------
+ tests/reportes.test.js                      |  96 +++
+ 14 files changed, 978 insertions(+), 1092 deletions(-)
+ create mode 100644 components/reportes/AvisosCalidad.jsx
+ create mode 100644 components/reportes/FiltrosReporte.jsx
+ create mode 100644 components/reportes/MediosYConciliacion.jsx
+ create mode 100644 components/reportes/ResumenEjecutivo.jsx
+ create mode 100644 components/reportes/ResumenPorAlicuota.jsx
+ create mode 100644 components/reportes/TablaLibro.jsx
+ create mode 100644 hooks/useReportes.js
+ create mode 100644 lib/domain/reportes.js
+ create mode 100644 lib/export/excel.js
+ create mode 100644 lib/export/pdf.js
+ delete mode 100644 lib/reportes.js
+ create mode 100644 tests/reportes.test.js
+
+diff --git a/REFACTOR.md b/REFACTOR.md
+index 742ec63..34f5a22 100644
+--- a/REFACTOR.md
++++ b/REFACTOR.md
+@@ -109,4 +109,34 @@ Corregido en esta fase:
+   ya no reaparecen al cambiar de dispositivo o limpiar el navegador.
+   Nuevo hooks/useAnuncios.js; se limpiaron los console.log de locales.js.
+ 
+-## Próximo: Fase 4 — superadmin.jsx (934 → ~100)
++## Fase 5 (hecha) — reportes 663 + lib/reportes 454 → módulo del contador
++```
++pages/reportes.js                 108
++hooks/useReportes.js               85
++lib/domain/reportes.js            110   agrupaciones puras + calidad del dato
++lib/export/pdf.js                 113   (reemplaza generarReportePDF)
++lib/export/excel.js               119   (reemplaza generarReporteExcel)
++components/reportes/
++  FiltrosReporte.jsx               61
++  AvisosCalidad.jsx                27
++  ResumenEjecutivo.jsx             48
++  ResumenPorAlicuota.jsx           43
++  MediosYConciliacion.jsx          88
++  TablaLibro.jsx                   77
++components/ReportGuide.jsx            reciclado como "¿Cómo leer esto?"
++```
++
++Corregido en esta fase:
++- Se dejaron de inventar datos fiscales: antes TODO salía como "Factura A", punto de
++  venta "0001", número = 8 chars del UUID e IVA 21% calculado al vuelo. Ahora se lee
++  tipo_comprobante, punto_venta, nro_comprobante, alicuota_iva y monto_iva reales
++- locales.condicion_fiscal decide si se discrimina IVA (Monotributo no lo ve)
++- Consolidado de varios locales: solo discrimina IVA si TODOS lo hacen
++- Panel de calidad del dato arriba de los números (cuántos movimientos sin comprobante,
++  sin número, sin alícuota, cuántos anulados)
++- Conciliación de caja real: días que cuadraron, faltantes, sobrantes, cierres sin contar
++- resumen.pendiente que nunca se calculaba y "saldo inicial: 0" hardcodeado: eliminados
++- Excel: montos como números (sumables), nombres de hoja sin emoji (límite 31 chars)
++- PDF: pie aclarando que no reemplaza la liquidación de un profesional
++
++## Próximo: Fase 6 — locales.js + onboarding, y por último Fase 4 — superadmin
+diff --git a/components/reportes/AvisosCalidad.jsx b/components/reportes/AvisosCalidad.jsx
+new file mode 100644
+index 0000000..efffbf4
+--- /dev/null
++++ b/components/reportes/AvisosCalidad.jsx
+@@ -0,0 +1,27 @@
++const ESTILO = {
++  alto:  { fondo: 'bg-red-50 border-red-200', texto: 'text-red-800', icono: '⚠️' },
++  medio: { fondo: 'bg-amber-50 border-amber-200', texto: 'text-amber-800', icono: '⚠️' },
++  info:  { fondo: 'bg-blue-50 border-blue-200', texto: 'text-blue-800', icono: 'ℹ️' },
++}
++
++/**
++ * Qué le falta al dato. Va antes de los números: si el contador no sabe que el 60%
++ * de las ventas no tiene comprobante, toma el reporte como completo.
++ */
++export default function AvisosCalidad({ calidad }) {
++  if (!calidad.avisos.length) return null
++
++  return (
++    <div className="space-y-2">
++      {calidad.avisos.map((a, i) => {
++        const e = ESTILO[a.nivel] || ESTILO.info
++        return (
++          <div key={i} className={`flex items-start gap-2 p-3 rounded-lg border ${e.fondo}`}>
++            <span className="shrink-0">{e.icono}</span>
++            <p className={`text-sm m-0 ${e.texto}`}>{a.texto}</p>
++          </div>
++        )
++      })}
++    </div>
++  )
++}
+diff --git a/components/reportes/FiltrosReporte.jsx b/components/reportes/FiltrosReporte.jsx
+new file mode 100644
+index 0000000..ac7cf1b
+--- /dev/null
++++ b/components/reportes/FiltrosReporte.jsx
+@@ -0,0 +1,61 @@
++import { useState } from 'react'
++import { formatFecha } from '../../lib/format'
++
++const PRESETS = [
++  { id: 'este-mes', label: 'Este mes' },
++  { id: 'mes-anterior', label: 'Mes anterior' },
++  { id: 'ultimos-30', label: 'Últimos 30 días' },
++  { id: 'trimestre', label: 'Trimestre' },
++]
++
++export default function FiltrosReporte({ locales, localId, onLocal, periodo, onPreset, onFechas }) {
++  const [desde, setDesde] = useState(periodo.desde)
++  const [hasta, setHasta] = useState(periodo.hasta)
++
++  return (
++    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
++      {locales.length > 1 && (
++        <div>
++          <label htmlFor="r-local" className="block text-sm font-semibold text-gray-700 mb-2">Local</label>
++          <select id="r-local" value={localId} onChange={(e) => onLocal(e.target.value)}
++            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
++            <option value="todos">Todos los locales (consolidado)</option>
++            {locales.map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}
++          </select>
++        </div>
++      )}
++
++      <div>
++        <span className="block text-sm font-semibold text-gray-700 mb-2">Período</span>
++        <div className="flex gap-2 flex-wrap mb-3">
++          {PRESETS.map(p => (
++            <button key={p.id} onClick={() => onPreset(p.id)}
++              className={`px-3 py-1.5 border-none rounded-md text-xs font-semibold cursor-pointer transition-colors ${
++                periodo.preset === p.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
++              {p.label}
++            </button>
++          ))}
++        </div>
++        <div className="flex gap-2 items-end flex-wrap">
++          <div>
++            <label htmlFor="r-desde" className="block text-xs text-gray-500 mb-1">Desde</label>
++            <input id="r-desde" type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
++              className="p-2 border border-gray-300 rounded-md text-sm" />
++          </div>
++          <div>
++            <label htmlFor="r-hasta" className="block text-xs text-gray-500 mb-1">Hasta</label>
++            <input id="r-hasta" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)}
++              className="p-2 border border-gray-300 rounded-md text-sm" />
++          </div>
++          <button onClick={() => onFechas(desde, hasta)}
++            className="px-4 py-2 bg-blue-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600">
++            Aplicar
++          </button>
++        </div>
++        <p className="mt-3 text-xs text-gray-500 m-0">
++          Del {formatFecha(periodo.desde + 'T12:00:00')} al {formatFecha(periodo.hasta + 'T12:00:00')}
++        </p>
++      </div>
++    </div>
++  )
++}
+diff --git a/components/reportes/MediosYConciliacion.jsx b/components/reportes/MediosYConciliacion.jsx
+new file mode 100644
+index 0000000..744466a
+--- /dev/null
++++ b/components/reportes/MediosYConciliacion.jsx
+@@ -0,0 +1,88 @@
++import { formatCurrency, formatFecha } from '../../lib/format'
++import { LABEL_TIPO_MEDIO } from '../../lib/constants/mediosPago'
++
++export default function MediosYConciliacion({ porMedio, conciliacion, cierres, totalFacturado }) {
++  return (
++    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
++      <section className="bg-white rounded-xl border border-gray-200 p-4">
++        <h2 className="font-bold text-gray-900 m-0 mb-3 text-base">Cobros por medio de pago</h2>
++        {porMedio.length === 0 ? (
++          <p className="text-xs text-gray-500 m-0">Sin cobros en el período.</p>
++        ) : (
++          <table className="w-full text-xs">
++            <thead>
++              <tr className="text-gray-500 border-b border-gray-200">
++                <th className="py-1 text-left font-semibold">Medio</th>
++                <th className="py-1 text-right font-semibold">Total</th>
++                <th className="py-1 text-right font-semibold">Comisión</th>
++                <th className="py-1 text-right font-semibold">Neto</th>
++              </tr>
++            </thead>
++            <tbody>
++              {porMedio.map(m => (
++                <tr key={m.nombre} className="border-b border-gray-100">
++                  <td className="py-1.5">
++                    <div className="font-semibold text-gray-900">{m.nombre}</div>
++                    <div className="text-gray-400">
++                      {LABEL_TIPO_MEDIO[m.tipo] || m.tipo} · {m.cantidad} ops
++                      {totalFacturado > 0 && ` · ${Math.round((m.total / totalFacturado) * 100)}%`}
++                    </div>
++                  </td>
++                  <td className="py-1.5 text-right text-gray-700">{formatCurrency(m.total)}</td>
++                  <td className="py-1.5 text-right text-red-600">{m.comisiones > 0 ? `-${formatCurrency(m.comisiones)}` : '—'}</td>
++                  <td className="py-1.5 text-right font-bold text-gray-900">{formatCurrency(m.neto)}</td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        )}
++      </section>
++
++      <section className="bg-white rounded-xl border border-gray-200 p-4">
++        <h2 className="font-bold text-gray-900 m-0 mb-3 text-base">Conciliación de caja</h2>
++        {conciliacion.cierres === 0 ? (
++          <p className="text-xs text-gray-500 m-0">No hay cierres de caja registrados en el período.</p>
++        ) : (
++          <>
++            <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
++              <div className="p-2 bg-gray-50 rounded"><span className="text-gray-500">Cierres</span><div className="font-bold text-gray-900">{conciliacion.cierres}</div></div>
++              <div className="p-2 bg-green-50 rounded"><span className="text-gray-500">Cuadraron</span><div className="font-bold text-green-700">{conciliacion.cuadrados}</div></div>
++              <div className="p-2 bg-red-50 rounded"><span className="text-gray-500">Con faltante</span><div className="font-bold text-red-700">{conciliacion.diasFaltante}</div></div>
++              <div className="p-2 bg-blue-50 rounded"><span className="text-gray-500">Con sobrante</span><div className="font-bold text-blue-700">{conciliacion.diasSobrante}</div></div>
++            </div>
++            <div className="flex justify-between items-baseline py-2 border-t border-gray-200">
++              <span className="text-sm text-gray-600">Diferencia acumulada</span>
++              <span className={`font-bold ${conciliacion.totalDiferencia < 0 ? 'text-red-700' : conciliacion.totalDiferencia > 0 ? 'text-blue-700' : 'text-green-700'}`}>
++                {formatCurrency(conciliacion.totalDiferencia)}
++              </span>
++            </div>
++            {conciliacion.sinContar > 0 && (
++              <p className="text-xs text-amber-700 m-0 mt-2">
++                {conciliacion.sinContar} cierres se hicieron sin contar el efectivo, así que no se pueden conciliar.
++              </p>
++            )}
++            {cierres.length > 0 && (
++              <details className="mt-3">
++                <summary className="text-xs font-semibold text-gray-600 cursor-pointer">Ver detalle por día</summary>
++                <table className="w-full text-xs mt-2">
++                  <tbody>
++                    {cierres.map(c => (
++                      <tr key={c.id} className="border-b border-gray-100">
++                        <td className="py-1 text-gray-700">{formatFecha(c.fecha_cierre)}</td>
++                        <td className="py-1 text-right text-gray-500">{c.efectivo_fisico == null ? 'sin contar' : formatCurrency(c.efectivo_fisico)}</td>
++                        <td className={`py-1 text-right font-semibold ${
++                          c.diferencia_efectivo == null ? 'text-gray-400' : c.diferencia_efectivo < 0 ? 'text-red-700' : c.diferencia_efectivo > 0 ? 'text-blue-700' : 'text-green-700'}`}>
++                          {c.diferencia_efectivo == null ? '—' : formatCurrency(c.diferencia_efectivo)}
++                        </td>
++                      </tr>
++                    ))}
++                  </tbody>
++                </table>
++              </details>
++            )}
++          </>
++        )}
++      </section>
++    </div>
++  )
++}
+diff --git a/components/reportes/ResumenEjecutivo.jsx b/components/reportes/ResumenEjecutivo.jsx
+new file mode 100644
+index 0000000..b556676
+--- /dev/null
++++ b/components/reportes/ResumenEjecutivo.jsx
+@@ -0,0 +1,48 @@
++import { formatCurrency } from '../../lib/format'
++
++const Fila = ({ label, valor, negativo, destacada, ayuda }) => (
++  <div className={`flex justify-between items-baseline gap-4 py-2 ${destacada ? 'border-t-2 border-gray-300 mt-1' : 'border-b border-gray-100'}`}>
++    <span className={`text-sm ${destacada ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
++      {label}
++      {ayuda && <span className="block text-xs text-gray-400">{ayuda}</span>}
++    </span>
++    <span className={`font-bold whitespace-nowrap ${destacada ? 'text-lg' : 'text-sm'} ${negativo ? 'text-red-600' : 'text-gray-900'}`}>
++      {negativo ? '-' : ''}{formatCurrency(Math.abs(valor))}
++    </span>
++  </div>
++)
++
++export default function ResumenEjecutivo({ resumen, discriminaIva }) {
++  return (
++    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
++      <header className="bg-slate-800 px-4 py-3">
++        <h2 className="text-white font-bold m-0 text-base">Resultado del período</h2>
++      </header>
++      <div className="p-4">
++        <Fila label="Total facturado" ayuda="Todo lo que cobraste, sin descontar nada" valor={resumen.totalFacturado} />
++        {discriminaIva && <Fila label="(-) IVA débito fiscal" valor={resumen.ivaDebitoFiscal} negativo />}
++        {discriminaIva && <Fila label="Neto gravado" valor={resumen.netoGravado} />}
++        <Fila label="(-) Comisiones de medios de pago" ayuda="Lo que se quedan las tarjetas y billeteras" valor={resumen.comisiones} negativo />
++        <Fila label="Ingreso neto real" ayuda="Lo que efectivamente entró" valor={resumen.ingresoNetoReal} />
++        <Fila label="(-) Gastos operativos" valor={resumen.gastosOperativos} negativo />
++        {discriminaIva && <Fila label="(+) IVA crédito fiscal" valor={resumen.ivaCreditoFiscal} />}
++        <Fila label="Resultado" valor={resumen.resultadoEjercicio} destacada negativo={resumen.resultadoEjercicio < 0} />
++
++        {discriminaIva && (
++          <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
++            <div className="flex justify-between items-baseline">
++              <span className="text-sm font-semibold text-gray-700">
++                Posición IVA
++                <span className="block text-xs text-gray-500 font-normal">Débito menos crédito fiscal</span>
++              </span>
++              <span className={`font-bold ${resumen.ivaAPagar >= 0 ? 'text-red-700' : 'text-green-700'}`}>
++                {formatCurrency(Math.abs(resumen.ivaAPagar))}
++                <span className="block text-xs font-normal text-right">{resumen.ivaAPagar >= 0 ? 'a pagar' : 'a favor'}</span>
++              </span>
++            </div>
++          </div>
++        )}
++      </div>
++    </section>
++  )
++}
+diff --git a/components/reportes/ResumenPorAlicuota.jsx b/components/reportes/ResumenPorAlicuota.jsx
+new file mode 100644
+index 0000000..b98104d
+--- /dev/null
++++ b/components/reportes/ResumenPorAlicuota.jsx
+@@ -0,0 +1,43 @@
++import { formatCurrency } from '../../lib/format'
++
++const Bloque = ({ titulo, filas }) => (
++  <div>
++    <h3 className="text-sm font-bold text-gray-700 mb-2 m-0">{titulo}</h3>
++    {filas.length === 0 ? (
++      <p className="text-xs text-gray-500 m-0">Sin movimientos.</p>
++    ) : (
++      <table className="w-full text-xs">
++        <thead>
++          <tr className="text-gray-500 border-b border-gray-200">
++            <th className="py-1 text-left font-semibold">Alícuota</th>
++            <th className="py-1 text-right font-semibold">Cant.</th>
++            <th className="py-1 text-right font-semibold">Neto</th>
++            <th className="py-1 text-right font-semibold">IVA</th>
++          </tr>
++        </thead>
++        <tbody>
++          {filas.map(a => (
++            <tr key={a.alicuota} className="border-b border-gray-100">
++              <td className="py-1.5 font-semibold text-gray-900">{a.alicuota}%</td>
++              <td className="py-1.5 text-right text-gray-600">{a.cantidad}</td>
++              <td className="py-1.5 text-right text-gray-700">{formatCurrency(a.neto)}</td>
++              <td className="py-1.5 text-right font-semibold text-gray-900">{formatCurrency(a.iva)}</td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    )}
++  </div>
++)
++
++export default function ResumenPorAlicuota({ ventas, compras }) {
++  return (
++    <section className="bg-white rounded-xl border border-gray-200 p-4">
++      <h2 className="font-bold text-gray-900 m-0 mb-3 text-base">Resumen por alícuota</h2>
++      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
++        <Bloque titulo="Ventas" filas={ventas} />
++        <Bloque titulo="Compras" filas={compras} />
++      </div>
++    </section>
++  )
++}
+diff --git a/components/reportes/TablaLibro.jsx b/components/reportes/TablaLibro.jsx
+new file mode 100644
+index 0000000..862dc5e
+--- /dev/null
++++ b/components/reportes/TablaLibro.jsx
+@@ -0,0 +1,77 @@
++import { useState } from 'react'
++import { formatCurrency, formatFecha } from '../../lib/format'
++import EmptyState from '../ui/EmptyState'
++
++const TIPO_LABEL = { A: 'Factura A', B: 'Factura B', C: 'Factura C', M: 'Factura M', TICKET: 'Ticket', SIN_COMPROBANTE: 'Sin comprobante' }
++const LIMITE = 25
++
++/** Libro IVA (ventas o compras). Muestra los primeros 25 y ofrece el resto en el Excel. */
++export default function TablaLibro({ tipo, filas, totales, discriminaIva }) {
++  const [verTodo, setVerTodo] = useState(false)
++  const esVentas = tipo === 'ventas'
++  const visibles = verTodo ? filas : filas.slice(0, LIMITE)
++
++  return (
++    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
++      <header className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
++        <h2 className="font-bold text-gray-900 m-0 text-base">{esVentas ? 'Libro IVA Ventas' : 'Libro IVA Compras'}</h2>
++        <span className="text-xs text-gray-500">{filas.length} registros</span>
++      </header>
++
++      {filas.length === 0 ? (
++        <EmptyState icono="📄" titulo={`Sin ${esVentas ? 'ventas' : 'compras'} en el período`} />
++      ) : (
++        <>
++          <div className="overflow-x-auto">
++            <table className="w-full text-xs">
++              <thead>
++                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
++                  <th className="p-2 text-left font-bold">Fecha</th>
++                  <th className="p-2 text-left font-bold">Comprobante</th>
++                  <th className="p-2 text-left font-bold hidden md:table-cell">{esVentas ? 'Medio' : 'Proveedor'}</th>
++                  {discriminaIva && <th className="p-2 text-right font-bold">Neto</th>}
++                  {discriminaIva && <th className="p-2 text-right font-bold">IVA</th>}
++                  <th className="p-2 text-right font-bold">Total</th>
++                </tr>
++              </thead>
++              <tbody>
++                {visibles.map(f => (
++                  <tr key={f.id} className="border-b border-gray-100 hover:bg-gray-50">
++                    <td className="p-2 text-gray-900 whitespace-nowrap">{formatFecha(f.fecha)}</td>
++                    <td className="p-2 text-gray-700">
++                      {TIPO_LABEL[f.tipo] || f.tipo}
++                      {f.numero && <span className="text-gray-400"> · {String(f.punto_venta ?? '').padStart(4, '0')}-{f.numero}</span>}
++                    </td>
++                    <td className="p-2 text-gray-700 hidden md:table-cell truncate max-w-[200px]">
++                      {esVentas ? f.medio : f.proveedor}
++                    </td>
++                    {discriminaIva && <td className="p-2 text-right text-gray-700">{formatCurrency(f.neto)}</td>}
++                    {discriminaIva && <td className="p-2 text-right text-gray-500">{formatCurrency(f.iva)} <span className="text-gray-400">({f.alicuota}%)</span></td>}
++                    <td className="p-2 text-right font-bold text-gray-900">{formatCurrency(f.total)}</td>
++                  </tr>
++                ))}
++              </tbody>
++              <tfoot>
++                <tr className="bg-gray-50 border-t-2 border-gray-300 font-bold text-gray-900">
++                  <td className="p-2" colSpan={discriminaIva ? 3 : 3}>Totales del período</td>
++                  {discriminaIva && <td className="p-2 text-right">{formatCurrency(totales.neto)}</td>}
++                  {discriminaIva && <td className="p-2 text-right">{formatCurrency(totales.iva)}</td>}
++                  <td className="p-2 text-right">{formatCurrency(totales.total)}</td>
++                </tr>
++              </tfoot>
++            </table>
++          </div>
++
++          {filas.length > LIMITE && (
++            <footer className="px-4 py-2 border-t border-gray-100 text-center">
++              <button onClick={() => setVerTodo(v => !v)}
++                className="text-xs text-blue-600 font-semibold bg-transparent border-none cursor-pointer hover:underline">
++                {verTodo ? 'Ver menos' : `Ver los ${filas.length} registros`}
++              </button>
++            </footer>
++          )}
++        </>
++      )}
++    </section>
++  )
++}
+diff --git a/hooks/useReportes.js b/hooks/useReportes.js
+new file mode 100644
+index 0000000..08d2fb4
+--- /dev/null
++++ b/hooks/useReportes.js
+@@ -0,0 +1,85 @@
++import { useState, useEffect, useCallback, useMemo } from 'react'
++import toast from 'react-hot-toast'
++import { getMembresias } from '../lib/services/miembros'
++import { getLocales } from '../lib/services/locales'
++import { listarTransaccionesPeriodo } from '../lib/services/transacciones'
++import { listarCierres } from '../lib/services/cierresCaja'
++import { calcularResumenPeriodo } from '../lib/domain/transacciones'
++import { agruparPorAlicuota, agruparPorMedio, agruparPorDia, evaluarCalidad, conciliarCierres } from '../lib/domain/reportes'
++import { rangoEntre, periodoRapido } from '../lib/dates'
++import { discriminaIva } from '../lib/constants/transacciones'
++
++/** Datos del reporte contable para un local (o todos) en un período. */
++export function useReportes(userId) {
++  const [locales, setLocales] = useState([])
++  const [localId, setLocalId] = useState('todos')
++  const [periodo, setPeriodo] = useState(() => ({ ...periodoRapido('este-mes'), preset: 'este-mes' }))
++  const [transacciones, setTransacciones] = useState([])
++  const [cierres, setCierres] = useState([])
++  const [loading, setLoading] = useState(true)
++
++  useEffect(() => {
++    if (!userId) return
++    getMembresias(userId)
++      .then(async (membresias) => {
++        if (!membresias?.length) { setLocales([]); return }
++        setLocales(await getLocales(membresias.map(m => m.local_id)))
++      })
++      .catch(() => toast.error('No se pudieron cargar tus locales'))
++  }, [userId])
++
++  const localIds = useMemo(
++    () => (localId === 'todos' ? locales.map(l => l.id) : [localId]),
++    [localId, locales],
++  )
++
++  const cargar = useCallback(async () => {
++    if (!localIds.length) { setLoading(false); return }
++    setLoading(true)
++    try {
++      const { inicio, fin } = rangoEntre(periodo.desde, periodo.hasta)
++      const [tx, cj] = await Promise.all([
++        listarTransaccionesPeriodo(localIds, periodo.desde, periodo.hasta),
++        listarCierres(localIds, { inicio, fin, limite: 200 }),
++      ])
++      setTransacciones(tx)
++      setCierres(cj)
++    } catch (err) {
++      toast.error(`No se pudo generar el reporte: ${err.message}`)
++      setTransacciones([])
++      setCierres([])
++    } finally { setLoading(false) }
++  }, [localIds, periodo])
++
++  useEffect(() => { cargar() }, [cargar])
++
++  /**
++   * Consolidado: si son varios locales con condiciones fiscales distintas,
++   * solo se discrimina IVA cuando TODOS lo discriminan; si no, los totales
++   * mezclarían criterios y el número no significaría nada.
++   */
++  const localActual = localId === 'todos'
++    ? { id: 'todos', nombre: 'Todos los locales', condicion_fiscal: locales.every(l => discriminaIva(l.condicion_fiscal)) ? 'Responsable Inscripto' : 'Mixto' }
++    : locales.find(l => l.id === localId)
++
++  const datos = useMemo(() => {
++    const conIva = discriminaIva(localActual?.condicion_fiscal)
++    const { resumen, libroVentas, libroCompras } = calcularResumenPeriodo(transacciones, { discriminaIva: conIva })
++    return {
++      resumen, libroVentas, libroCompras, discriminaIva: conIva,
++      porAlicuotaVentas: agruparPorAlicuota(libroVentas),
++      porAlicuotaCompras: agruparPorAlicuota(libroCompras),
++      porMedio: agruparPorMedio(transacciones),
++      porDia: agruparPorDia(transacciones),
++      calidad: evaluarCalidad(transacciones),
++      conciliacion: conciliarCierres(cierres),
++    }
++  }, [transacciones, cierres, localActual?.condicion_fiscal])
++
++  return {
++    locales, localId, setLocalId, localActual, periodo, cierres, loading,
++    aplicarPreset: (preset) => setPeriodo({ ...periodoRapido(preset), preset }),
++    aplicarFechas: (desde, hasta) => setPeriodo({ desde, hasta, preset: 'personalizado' }),
++    ...datos,
++  }
++}
+diff --git a/lib/domain/reportes.js b/lib/domain/reportes.js
+new file mode 100644
+index 0000000..1989f1c
+--- /dev/null
++++ b/lib/domain/reportes.js
+@@ -0,0 +1,110 @@
++/**
++ * Agregaciones para los reportes. Funciones puras: sin React, sin Supabase.
++ *
++ * Regla de este módulo: NO se inventan datos fiscales. Si una transacción no tiene
++ * comprobante o alícuota cargada, se informa como tal en vez de asumir "Factura A, 21%".
++ * El reporte anterior fabricaba tipo, punto de venta y número a partir del UUID, y eso
++ * es lo que un contador termina cargando como si fuera real.
++ */
++import { esCobro, esGasto, esValida, comisionDe } from './transacciones'
++import { aFechaISO } from '../dates'
++
++const num = (v) => (v === null || v === undefined || Number.isNaN(Number(v)) ? 0 : Number(v))
++const redondear = (v) => Math.round(v * 100) / 100
++
++/** Ventas y compras agrupadas por alícuota, como las pide el libro IVA. */
++export const agruparPorAlicuota = (filas) => {
++  const mapa = new Map()
++  for (const f of filas) {
++    const alicuota = num(f.alicuota)
++    const actual = mapa.get(alicuota) || { alicuota, neto: 0, iva: 0, total: 0, cantidad: 0 }
++    actual.neto += num(f.neto)
++    actual.iva += num(f.iva)
++    actual.total += num(f.total)
++    actual.cantidad += 1
++    mapa.set(alicuota, actual)
++  }
++  return [...mapa.values()]
++    .map(a => ({ ...a, neto: redondear(a.neto), iva: redondear(a.iva), total: redondear(a.total) }))
++    .sort((a, b) => b.alicuota - a.alicuota)
++}
++
++/** Cobros agrupados por medio de pago, con comisión y neto acreditado. */
++export const agruparPorMedio = (transacciones) => {
++  const mapa = new Map()
++  for (const t of transacciones) {
++    if (!esValida(t) || !esCobro(t)) continue
++    const nombre = t.medios_pago?.nombre || 'Sin medio'
++    const actual = mapa.get(nombre) || { nombre, tipo: t.medios_pago?.tipo || 'otro', total: 0, comisiones: 0, cantidad: 0 }
++    actual.total += num(t.monto)
++    actual.comisiones += comisionDe(t)
++    actual.cantidad += 1
++    mapa.set(nombre, actual)
++  }
++  return [...mapa.values()]
++    .map(m => ({ ...m, total: redondear(m.total), comisiones: redondear(m.comisiones), neto: redondear(m.total - m.comisiones) }))
++    .sort((a, b) => b.total - a.total)
++}
++
++/** Movimientos por día: sirve para el libro caja y para ver estacionalidad. */
++export const agruparPorDia = (transacciones) => {
++  const mapa = new Map()
++  for (const t of transacciones) {
++    if (!esValida(t)) continue
++    const dia = aFechaISO(new Date(t.creado_en))
++    const actual = mapa.get(dia) || { fecha: dia, ventas: 0, gastos: 0, cantidad: 0 }
++    if (esCobro(t)) actual.ventas += num(t.monto)
++    else if (esGasto(t)) actual.gastos += num(t.monto)
++    actual.cantidad += 1
++    mapa.set(dia, actual)
++  }
++  return [...mapa.values()]
++    .map(d => ({ ...d, ventas: redondear(d.ventas), gastos: redondear(d.gastos), resultado: redondear(d.ventas - d.gastos) }))
++    .sort((a, b) => a.fecha.localeCompare(b.fecha))
++}
++
++/**
++ * Qué tan confiable es este reporte. Va arriba de todo: si el contador no sabe
++ * qué le falta al dato, lo toma como completo.
++ */
++export const evaluarCalidad = (transacciones) => {
++  const validas = transacciones.filter(esValida)
++  const cobros = validas.filter(esCobro)
++  const sinComprobante = validas.filter(t => !t.tipo_comprobante || t.tipo_comprobante === 'SIN_COMPROBANTE').length
++  const sinNumero = validas.filter(t => t.tipo_comprobante && t.tipo_comprobante !== 'SIN_COMPROBANTE' && !t.nro_comprobante).length
++  const anuladas = transacciones.filter(t => t.revertida).length
++  const sinAlicuota = validas.filter(t => t.alicuota_iva === null || t.alicuota_iva === undefined).length
++
++  const avisos = []
++  if (validas.length === 0) avisos.push({ nivel: 'info', texto: 'No hay movimientos en el período seleccionado.' })
++  if (sinComprobante > 0) {
++    const pct = Math.round((sinComprobante / validas.length) * 100)
++    avisos.push({
++      nivel: pct > 50 ? 'alto' : 'medio',
++      texto: `${sinComprobante} de ${validas.length} movimientos (${pct}%) no tienen comprobante asociado.`,
++    })
++  }
++  if (sinNumero > 0) avisos.push({ nivel: 'medio', texto: `${sinNumero} comprobantes no tienen número cargado.` })
++  if (sinAlicuota > 0) avisos.push({ nivel: 'medio', texto: `${sinAlicuota} movimientos no tienen alícuota de IVA definida.` })
++  if (anuladas > 0) avisos.push({ nivel: 'info', texto: `${anuladas} movimientos fueron anulados y quedan excluidos de los totales.` })
++
++  return { total: validas.length, cobros: cobros.length, sinComprobante, sinNumero, sinAlicuota, anuladas, avisos }
++}
++
++/** Conciliación de los cierres de caja del período: esperado vs contado. */
++export const conciliarCierres = (cierres) => {
++  const conDiferencia = cierres.filter(c => c.diferencia_efectivo !== null && c.diferencia_efectivo !== undefined)
++  const totalDiferencia = conDiferencia.reduce((s, c) => s + num(c.diferencia_efectivo), 0)
++  const faltantes = conDiferencia.filter(c => num(c.diferencia_efectivo) < 0)
++  const sobrantes = conDiferencia.filter(c => num(c.diferencia_efectivo) > 0)
++
++  return {
++    cierres: cierres.length,
++    sinContar: cierres.length - conDiferencia.length,
++    totalDiferencia: redondear(totalDiferencia),
++    diasFaltante: faltantes.length,
++    diasSobrante: sobrantes.length,
++    cuadrados: conDiferencia.length - faltantes.length - sobrantes.length,
++    peorFaltante: faltantes.length ? redondear(Math.min(...faltantes.map(c => num(c.diferencia_efectivo)))) : 0,
++  }
++}
+diff --git a/lib/export/excel.js b/lib/export/excel.js
+new file mode 100644
+index 0000000..b70d27b
+--- /dev/null
++++ b/lib/export/excel.js
+@@ -0,0 +1,119 @@
++import * as XLSX from 'xlsx'
++import { formatFecha } from '../format'
++import { LABEL_TIPO_MEDIO } from '../constants/mediosPago'
++
++const TIPO_LABEL = { A: 'Factura A', B: 'Factura B', C: 'Factura C', M: 'Factura M', TICKET: 'Ticket', SIN_COMPROBANTE: 'Sin comprobante' }
++const n = (v) => Number(v) || 0
++
++/** Los nombres de hoja de Excel no admiten : \ / ? * [ ] ni más de 31 caracteres. */
++const hoja = (wb, nombre, filas, anchos) => {
++  const ws = XLSX.utils.aoa_to_sheet(filas)
++  if (anchos) ws['!cols'] = anchos.map(w => ({ wch: w }))
++  XLSX.utils.book_append_sheet(wb, ws, nombre.slice(0, 31))
++}
++
++/**
++ * Libro de trabajo para el contador. Cada hoja es autoexplicativa y los montos
++ * van como números (no como texto con símbolo), para que se puedan sumar.
++ */
++export const generarExcel = ({ local, periodo, resumen, libroVentas, libroCompras, porAlicuotaVentas, porAlicuotaCompras, porMedio, porDia, cierres, conciliacion, calidad }) => {
++  const wb = XLSX.utils.book_new()
++  const titulo = `${local.nombre} — ${formatFecha(periodo.desde + 'T12:00:00')} al ${formatFecha(periodo.hasta + 'T12:00:00')}`
++
++  hoja(wb, 'Resumen', [
++    [titulo], [],
++    ['Condición fiscal', local.condicion_fiscal || 'No especificada'],
++    ['Generado', formatFecha(new Date())],
++    [],
++    ['RESULTADO DEL PERÍODO'],
++    ['Concepto', 'Importe'],
++    ['Total facturado (bruto)', n(resumen.totalFacturado)],
++    ['(-) IVA débito fiscal', -n(resumen.ivaDebitoFiscal)],
++    ['Neto gravado', n(resumen.netoGravado)],
++    ['(-) Comisiones de medios de pago', -n(resumen.comisiones)],
++    ['Ingreso neto real', n(resumen.ingresoNetoReal)],
++    ['(-) Gastos operativos', -n(resumen.gastosOperativos)],
++    ['(+) IVA crédito fiscal', n(resumen.ivaCreditoFiscal)],
++    ['RESULTADO', n(resumen.resultadoEjercicio)],
++    [],
++    ['POSICIÓN IVA'],
++    ['IVA débito fiscal (ventas)', n(resumen.ivaDebitoFiscal)],
++    ['IVA crédito fiscal (compras)', n(resumen.ivaCreditoFiscal)],
++    ['Saldo', n(resumen.ivaAPagar)],
++    [],
++    ['CANTIDADES'],
++    ['Ventas', calidad.cobros],
++    ['Gastos', resumen.cantidadGastos],
++    ['Anulados (excluidos)', calidad.anuladas],
++    [],
++    ['ADVERTENCIAS SOBRE EL DATO'],
++    ...(calidad.avisos.length ? calidad.avisos.map(a => [a.texto]) : [['Sin observaciones.']]),
++  ], [45, 18])
++
++  hoja(wb, 'IVA Ventas', [
++    ['LIBRO IVA VENTAS'], [titulo], [],
++    ['Fecha', 'Comprobante', 'Punto de venta', 'Número', 'Medio de pago', 'Neto', 'Alícuota %', 'IVA', 'Total', 'Comisión'],
++    ...libroVentas.map(v => [
++      formatFecha(v.fecha), TIPO_LABEL[v.tipo] || v.tipo,
++      v.punto_venta ?? '', v.numero ?? '', v.medio || '',
++      n(v.neto), n(v.alicuota), n(v.iva), n(v.total), n(v.comision),
++    ]),
++    [], ['TOTALES', '', '', '', '', n(resumen.netoGravado), '', n(resumen.ivaDebitoFiscal), n(resumen.totalFacturado), n(resumen.comisiones)],
++  ], [12, 16, 14, 12, 18, 14, 10, 14, 14, 12])
++
++  hoja(wb, 'IVA Compras', [
++    ['LIBRO IVA COMPRAS'], [titulo], [],
++    ['Fecha', 'Comprobante', 'Punto de venta', 'Número', 'Proveedor / concepto', 'Neto', 'Alícuota %', 'IVA', 'Total'],
++    ...libroCompras.map(c => [
++      formatFecha(c.fecha), TIPO_LABEL[c.tipo] || c.tipo,
++      c.punto_venta ?? '', c.numero ?? '', c.proveedor || '',
++      n(c.neto), n(c.alicuota), n(c.iva), n(c.total),
++    ]),
++    [], ['TOTALES', '', '', '', '', '', '', n(resumen.ivaCreditoFiscal), n(resumen.gastosOperativos)],
++  ], [12, 16, 14, 12, 28, 14, 10, 14, 14])
++
++  hoja(wb, 'Resumen IVA', [
++    ['RESUMEN POR ALÍCUOTA'], [titulo], [],
++    ['VENTAS'], ['Alícuota %', 'Cantidad', 'Neto', 'IVA', 'Total'],
++    ...porAlicuotaVentas.map(a => [n(a.alicuota), a.cantidad, n(a.neto), n(a.iva), n(a.total)]),
++    [], ['COMPRAS'], ['Alícuota %', 'Cantidad', 'Neto', 'IVA', 'Total'],
++    ...porAlicuotaCompras.map(a => [n(a.alicuota), a.cantidad, n(a.neto), n(a.iva), n(a.total)]),
++  ], [12, 12, 16, 16, 16])
++
++  hoja(wb, 'Medios de pago', [
++    ['COBROS POR MEDIO DE PAGO'], [titulo], [],
++    ['Medio', 'Tipo', 'Cantidad', 'Total cobrado', 'Comisión', 'Neto acreditado', '% del total'],
++    ...porMedio.map(m => [
++      m.nombre, LABEL_TIPO_MEDIO[m.tipo] || m.tipo, m.cantidad,
++      n(m.total), n(m.comisiones), n(m.neto),
++      resumen.totalFacturado ? Math.round((m.total / resumen.totalFacturado) * 1000) / 10 : 0,
++    ]),
++  ], [22, 18, 10, 16, 14, 16, 12])
++
++  hoja(wb, 'Libro caja', [
++    ['MOVIMIENTOS POR DÍA'], [titulo], [],
++    ['Fecha', 'Movimientos', 'Ventas', 'Gastos', 'Resultado'],
++    ...porDia.map(d => [formatFecha(d.fecha + 'T12:00:00'), d.cantidad, n(d.ventas), n(d.gastos), n(d.resultado)]),
++  ], [14, 12, 16, 16, 16])
++
++  hoja(wb, 'Conciliación', [
++    ['CONCILIACIÓN DE CAJA'], [titulo], [],
++    ['Cierres registrados', conciliacion.cierres],
++    ['Cierres sin conteo de efectivo', conciliacion.sinContar],
++    ['Días que cuadraron', conciliacion.cuadrados],
++    ['Días con faltante', conciliacion.diasFaltante],
++    ['Días con sobrante', conciliacion.diasSobrante],
++    ['Diferencia acumulada', n(conciliacion.totalDiferencia)],
++    [],
++    ['Fecha cierre', 'Inicial', 'Cobrado', 'Gastado', 'Efectivo contado', 'Diferencia', 'Observaciones'],
++    ...cierres.map(c => [
++      formatFecha(c.fecha_cierre), n(c.monto_inicial_efectivo), n(c.total_cobrado), n(c.total_gastado),
++      c.efectivo_fisico == null ? 'No contado' : n(c.efectivo_fisico),
++      c.diferencia_efectivo == null ? '' : n(c.diferencia_efectivo),
++      c.observaciones || '',
++    ]),
++  ], [16, 14, 14, 14, 16, 14, 30])
++
++  const nombre = `${local.nombre.replace(/[^\w\s-]/g, '').trim()} ${periodo.desde} a ${periodo.hasta}.xlsx`
++  XLSX.writeFile(wb, nombre)
++}
+diff --git a/lib/export/pdf.js b/lib/export/pdf.js
+new file mode 100644
+index 0000000..c1b1d1b
+--- /dev/null
++++ b/lib/export/pdf.js
+@@ -0,0 +1,113 @@
++import jsPDF from 'jspdf'
++import autoTable from 'jspdf-autotable'
++import { formatCurrency, formatFecha } from '../format'
++
++const TIPO_LABEL = { A: 'Fac. A', B: 'Fac. B', C: 'Fac. C', M: 'Fac. M', TICKET: 'Ticket', SIN_COMPROBANTE: 'Sin compr.' }
++const AZUL = [30, 58, 95]
++
++/** Resumen imprimible del período. El detalle completo va en el Excel. */
++export const generarPDF = ({ local, periodo, resumen, libroVentas, libroCompras, porMedio, conciliacion, calidad }) => {
++  const doc = new jsPDF('landscape', 'mm', 'a4')
++  const ancho = doc.internal.pageSize.getWidth()
++
++  doc.setFontSize(9); doc.setTextColor(120)
++  doc.text('GDT Suite', 14, 12)
++  doc.setFontSize(17); doc.setFont('helvetica', 'bold'); doc.setTextColor(...AZUL)
++  doc.text(local.nombre, 14, 20)
++  doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(0)
++  doc.text(`Reporte contable · ${formatFecha(periodo.desde + 'T12:00:00')} al ${formatFecha(periodo.hasta + 'T12:00:00')}`, 14, 26)
++  doc.setFontSize(8); doc.setTextColor(120)
++  doc.text(`Condición fiscal: ${local.condicion_fiscal || 'no especificada'} · Emitido ${formatFecha(new Date())}`, 14, 31)
++  doc.setDrawColor(...AZUL); doc.setLineWidth(0.4); doc.line(14, 34, ancho - 14, 34)
++
++  autoTable(doc, {
++    startY: 40,
++    head: [['Resultado del período', 'Importe']],
++    body: [
++      ['Total facturado (bruto)', formatCurrency(resumen.totalFacturado)],
++      ['(-) IVA débito fiscal', `-${formatCurrency(resumen.ivaDebitoFiscal)}`],
++      ['Neto gravado', formatCurrency(resumen.netoGravado)],
++      ['(-) Comisiones de medios de pago', `-${formatCurrency(resumen.comisiones)}`],
++      ['Ingreso neto real', formatCurrency(resumen.ingresoNetoReal)],
++      ['(-) Gastos operativos', `-${formatCurrency(resumen.gastosOperativos)}`],
++      ['(+) IVA crédito fiscal', formatCurrency(resumen.ivaCreditoFiscal)],
++      ['RESULTADO', formatCurrency(resumen.resultadoEjercicio)],
++      ['Posición IVA del período', formatCurrency(resumen.ivaAPagar)],
++    ],
++    theme: 'striped',
++    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: 'bold' },
++    columnStyles: { 0: { cellWidth: 120 }, 1: { halign: 'right', cellWidth: 45 } },
++    margin: { left: 14 }, tableWidth: 165, styles: { fontSize: 9 },
++    didParseCell: (d) => { if (d.row.index === 7) d.cell.styles.fontStyle = 'bold' },
++  })
++
++  if (porMedio.length) {
++    autoTable(doc, {
++      startY: 40,
++      head: [['Medio de pago', 'Cant.', 'Total', 'Comisión', 'Neto']],
++      body: porMedio.map(m => [m.nombre, m.cantidad, formatCurrency(m.total), formatCurrency(m.comisiones), formatCurrency(m.neto)]),
++      theme: 'striped',
++      headStyles: { fillColor: AZUL, textColor: 255, fontStyle: 'bold' },
++      margin: { left: 188 }, tableWidth: ancho - 202,
++      styles: { fontSize: 8 },
++      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
++    })
++  }
++
++  let y = Math.max(doc.lastAutoTable?.finalY || 100, 100) + 8
++
++  if (calidad.avisos.length) {
++    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(150, 80, 0)
++    doc.text('Observaciones sobre la calidad del dato', 14, y); y += 5
++    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80)
++    for (const a of calidad.avisos) { doc.text(`• ${a.texto}`, 16, y); y += 4 }
++    y += 4
++  }
++
++  if (conciliacion.cierres > 0) {
++    doc.setFontSize(8); doc.setTextColor(80)
++    doc.text(
++      `Caja: ${conciliacion.cierres} cierres · ${conciliacion.cuadrados} cuadraron · ${conciliacion.diasFaltante} con faltante · ` +
++      `${conciliacion.diasSobrante} con sobrante · diferencia acumulada ${formatCurrency(conciliacion.totalDiferencia)}`, 14, y)
++    y += 8
++  }
++
++  const tabla = (titulo, cabecera, filas) => {
++    if (!filas.length) return
++    doc.addPage()
++    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(...AZUL)
++    doc.text(titulo, 14, 16)
++    autoTable(doc, {
++      startY: 22, head: [cabecera], body: filas, theme: 'grid',
++      headStyles: { fillColor: AZUL, textColor: 255, fontStyle: 'bold', fontSize: 8 },
++      styles: { fontSize: 7.5, cellPadding: 1.5 },
++      columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
++    })
++  }
++
++  tabla('Libro IVA Ventas',
++    ['Fecha', 'Compr.', 'PV', 'Número', 'Medio', 'Neto', 'Alíc.', 'IVA', 'Total'],
++    libroVentas.map(v => [
++      formatFecha(v.fecha), TIPO_LABEL[v.tipo] || v.tipo, v.punto_venta ?? '-', v.numero ?? '-', v.medio || '-',
++      formatCurrency(v.neto), `${v.alicuota}%`, formatCurrency(v.iva), formatCurrency(v.total),
++    ]))
++
++  tabla('Libro IVA Compras',
++    ['Fecha', 'Compr.', 'PV', 'Número', 'Proveedor', 'Neto', 'Alíc.', 'IVA', 'Total'],
++    libroCompras.map(c => [
++      formatFecha(c.fecha), TIPO_LABEL[c.tipo] || c.tipo, c.punto_venta ?? '-', c.numero ?? '-', c.proveedor || '-',
++      formatCurrency(c.neto), `${c.alicuota}%`, formatCurrency(c.iva), formatCurrency(c.total),
++    ]))
++
++  const paginas = doc.internal.getNumberOfPages()
++  for (let i = 1; i <= paginas; i++) {
++    doc.setPage(i)
++    doc.setFontSize(7); doc.setTextColor(150)
++    doc.text(
++      'Reporte generado a partir de los movimientos cargados en el sistema. No reemplaza la liquidación de un profesional.',
++      14, doc.internal.pageSize.getHeight() - 8)
++    doc.text(`${i} / ${paginas}`, ancho - 20, doc.internal.pageSize.getHeight() - 8)
++  }
++
++  doc.save(`${local.nombre.replace(/[^\w\s-]/g, '').trim()} ${periodo.desde} a ${periodo.hasta}.pdf`)
++}
+diff --git a/lib/reportes.js b/lib/reportes.js
+deleted file mode 100644
+index d5fa527..0000000
+--- a/lib/reportes.js
++++ /dev/null
+@@ -1,455 +0,0 @@
+-import jsPDF from 'jspdf'
+-import autoTable from 'jspdf-autotable'
+-import * as XLSX from 'xlsx'
+-import { formatCurrency } from './format'
+-
+-// ==========================================
+-// GENERAR PDF - Profesional Contable Argentino
+-// ==========================================
+-export const generarReportePDF = (local, fecha, resumen, libroVentas, libroCompras) => {
+-  try {
+-    const doc = new jsPDF('landscape', 'mm', 'a4')
+-    const fechaFormateada = fecha.replace(/_/g, ' al ')
+-
+-    // HEADER
+-    doc.setFontSize(10)
+-    doc.setTextColor(80, 80, 80)
+-    doc.text('GDT SUITE - Sistema de Gestión', 14, 12)
+-
+-    doc.setFontSize(18)
+-    doc.setFont('helvetica', 'bold')
+-    doc.setTextColor(0, 0, 139)
+-    doc.text(local.nombre.toUpperCase(), 14, 20)
+-
+-    doc.setFontSize(11)
+-    doc.setFont('helvetica', 'normal')
+-    doc.setTextColor(0, 0, 0)
+-    doc.text(`Reporte Contable - ${fechaFormateada}`, 14, 26)
+-
+-    doc.setDrawColor(0, 0, 139)
+-    doc.setLineWidth(0.5)
+-    doc.line(14, 28, 283, 28)
+-
+-    // RESUMEN EJECUTIVO
+-    let yPos = 35
+-    doc.setFontSize(12)
+-    doc.setFont('helvetica', 'bold')
+-    doc.text('📊 RESUMEN EJECUTIVO', 14, yPos)
+-    yPos += 8
+-
+-    const resumenData = [
+-      ['Total Facturado (bruto)', formatCurrency(resumen.totalFacturado)],
+-      ['(-) IVA Débito Fiscal', '-' + formatCurrency(resumen.ivaDebitoFiscal)],
+-      ['Neto Gravado', formatCurrency(resumen.netoGravado)],
+-      ['(-) Comisiones', '-' + formatCurrency(resumen.comisiones)],
+-      ['INGRESO NETO REAL', formatCurrency(resumen.ingresoNetoReal)],
+-      ['(-) Gastos operativos', '-' + formatCurrency(resumen.gastosOperativos)],
+-      ['(-) IVA Crédito Fiscal', '-' + formatCurrency(resumen.ivaCreditoFiscal)],
+-      ['RESULTADO DEL EJERCICIO', formatCurrency(resumen.resultadoEjercicio)],
+-    ]
+-
+-    autoTable(doc, {
+-      startY: yPos,
+-      head: [['Concepto', 'Monto']],
+-      body: resumenData,
+-      theme: 'striped',
+-      headStyles: { fillColor: [0, 0, 139], textColor: 255, fontStyle: 'bold' },
+-      bodyStyles: { textColor: 50 },
+-      alternateRowStyles: { fillColor: [248, 248, 248] },
+-      columnStyles: {
+-        0: { cellWidth: 180 },
+-        1: { cellWidth: 90, halign: 'right', fontStyle: 'bold' }
+-      },
+-      margin: { left: 14, right: 14 }
+-    })
+-
+-    // LIBRO IVA VENTAS
+-    doc.addPage()
+-    yPos = 12
+-    doc.setFontSize(12)
+-    doc.setFont('helvetica', 'bold')
+-    doc.text('📘 LIBRO IVA VENTAS (Débito Fiscal)', 14, yPos)
+-    yPos += 6
+-
+-    const ventasData = libroVentas.map(v => [
+-      new Date(v.fecha).toLocaleDateString('es-AR'),
+-      v.tipo,
+-      v.numero,
+-      v.medio,
+-      formatCurrency(v.total),
+-      formatCurrency(v.iva),
+-      formatCurrency(v.neto)
+-    ])
+-
+-    autoTable(doc, {
+-      startY: yPos,
+-      head: [['Fecha', 'Tipo', 'Nro.', 'Medio', 'Total', 'IVA', 'Neto']],
+-      body: ventasData,
+-      theme: 'grid',
+-      headStyles: { fillColor: [255, 165, 0], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+-      bodyStyles: { fontSize: 8 },
+-      columnStyles: {
+-        0: { cellWidth: 35 },
+-        1: { cellWidth: 25 },
+-        2: { cellWidth: 25 },
+-        3: { cellWidth: 40 },
+-        4: { cellWidth: 45, halign: 'right' },
+-        5: { cellWidth: 35, halign: 'right' },
+-        6: { cellWidth: 45, halign: 'right' }
+-      },
+-      margin: { left: 14, right: 14 }
+-    })
+-
+-    // LIBRO IVA COMPRAS
+-    if (libroCompras && libroCompras.length > 0) {
+-      doc.addPage()
+-      yPos = 12
+-      doc.setFontSize(12)
+-      doc.setFont('helvetica', 'bold')
+-      doc.text('📗 LIBRO IVA COMPRAS (Crédito Fiscal)', 14, yPos)
+-      yPos += 6
+-
+-      const comprasData = libroCompras.map(c => [
+-        new Date(c.fecha).toLocaleDateString('es-AR'),
+-        c.tipo,
+-        c.numero,
+-        c.proveedor,
+-        formatCurrency(c.total),
+-        formatCurrency(c.iva),
+-        formatCurrency(c.neto)
+-      ])
+-
+-      autoTable(doc, {
+-        startY: yPos,
+-        head: [['Fecha', 'Tipo', 'Nro.', 'Proveedor', 'Total', 'IVA', 'Neto']],
+-        body: comprasData,
+-        theme: 'grid',
+-        headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+-        bodyStyles: { fontSize: 8 },
+-        columnStyles: {
+-          0: { cellWidth: 35 },
+-          1: { cellWidth: 25 },
+-          2: { cellWidth: 25 },
+-          3: { cellWidth: 70 },
+-          4: { cellWidth: 45, halign: 'right' },
+-          5: { cellWidth: 35, halign: 'right' },
+-          6: { cellWidth: 45, halign: 'right' }
+-        },
+-        margin: { left: 14, right: 14 }
+-      })
+-    }
+-
+-    // FOOTER
+-    const pageCount = doc.internal.getNumberOfPages()
+-    for (let i = 1; i <= pageCount; i++) {
+-      doc.setPage(i)
+-      doc.setFontSize(8)
+-      doc.setTextColor(128, 128, 128)
+-      doc.text(`Página ${i} de ${pageCount}`, 14, 200)
+-      doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, 200, 200)
+-    }
+-
+-    doc.save(`Reporte_${local.nombre.replace(/\s+/g, '_')}_${fecha}.pdf`)
+-    return true
+-  } catch (error) {
+-    console.error('Error generando PDF:', error)
+-    throw error
+-  }
+-}
+-
+-// ==========================================
+-// GENERAR EXCEL - Profesional Contable Argentino
+-// ==========================================
+-export const generarReporteExcel = (local, fecha, resumen, libroVentas, libroCompras) => {
+-  try {
+-    // ==========================================
+-    // VALIDAR PARÁMETROS (defensivo)
+-    // ==========================================
+-    const ventas = Array.isArray(libroVentas) ? libroVentas : []
+-    const compras = Array.isArray(libroCompras) ? libroCompras : []
+-    
+-    const wb = XLSX.utils.book_new()
+-    const fechaFormateada = fecha.replace(/_/g, ' al ')
+-
+-    // ==========================================
+-    // CALCULAR TOTALES AL INICIO
+-    // ==========================================
+-    const totalVentas = ventas.reduce((sum, v) => sum + (v.total || 0), 0)
+-    const totalIvaVentas = ventas.reduce((sum, v) => sum + (v.iva || 0), 0)
+-    const totalNetoVentas = ventas.reduce((sum, v) => sum + (v.neto || 0), 0)
+-    
+-    const totalCompras = compras.reduce((sum, c) => sum + (c.total || 0), 0)
+-    const totalIvaCompras = compras.reduce((sum, c) => sum + (c.iva || 0), 0)
+-    const totalNetoCompras = compras.reduce((sum, c) => sum + (c.neto || 0), 0)
+-
+-    // ==========================================
+-    // HOJA 1: PORTADA / RESUMEN EJECUTIVO
+-    // ==========================================
+-    const portadaData = [
+-      ['GDT SUITE - SISTEMA DE GESTIÓN'],
+-      [''],
+-      ['REPORTE CONTABLE COMPLETO'],
+-      [''],
+-      ['Local:', local?.nombre || 'Sin nombre'],
+-      ['Período:', fechaFormateada],
+-      ['Generado:', new Date().toLocaleString('es-AR')],
+-      [''],
+-      ['═══════════════════════════════════════'],
+-      [''],
+-      ['RESUMEN EJECUTIVO'],
+-      [''],
+-      ['CONCEPTO', 'MONTO'],
+-      ['Total Facturado (bruto)', resumen?.totalFacturado || 0],
+-      ['(-) IVA Débito Fiscal', -(resumen?.ivaDebitoFiscal || 0)],
+-      ['Neto Gravado', resumen?.netoGravado || 0],
+-      ['(-) Comisiones medios de pago', -(resumen?.comisiones || 0)],
+-      ['═══════════════════════════════════════', ''],
+-      ['INGRESO NETO REAL', resumen?.ingresoNetoReal || 0],
+-      [''],
+-      ['(-) Gastos operativos', -(resumen?.gastosOperativos || 0)],
+-      ['(-) IVA Crédito Fiscal', -(resumen?.ivaCreditoFiscal || 0)],
+-      ['═══════════════════════════════════════', ''],
+-      ['RESULTADO DEL EJERCICIO', resumen?.resultadoEjercicio || 0],
+-      [''],
+-      ['═══════════════════════════════════════'],
+-      [''],
+-      ['INDICADORES CLAVE'],
+-      ['Ventas (cantidad)', resumen?.cantidadVentas || 0],
+-      ['Gastos (cantidad)', resumen?.cantidadGastos || 0],
+-      ['IVA a pagar', resumen?.ivaAPagar || 0],
+-      [''],
+-      ['═══════════════════════════════════════'],
+-      [''],
+-      ['Este reporte incluye:'],
+-      ['✓ Libro IVA Ventas'],
+-      ['✓ Libro IVA Compras'],
+-      ['✓ Resumen por Condición de IVA'],
+-      ['✓ Resumen por Medio de Pago'],
+-      ['✓ Libro Caja'],
+-    ]
+-
+-    const wsPortada = XLSX.utils.aoa_to_sheet(portadaData)
+-    wsPortada['!cols'] = [{ wch: 50 }, { wch: 25 }]
+-    wsPortada['!merges'] = [
+-      { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+-      { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
+-      { s: { r: 8, c: 0 }, e: { r: 8, c: 1 } },
+-      { s: { r: 10, c: 0 }, e: { r: 10, c: 1 } },
+-      { s: { r: 18, c: 0 }, e: { r: 18, c: 1 } },
+-      { s: { r: 23, c: 0 }, e: { r: 23, c: 1 } },
+-      { s: { r: 26, c: 0 }, e: { r: 26, c: 1 } },
+-    ]
+-    XLSX.utils.book_append_sheet(wb, wsPortada, ' RESUMEN')
+-
+-    // ==========================================
+-    // HOJA 2: LIBRO IVA VENTAS
+-    // ==========================================
+-    const ventasData = [
+-      ['LIBRO IVA VENTAS - DÉBITO FISCAL'],
+-      ['Período:', fechaFormateada],
+-      [''],
+-      ['Fecha', 'Tipo', 'Punto Venta', 'Nro. Comprobante', 'Medio de Pago', 'Descripción', 'Importe Total', 'IVA 21%', 'Neto Gravado'],
+-      ...ventas.map(v => [
+-        new Date(v.fecha).toLocaleDateString('es-AR'),
+-        v.tipo || '-',
+-        v.punto_venta || '0001',
+-        v.numero || '-',
+-        v.medio || '-',
+-        v.descripcion || '-',
+-        v.total || 0,
+-        v.iva || 0,
+-        v.neto || 0
+-      ])
+-    ]
+-
+-    ventasData.push([])
+-    ventasData.push(['TOTALES', '', '', '', '', '', totalVentas, totalIvaVentas, totalNetoVentas])
+-
+-    const wsVentas = XLSX.utils.aoa_to_sheet(ventasData)
+-    wsVentas['!cols'] = [
+-      { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 15 },
+-      { wch: 20 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+-    ]
+-    XLSX.utils.book_append_sheet(wb, wsVentas, '📘 IVA VENTAS')
+-
+-    // ==========================================
+-    // HOJA 3: LIBRO IVA COMPRAS
+-    // ==========================================
+-    const comprasData = [
+-      ['LIBRO IVA COMPRAS - CRÉDITO FISCAL'],
+-      ['Período:', fechaFormateada],
+-      [''],
+-      ['Fecha', 'Tipo', 'Punto Venta', 'Nro. Comprobante', 'Proveedor', 'Importe Total', 'IVA 21%', 'Neto Gravado'],
+-      ...compras.map(c => [
+-        new Date(c.fecha).toLocaleDateString('es-AR'),
+-        c.tipo || '-',
+-        c.punto_venta || '0001',
+-        c.numero || '-',
+-        c.proveedor || '-',
+-        c.total || 0,
+-        c.iva || 0,
+-        c.neto || 0
+-      ])
+-    ]
+-
+-    if (compras.length > 0) {
+-      comprasData.push([])
+-      comprasData.push(['TOTALES', '', '', '', '', totalCompras, totalIvaCompras, totalNetoCompras])
+-    }
+-
+-    const wsCompras = XLSX.utils.aoa_to_sheet(comprasData)
+-    wsCompras['!cols'] = [
+-      { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 15 },
+-      { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+-    ]
+-    XLSX.utils.book_append_sheet(wb, wsCompras, ' IVA COMPRAS')
+-
+-    // ==========================================
+-    // HOJA 4: RESUMEN POR CONDICIÓN DE IVA
+-    // ==========================================
+-    const condicionIvaMap = {}
+-    ventas.forEach(v => {
+-      const condicion = v.tipo || 'Factura A'
+-      if (!condicionIvaMap[condicion]) {
+-        condicionIvaMap[condicion] = { cantidad: 0, total: 0, iva: 0, neto: 0 }
+-      }
+-      condicionIvaMap[condicion].cantidad++
+-      condicionIvaMap[condicion].total += v.total || 0
+-      condicionIvaMap[condicion].iva += v.iva || 0
+-      condicionIvaMap[condicion].neto += v.neto || 0
+-    })
+-
+-    const condicionData = [
+-      ['RESUMEN POR CONDICIÓN DE IVA'],
+-      [''],
+-      ['Condición', 'Cantidad', 'Total Facturado', 'IVA', 'Neto Gravado'],
+-      ...Object.entries(condicionIvaMap).map(([condicion, datos]) => [
+-        condicion,
+-        datos.cantidad,
+-        datos.total,
+-        datos.iva,
+-        datos.neto
+-      ])
+-    ]
+-
+-    const wsCondicion = XLSX.utils.aoa_to_sheet(condicionData)
+-    wsCondicion['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 15 }]
+-    XLSX.utils.book_append_sheet(wb, wsCondicion, '📋 RESUMEN IVA')
+-
+-    // ==========================================
+-    // HOJA 5: RESUMEN POR MEDIO DE PAGO
+-    // ==========================================
+-    const medioPagoMap = {}
+-    ventas.forEach(v => {
+-      const medio = v.medio || 'Efectivo'
+-      if (!medioPagoMap[medio]) {
+-        medioPagoMap[medio] = { cantidad: 0, total: 0 }
+-      }
+-      medioPagoMap[medio].cantidad++
+-      medioPagoMap[medio].total += v.total || 0
+-    })
+-
+-    const totalFacturado = resumen?.totalFacturado || 0
+-    const medioData = [
+-      ['RESUMEN POR MEDIO DE PAGO'],
+-      [''],
+-      ['Medio de Pago', 'Cantidad', 'Total', 'Porcentaje'],
+-      ...Object.entries(medioPagoMap).map(([medio, datos]) => [
+-        medio,
+-        datos.cantidad,
+-        datos.total,
+-        totalFacturado > 0 ? ((datos.total / totalFacturado) * 100).toFixed(2) + '%' : '0%'
+-      ])
+-    ]
+-
+-    const wsMedio = XLSX.utils.aoa_to_sheet(medioData)
+-    wsMedio['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 12 }]
+-    XLSX.utils.book_append_sheet(wb, wsMedio, '💳 MEDIOS PAGO')
+-
+-    // ==========================================
+-    // HOJA 6: LIBRO CAJA
+-    // ==========================================
+-    const libroCajaData = [
+-      ['LIBRO CAJA'],
+-      ['Período:', fechaFormateada],
+-      [''],
+-      ['Fecha', 'Descripción', 'Ingreso', 'Egreso', 'Saldo'],
+-    ]
+-
+-    const movimientosCaja = []
+-    
+-    ventas.forEach(v => {
+-      movimientosCaja.push({
+-        fecha: v.fecha,
+-        descripcion: `Venta ${v.numero || '-'} - ${v.descripcion || '-'}`,
+-        ingreso: v.total || 0,
+-        egreso: 0
+-      })
+-    })
+-
+-    compras.forEach(c => {
+-      movimientosCaja.push({
+-        fecha: c.fecha,
+-        descripcion: `Compra ${c.numero || '-'} - ${c.proveedor || '-'}`,
+-        ingreso: 0,
+-        egreso: c.total || 0
+-      })
+-    })
+-
+-    movimientosCaja.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+-
+-    let saldo = 0
+-    movimientosCaja.forEach(mov => {
+-      saldo += mov.ingreso - mov.egreso
+-      libroCajaData.push([
+-        new Date(mov.fecha).toLocaleDateString('es-AR'),
+-        mov.descripcion,
+-        mov.ingreso,
+-        mov.egreso,
+-        saldo
+-      ])
+-    })
+-
+-    libroCajaData.push([])
+-    libroCajaData.push(['TOTALES', '', totalVentas, totalCompras, saldo])
+-
+-    const wsCaja = XLSX.utils.aoa_to_sheet(libroCajaData)
+-    wsCaja['!cols'] = [
+-      { wch: 12 }, { wch: 50 }, { wch: 18 }, { wch: 18 }, { wch: 18 }
+-    ]
+-    XLSX.utils.book_append_sheet(wb, wsCaja, '📒 LIBRO CAJA')
+-
+-    // ==========================================
+-    // HOJA 7: CONCILIACIÓN BANCARIA
+-    // ==========================================
+-    const conciliacionData = [
+-      ['CONCILIACIÓN BANCARIA'],
+-      ['Período:', fechaFormateada],
+-      [''],
+-      ['CONCEPTO', 'IMPORTE'],
+-      ['Saldo inicial', 0],
+-      ['(+) Cobros del período', totalFacturado],
+-      ['(-) Gastos del período', -(resumen?.gastosOperativos || 0)],
+-      ['(-) Comisiones', -(resumen?.comisiones || 0)],
+-      ['(-) IVA a pagar', -(resumen?.ivaAPagar || 0)],
+-      ['════════════════════════════', ''],
+-      ['SALDO FINAL ESPERADO', resumen?.resultadoEjercicio || 0],
+-      [''],
+-      ['OBSERVACIONES:'],
+-      ['Verificar que el saldo final coincida con el extracto bancario'],
+-      ['Pendientes de acreditación:', resumen?.pendiente || 0],
+-    ]
+-
+-    const wsConciliacion = XLSX.utils.aoa_to_sheet(conciliacionData)
+-    wsConciliacion['!cols'] = [{ wch: 40 }, { wch: 20 }]
+-    XLSX.utils.book_append_sheet(wb, wsConciliacion, '🏦 CONCILIACIÓN')
+-
+-    // Guardar Excel
+-    const nombreArchivo = `Reporte_Completo_${(local?.nombre || 'Local').replace(/\s+/g, '_')}_${fecha}.xlsx`
+-    XLSX.writeFile(wb, nombreArchivo)
+-    return true
+-  } catch (error) {
+-    console.error('Error generando Excel:', error)
+-    throw error
+-  }
+-}
+\ No newline at end of file
+diff --git a/pages/reportes.js b/pages/reportes.js
+index fb7ef70..6bcb060 100644
+--- a/pages/reportes.js
++++ b/pages/reportes.js
+@@ -1,664 +1,108 @@
+-import { supabase } from '../lib/supabaseClient'
+-import { useState, useEffect } from 'react'
++import { useState } from 'react'
+ import { useRouter } from 'next/router'
+-import { formatCurrency } from '../lib/format'
+ import toast from 'react-hot-toast'
+-import { generarReportePDF, generarReporteExcel } from '../lib/reportes'
+-
+-export default function ReportesContables() {
+-  const [user, setUser] = useState(null)
+-  const [loading, setLoading] = useState(true)
+-  const [locales, setLocales] = useState([])
+-  const [localSeleccionado, setLocalSeleccionado] = useState('todos')
+-  const [showAyudaModal, setShowAyudaModal] = useState(false)
+-  // Período
+-  const [fechaDesde, setFechaDesde] = useState(() => {
+-    const d = new Date()
+-    d.setDate(1) // Primer día del mes
+-    return d.toISOString().split('T')[0]
+-  })
+-  const [fechaHasta, setFechaHasta] = useState(() => {
+-    const d = new Date()
+-    d.setMonth(d.getMonth() + 1)
+-    d.setDate(0) // Último día del mes
+-    return d.toISOString().split('T')[0]
+-  })
+-  
+-  // Datos
+-  const [resumen, setResumen] = useState({
+-    totalFacturado: 0,
+-    ivaDebitoFiscal: 0,
+-    netoGravado: 0,
+-    comisiones: 0,
+-    ingresoNetoReal: 0,
+-    gastosOperativos: 0,
+-    ivaCreditoFiscal: 0,
+-    resultadoEjercicio: 0,
+-    cantidadVentas: 0,
+-    cantidadGastos: 0,
+-    ivaAPagar: 0
+-  })
+-  
+-  const [libroVentas, setLibroVentas] = useState([])
+-  const [libroCompras, setLibroCompras] = useState([])
+-  const [cierresCaja, setCierresCaja] = useState([])
+-  
++import { useAuthGuard } from '../hooks/useAuthGuard'
++import { useSignOut } from '../hooks/useSignOut'
++import { useReportes } from '../hooks/useReportes'
++import { generarPDF } from '../lib/export/pdf'
++import { generarExcel } from '../lib/export/excel'
++
++import LoadingScreen from '../components/ui/LoadingScreen'
++import BottomNav from '../components/layout/BottomNav'
++import ReportGuide from '../components/ReportGuide'
++import FiltrosReporte from '../components/reportes/FiltrosReporte'
++import AvisosCalidad from '../components/reportes/AvisosCalidad'
++import ResumenEjecutivo from '../components/reportes/ResumenEjecutivo'
++import ResumenPorAlicuota from '../components/reportes/ResumenPorAlicuota'
++import MediosYConciliacion from '../components/reportes/MediosYConciliacion'
++import TablaLibro from '../components/reportes/TablaLibro'
++
++export default function Reportes() {
+   const router = useRouter()
++  const signOut = useSignOut()
++  const { user, checking } = useAuthGuard()
++  const r = useReportes(user?.id)
++  const [ayuda, setAyuda] = useState(false)
+ 
+-  useEffect(() => {
+-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+-      if (!session?.user) { router.push('/'); return }
+-      setUser(session.user)
+-      await cargarLocales(session.user.id)
+-    })
+-  }, [router])
+-
+-  useEffect(() => {
+-    if (user && locales.length > 0) {
+-      cargarReportes()
+-    }
+-  }, [fechaDesde, fechaHasta, localSeleccionado, user, locales])
+-
+-  const cargarLocales = async (userId) => {
+-    try {
+-      const { data } = await supabase
+-        .from('miembros_locales')
+-        .select('local_id, rol')
+-        .eq('user_id', userId)
+-        .eq('activo', true)
+-      
+-      if (data && data.length > 0) {
+-        const localIds = data.map(m => m.local_id)
+-        const { data: localesData } = await supabase
+-          .from('locales')
+-          .select('id, nombre')
+-          .in('id', localIds)
+-        
+-        setLocales(localesData || [])
+-      }
+-    } catch (err) {
+-      console.error('Error cargando locales:', err)
+-    } finally {
+-      setLoading(false)
+-    }
+-  }
++  if (checking || r.loading) return <LoadingScreen mensaje="Generando reporte…" icono="📊" />
+ 
+-  const cargarReportes = async () => {
+-    if (!user) return
+-    
+-    setLoading(true)
++  const exportar = (fn, formato) => {
++    if (!r.localActual) return
+     try {
+-      const inicio = new Date(fechaDesde + 'T00:00:00').toISOString()
+-      const fin = new Date(fechaHasta + 'T23:59:59').toISOString()
+-      
+-      // Determinar qué locales consultar
+-      const localesAConsultar = localSeleccionado === 'todos' 
+-        ? locales.map(l => l.id)
+-        : [localSeleccionado]
+-      
+-      // Cargar transacciones
+-      const { data: transacciones } = await supabase
+-        .from('transacciones')
+-        .select(`
+-          *,
+-          medios_pago (nombre, tipo, comision_porcentaje)
+-        `)
+-        .in('local_id', localesAConsultar)
+-        .gte('creado_en', inicio)
+-        .lte('creado_en', fin)
+-      
+-      // Calcular totales
+-      calcularResumen(transacciones || [])
+-      
+-      // Cargar cierres de caja
+-      const { data: cierresData } = await supabase
+-        .from('cierres_caja')
+-        .select('*')
+-        .in('local_id', localesAConsultar)
+-        .eq('estado', 'cerrada')
+-        .gte('fecha_cierre', inicio)
+-        .lte('fecha_cierre', fin)
+-        .order('fecha_cierre', { ascending: false })
+-      
+-      setCierresCaja(cierresData || [])
+-      
++      fn({
++        local: r.localActual, periodo: r.periodo, resumen: r.resumen,
++        libroVentas: r.libroVentas, libroCompras: r.libroCompras,
++        porAlicuotaVentas: r.porAlicuotaVentas, porAlicuotaCompras: r.porAlicuotaCompras,
++        porMedio: r.porMedio, porDia: r.porDia,
++        cierres: r.cierres, conciliacion: r.conciliacion, calidad: r.calidad,
++      })
++      toast.success(`${formato} descargado`)
+     } catch (err) {
+-      console.error('Error cargando reportes:', err)
+-      toast.error('Error al cargar reportes')
+-    } finally {
+-      setLoading(false)
+-    }
+-  }
+-
+-  const calcularResumen = (transacciones) => {
+-    let totalFacturado = 0
+-    let ivaDebitoFiscal = 0
+-    let netoGravado = 0
+-    let comisiones = 0
+-    let gastosOperativos = 0
+-    let ivaCreditoFiscal = 0
+-    let cantidadVentas = 0
+-    let cantidadGastos = 0
+-    
+-    const libroVentasTemp = []
+-    const libroComprasTemp = []
+-    
+-    transacciones.forEach(t => {
+-      const medio = t.medios_pago || {}
+-      const comision = (t.monto || 0) * (medio.comision_porcentaje || 0) / 100
+-      const iva = (t.monto || 0) - ((t.monto || 0) / 1.21)
+-      const neto = (t.monto || 0) / 1.21
+-      
+-      if (t.tipo === 'COBRO_RECIBIDO' && !t.es_reversa) {
+-        totalFacturado += t.monto || 0
+-        ivaDebitoFiscal += iva
+-        netoGravado += neto
+-        comisiones += comision
+-        cantidadVentas++
+-        
+-        libroVentasTemp.push({
+-          fecha: t.creado_en,
+-          tipo: 'Factura A',
+-          punto_venta: '0001',
+-          numero: t.id.toString().slice(-8),
+-          medio: medio.nombre || '-',
+-          descripcion: t.descripcion || 'Venta',
+-          total: t.monto || 0,
+-          iva: iva,
+-          neto: neto
+-        })
+-        
+-      } else if (t.tipo === 'GASTO_REGISTRADO' && !t.es_reversa) {
+-        gastosOperativos += t.monto || 0
+-        ivaCreditoFiscal += iva
+-        cantidadGastos++
+-        
+-        libroComprasTemp.push({
+-          fecha: t.creado_en,
+-          tipo: 'Factura A',
+-          punto_venta: '0001',
+-          numero: t.id.toString().slice(-8),
+-          proveedor: t.descripcion || 'Proveedor',
+-          total: t.monto || 0,
+-          iva: iva,
+-          neto: neto
+-        })
+-      }
+-    })
+-    
+-    const ingresoNetoReal = totalFacturado - comisiones
+-    const resultadoEjercicio = ingresoNetoReal - gastosOperativos
+-    const ivaAPagar = ivaDebitoFiscal - ivaCreditoFiscal
+-    
+-    setResumen({
+-      totalFacturado,
+-      ivaDebitoFiscal,
+-      netoGravado,
+-      comisiones,
+-      ingresoNetoReal,
+-      gastosOperativos,
+-      ivaCreditoFiscal,
+-      resultadoEjercicio,
+-      cantidadVentas,
+-      cantidadGastos,
+-      ivaAPagar
+-    })
+-    
+-    setLibroVentas(libroVentasTemp.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)))
+-    setLibroCompras(libroComprasTemp.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)))
+-  }
+-
+-  const handlePeriodoRapido = (tipo) => {
+-    const ahora = new Date()
+-    let desde = new Date()
+-    let hasta = new Date()
+-    
+-    switch(tipo) {
+-      case 'este-mes':
+-        desde.setDate(1)
+-        hasta.setMonth(hasta.getMonth() + 1)
+-        hasta.setDate(0)
+-        break
+-      case 'mes-anterior':
+-        desde.setMonth(desde.getMonth() - 1)
+-        desde.setDate(1)
+-        hasta.setDate(0)
+-        break
+-      case 'ultimos-30':
+-        desde.setDate(desde.getDate() - 30)
+-        break
+-      case 'trimestre':
+-        desde.setDate(1)
+-        desde.setMonth(desde.getMonth() - 2)
+-        break
+-      default:
+-        break
+-    }
+-    
+-    setFechaDesde(desde.toISOString().split('T')[0])
+-    setFechaHasta(hasta.toISOString().split('T')[0])
+-  }
+-
+-    const handleExportarExcel = () => {
+-    try {
+-      generarReporteExcel(
+-        localSeleccionado === 'todos' ? { nombre: 'Consolidado' } : locales.find(l => l.id === localSeleccionado),
+-        `${fechaDesde}_a_${fechaHasta}`,
+-        resumen,
+-        libroVentas,
+-        libroCompras
+-      )
+-      toast.success(' Excel exportado correctamente')
+-    } catch (error) {
+-      console.error('Error exportando:', error)
+-      toast.error('Error al exportar')
++      toast.error(`No se pudo generar el ${formato}: ${err.message}`)
+     }
+   }
+ 
+-  const handleExportarPDF = () => {
+-    try {
+-      generarReportePDF(
+-        localSeleccionado === 'todos' ? { nombre: 'Consolidado' } : locales.find(l => l.id === localSeleccionado),
+-        `${fechaDesde}_a_${fechaHasta}`,
+-        resumen,
+-        libroVentas,
+-        libroCompras
+-      )
+-      toast.success('📄 PDF exportado correctamente')
+-    } catch (error) {
+-      console.error('Error exportando:', error)
+-      toast.error('Error al exportar PDF')
+-    }
+-  }
+-
+-  const formatFecha = (fecha) => {
+-    if (!fecha) return '-'
+-    return new Date(fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+-  }
+-
+-  if (loading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><p>Cargando reportes...</p></div>
++  const totalesVentas = { neto: r.resumen.netoGravado, iva: r.resumen.ivaDebitoFiscal, total: r.resumen.totalFacturado }
++  const totalesCompras = { neto: r.resumen.gastosOperativos - r.resumen.ivaCreditoFiscal, iva: r.resumen.ivaCreditoFiscal, total: r.resumen.gastosOperativos }
+ 
+   return (
+-    <main className="min-h-screen bg-slate-50 pb-8">
+-      {/* HEADER */}
+-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+-          <div>
+-            <h1 className="m-0 text-xl font-bold text-gray-900">📊 Reportes Contables</h1>
+-            <p className="mt-0.5 text-xs text-gray-500">
+-              {localSeleccionado === 'todos' ? 'Todos los locales' : locales.find(l => l.id === localSeleccionado)?.nombre}
+-            </p>
++    <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
++      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
++        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-3 flex-wrap">
++          <div className="min-w-0">
++            <h1 className="m-0 text-base md:text-lg font-bold text-gray-900">📊 Reportes contables</h1>
++            <p className="mt-0.5 text-xs text-gray-500 truncate m-0">{r.localActual?.nombre || 'Sin locales'}</p>
+           </div>
+-          <div className="flex items-center gap-2">
+-            <button 
+-              onClick={handleExportarPDF}
+-              className="px-4 py-2 bg-amber-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-amber-600 flex items-center gap-2"
+-            >
+-              📄 Exportar PDF
+-            </button>
+-            <button 
+-              onClick={handleExportarExcel}
+-              className="px-4 py-2 bg-emerald-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-emerald-600 flex items-center gap-2"
+-            >
+-               Exportar Excel
+-            </button>
+-                        <button 
+-              onClick={() => setShowAyudaModal(true)}
+-              className="px-4 py-2 bg-blue-100 text-blue-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-blue-200 flex items-center gap-2"
+-            >
+-              💬 ¿Cómo leer esto?
+-            </button>
+-            <button 
+-              onClick={() => router.push('/locales')}
+-              className="px-4 py-2 bg-gray-100 text-gray-600 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200"
+-            >
+-              ← Volver
+-            </button>
+-            <button 
+-              onClick={async () => { await supabase.auth.signOut(); router.push('/') }}
+-              className="px-4 py-2 bg-gray-100 text-gray-500 border-none rounded-lg text-sm cursor-pointer hover:bg-gray-200"
+-            >
+-              Salir
+-            </button>
++          <div className="flex items-center gap-2 flex-wrap">
++            <button onClick={() => exportar(generarPDF, 'PDF')}
++              className="px-3 py-2 bg-amber-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-amber-600">📄 PDF</button>
++            <button onClick={() => exportar(generarExcel, 'Excel')}
++              className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-emerald-600">📗 Excel</button>
++            <button onClick={() => setAyuda(true)}
++              className="px-3 py-2 bg-blue-100 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-200">¿Cómo leer esto?</button>
++            <button onClick={() => router.push('/dashboard')}
++              className="hidden md:block px-3 py-2 bg-gray-100 text-gray-600 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-200">← Caja</button>
++            <button onClick={signOut}
++              className="hidden md:block px-3 py-2 bg-gray-100 text-gray-500 border-none rounded-lg text-xs cursor-pointer hover:bg-gray-200">Salir</button>
+           </div>
+         </div>
+       </header>
+ 
+-      <div className="max-w-7xl mx-auto p-4 space-y-4">
+-        {/* FILTROS */}
+-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+-          <div className="mb-4">
+-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+-              📍 Local:
+-            </label>
+-            <select
+-              value={localSeleccionado}
+-              onChange={(e) => setLocalSeleccionado(e.target.value)}
+-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+-            >
+-              <option value="todos">🏢 Todos los locales (Consolidado)</option>
+-              {locales.map(local => (
+-                <option key={local.id} value={local.id}>{local.nombre}</option>
+-              ))}
+-            </select>
+-          </div>
+-
+-          <div className="mb-4">
+-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+-               Período:
+-            </label>
+-            <div className="flex gap-2 mb-3 flex-wrap">
+-              <button 
+-                onClick={() => handlePeriodoRapido('este-mes')}
+-                className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-200"
+-              >
+-                Este mes
+-              </button>
+-              <button 
+-                onClick={() => handlePeriodoRapido('mes-anterior')}
+-                className="px-3 py-1.5 bg-gray-100 text-gray-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
+-              >
+-                Mes anterior
+-              </button>
+-              <button 
+-                onClick={() => handlePeriodoRapido('ultimos-30')}
+-                className="px-3 py-1.5 bg-gray-100 text-gray-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
+-              >
+-                Últimos 30 días
+-              </button>
+-              <button 
+-                onClick={() => handlePeriodoRapido('trimestre')}
+-                className="px-3 py-1.5 bg-gray-100 text-gray-700 border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200"
+-              >
+-                Trimestre
+-              </button>
+-            </div>
+-            <div className="grid grid-cols-2 gap-3">
+-              <div>
+-                <label className="block text-xs text-gray-600 mb-1">Desde:</label>
+-                <input
+-                  type="date"
+-                  value={fechaDesde}
+-                  onChange={(e) => setFechaDesde(e.target.value)}
+-                  className="w-full p-2 border border-gray-300 rounded-md text-sm"
+-                />
+-              </div>
+-              <div>
+-                <label className="block text-xs text-gray-600 mb-1">Hasta:</label>
+-                <input
+-                  type="date"
+-                  value={fechaHasta}
+-                  onChange={(e) => setFechaHasta(e.target.value)}
+-                  className="w-full p-2 border border-gray-300 rounded-md text-sm"
+-                />
+-              </div>
+-            </div>
+-          </div>
+-        </div>
++      <div className="max-w-7xl mx-auto p-3 md:p-4 space-y-4">
++        <FiltrosReporte
++          locales={r.locales} localId={r.localId} onLocal={r.setLocalId}
++          periodo={r.periodo} onPreset={r.aplicarPreset} onFechas={r.aplicarFechas}
++        />
+ 
+-        {/* RESUMEN EJECUTIVO */}
+-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+-          <div className="bg-slate-800 p-4">
+-            <h2 className="text-white font-bold m-0">RESUMEN EJECUTIVO</h2>
+-          </div>
+-          
+-          <div className="p-4 space-y-3">
+-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+-              <span className="text-sm text-gray-600">Total Facturado (bruto)</span>
+-              <span className="font-bold text-gray-900">{formatCurrency(resumen.totalFacturado)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+-              <span className="text-sm text-gray-600">(-) IVA Débito Fiscal</span>
+-              <span className="font-bold text-red-600">-${formatCurrency(resumen.ivaDebitoFiscal)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+-              <span className="text-sm text-gray-600">Neto Gravado</span>
+-              <span className="font-bold text-gray-900">{formatCurrency(resumen.netoGravado)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+-              <span className="text-sm text-gray-600">(-) Comisiones de medios de pago</span>
+-              <span className="font-bold text-red-600">-${formatCurrency(resumen.comisiones)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-3 border-b-2 border-gray-300 bg-slate-50 px-3 -mx-3">
+-              <span className="text-sm font-bold text-gray-900">INGRESO NETO REAL</span>
+-              <span className="font-extrabold text-lg text-emerald-600">{formatCurrency(resumen.ingresoNetoReal)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+-              <span className="text-sm text-gray-600">(-) Gastos operativos</span>
+-              <span className="font-bold text-red-600">-${formatCurrency(resumen.gastosOperativos)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+-              <span className="text-sm text-gray-600">(-) IVA Crédito Fiscal (compras)</span>
+-              <span className="font-bold text-gray-500">-${formatCurrency(resumen.ivaCreditoFiscal)}</span>
+-            </div>
+-            <div className="flex justify-between items-center py-4 border-b-2 border-gray-300 bg-emerald-50 px-3 -mx-3">
+-              <span className="text-base font-bold text-gray-900">RESULTADO DEL EJERCICIO</span>
+-              <span className="font-extrabold text-2xl text-emerald-600">{formatCurrency(resumen.resultadoEjercicio)}</span>
+-            </div>
+-            
+-            {/* TARJETAS INFERIORES */}
+-            <div className="grid grid-cols-3 gap-4 mt-6">
+-              <div className="bg-gray-50 rounded-lg p-4 text-center">
+-                <div className="text-xs text-gray-500 mb-1">Ventas</div>
+-                <div className="text-2xl font-bold text-gray-900">{resumen.cantidadVentas}</div>
+-              </div>
+-              <div className="bg-gray-50 rounded-lg p-4 text-center">
+-                <div className="text-xs text-gray-500 mb-1">Gastos</div>
+-                <div className="text-2xl font-bold text-gray-900">{resumen.cantidadGastos}</div>
+-              </div>
+-              <div className="bg-gray-50 rounded-lg p-4 text-center">
+-                <div className="text-xs text-gray-500 mb-1">IVA a pagar</div>
+-                <div className="text-2xl font-bold text-red-600">{formatCurrency(resumen.ivaAPagar)}</div>
+-              </div>
+-            </div>
+-          </div>
+-        </div>
++        <AvisosCalidad calidad={r.calidad} />
+ 
+-        {/* LIBRO IVA VENTAS */}
+-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+-          <div className="bg-amber-500 p-4 flex justify-between items-center">
+-            <h2 className="text-white font-bold m-0">📘 LIBRO IVA VENTAS (Débito Fiscal)</h2>
+-            <span className="text-xs text-white/80">{libroVentas.length} registros</span>
+-          </div>
+-          <div className="overflow-x-auto">
+-            <table className="w-full text-xs">
+-              <thead className="bg-gray-50 border-b border-gray-200">
+-                <tr>
+-                  <th className="p-2 text-left text-gray-600 font-bold">Fecha</th>
+-                  <th className="p-2 text-left text-gray-600 font-bold">Tipo</th>
+-                  <th className="p-2 text-left text-gray-600 font-bold">Nro.</th>
+-                  <th className="p-2 text-left text-gray-600 font-bold">Medio</th>
+-                  <th className="p-2 text-left text-gray-600 font-bold">Descripción</th>
+-                  <th className="p-2 text-right text-gray-600 font-bold">Total</th>
+-                  <th className="p-2 text-right text-gray-600 font-bold">IVA</th>
+-                  <th className="p-2 text-right text-gray-600 font-bold">Neto</th>
+-                </tr>
+-              </thead>
+-              <tbody>
+-                {libroVentas.slice(0, 50).map((venta, idx) => (
+-                  <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+-                    <td className="p-2">{formatFecha(venta.fecha)}</td>
+-                    <td className="p-2">{venta.tipo}</td>
+-                    <td className="p-2">{venta.numero}</td>
+-                    <td className="p-2">{venta.medio}</td>
+-                    <td className="p-2">{venta.descripcion}</td>
+-                    <td className="p-2 text-right font-semibold">{formatCurrency(venta.total)}</td>
+-                    <td className="p-2 text-right text-red-600">{formatCurrency(venta.iva)}</td>
+-                    <td className="p-2 text-right">{formatCurrency(venta.neto)}</td>
+-                  </tr>
+-                ))}
+-              </tbody>
+-            </table>
+-          </div>
+-        </div>
+-
+-        {/* LIBRO IVA COMPRAS */}
+-        {libroCompras.length > 0 && (
+-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+-            <div className="bg-emerald-600 p-4 flex justify-between items-center">
+-              <h2 className="text-white font-bold m-0">📗 LIBRO IVA COMPRAS (Crédito Fiscal)</h2>
+-              <span className="text-xs text-white/80">{libroCompras.length} registros</span>
+-            </div>
+-            <div className="overflow-x-auto">
+-              <table className="w-full text-xs">
+-                <thead className="bg-gray-50 border-b border-gray-200">
+-                  <tr>
+-                    <th className="p-2 text-left text-gray-600 font-bold">Fecha</th>
+-                    <th className="p-2 text-left text-gray-600 font-bold">Tipo</th>
+-                    <th className="p-2 text-left text-gray-600 font-bold">Nro.</th>
+-                    <th className="p-2 text-left text-gray-600 font-bold">Proveedor</th>
+-                    <th className="p-2 text-right text-gray-600 font-bold">Total</th>
+-                    <th className="p-2 text-right text-gray-600 font-bold">IVA</th>
+-                    <th className="p-2 text-right text-gray-600 font-bold">Neto</th>
+-                  </tr>
+-                </thead>
+-                <tbody>
+-                  {libroCompras.slice(0, 50).map((compra, idx) => (
+-                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+-                      <td className="p-2">{formatFecha(compra.fecha)}</td>
+-                      <td className="p-2">{compra.tipo}</td>
+-                      <td className="p-2">{compra.numero}</td>
+-                      <td className="p-2">{compra.proveedor}</td>
+-                      <td className="p-2 text-right font-semibold">{formatCurrency(compra.total)}</td>
+-                      <td className="p-2 text-right text-emerald-600">{formatCurrency(compra.iva)}</td>
+-                      <td className="p-2 text-right">{formatCurrency(compra.neto)}</td>
+-                    </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-            </div>
+-          </div>
++        {!r.discriminaIva && r.localActual && (
++          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 m-0">
++            {r.localActual.condicion_fiscal === 'Mixto'
++              ? 'Los locales seleccionados tienen condiciones fiscales distintas, así que no se discrimina IVA en el consolidado. Elegí un local para ver el detalle fiscal.'
++              : `Este local está como ${r.localActual.condicion_fiscal || 'sin condición fiscal definida'}, así que los importes se muestran sin discriminar IVA.`}
++          </p>
+         )}
+-      </div>
+-      
+-      {/* ========================================== */}
+-      {/* MODAL DE AYUDA / GUÍA DE LECTURA */}
+-      {/* ========================================== */}
+-      {showAyudaModal && (
+-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+-            
+-            {/* Header del Modal */}
+-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white sticky top-0 z-10">
+-              <div className="flex justify-between items-center">
+-                <h2 className="text-xl font-bold m-0 flex items-center gap-2">
+-                  📖 Guía de Lectura
+-                </h2>
+-                <button 
+-                  onClick={() => setShowAyudaModal(false)}
+-                  className="text-white/80 hover:text-white text-2xl font-bold bg-none border-none cursor-pointer"
+-                >
+-                  ×
+-                </button>
+-              </div>
+-              <p className="text-sm text-blue-100 m-0 mt-1">
+-                Entendé tu reporte contable en palabras simples
+-              </p>
+-            </div>
+ 
+-            {/* Contenido */}
+-            <div className="p-6 space-y-6">
+-              
+-              {/* Sección 1: Resumen */}
+-              <div>
+-                <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+-                  <span className="bg-blue-100 text-blue-700 w-7 h-7 rounded-full flex items-center justify-center text-sm">1</span>
+-                  Resumen Ejecutivo (La foto grande)
+-                </h3>
+-                <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-200">
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">💰</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">Total Facturado (Bruto)</div>
+-                      <div className="text-xs text-gray-600">Es todo el dinero que entró por ventas, <strong>incluyendo el IVA</strong> que le cobraste al cliente.</div>
+-                    </div>
+-                  </div>
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">🏛️</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">IVA Débito Fiscal</div>
+-                      <div className="text-xs text-gray-600">Es el IVA que <strong>vos le cobraste a tus clientes</strong>. Ese dinero no es tuyo, tenés que pagárselo a AFIP.</div>
+-                    </div>
+-                  </div>
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">💵</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">Ingreso Neto Real</div>
+-                      <div className="text-xs text-gray-600">Lo que realmente te queda después de quitarle el IVA y pagarle las comisiones a las tarjetas (Mercado Pago, Visa, etc.).</div>
+-                    </div>
+-                  </div>
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">📉</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">Resultado del Ejercicio</div>
+-                      <div className="text-xs text-gray-600">La ganancia (o pérdida) real de tu negocio en este período. <strong>(Ingresos - Gastos)</strong>.</div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
++        <ResumenEjecutivo resumen={r.resumen} discriminaIva={r.discriminaIva} />
+ 
+-              {/* Sección 2: Libros IVA */}
+-              <div>
+-                <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+-                  <span className="bg-amber-100 text-amber-700 w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
+-                  Libros IVA (Lo que le interesa a tu contador)
+-                </h3>
+-                <div className="bg-amber-50 rounded-xl p-4 space-y-3 border border-amber-200">
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">📘</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">Libro IVA Ventas (Débito Fiscal)</div>
+-                      <div className="text-xs text-gray-600">El registro de todas tus ventas. Muestra cuánto IVA "debés" al fisco por cada factura emitida.</div>
+-                    </div>
+-                  </div>
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">📗</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">Libro IVA Compras (Crédito Fiscal)</div>
+-                      <div className="text-xs text-gray-600">El registro de tus gastos e insumos. El IVA que pagaste acá <strong>se resta</strong> del IVA de ventas para pagarle menos a AFIP.</div>
+-                    </div>
+-                  </div>
+-                  <div className="flex gap-3">
+-                    <div className="text-lg">⚖️</div>
+-                    <div>
+-                      <div className="font-bold text-sm text-gray-900">IVA a Pagar</div>
+-                      <div className="text-xs text-gray-600">La diferencia entre el IVA que cobraste y el que pagaste. Si es positivo, le pagás a AFIP. Si es negativo, tenés saldo a favor.</div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
++        {r.discriminaIva && <ResumenPorAlicuota ventas={r.porAlicuotaVentas} compras={r.porAlicuotaCompras} />}
+ 
+-              {/* Sección 3: Consejos */}
+-              <div>
+-                <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+-                  <span className="bg-emerald-100 text-emerald-700 w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
+-                  💡 Consejos para fin de mes
+-                </h3>
+-                <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+-                  <ul className="text-xs text-gray-700 space-y-2 m-0 pl-4">
+-                    <li>✅ <strong>Revisá el "IVA a pagar":</strong> Si es muy alto, quizás te faltó cargar gastos con factura para tener más Crédito Fiscal.</li>
+-                    <li>✅ <strong>Compará meses:</strong> Usá los botones "Mes anterior" y "Este mes" para ver si tu negocio crece o baja.</li>
+-                    <li>✅ <strong>Exportá el Excel:</strong> Mandale este archivo a tu contador. Ya está formateado y listo para presentar.</li>
+-                    <li>✅ <strong>Controlá las comisiones:</strong> En "Resumen por Medio de Pago" podés ver cuánto te están comiendo las tarjetas.</li>
+-                  </ul>
+-                </div>
+-              </div>
++        <MediosYConciliacion
++          porMedio={r.porMedio} conciliacion={r.conciliacion}
++          cierres={r.cierres} totalFacturado={r.resumen.totalFacturado}
++        />
+ 
+-            </div>
++        <TablaLibro tipo="ventas" filas={r.libroVentas} totales={totalesVentas} discriminaIva={r.discriminaIva} />
++        <TablaLibro tipo="compras" filas={r.libroCompras} totales={totalesCompras} discriminaIva={r.discriminaIva} />
+ 
+-            {/* Footer */}
+-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end sticky bottom-0">
+-              <button 
+-                onClick={() => setShowAyudaModal(false)}
+-                className="px-5 py-2 bg-blue-600 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-700"
+-              >
+-                Entendido, cerrar
+-              </button>
+-            </div>
++        <p className="text-xs text-gray-400 text-center m-0">
++          Generado a partir de los movimientos cargados en el sistema. No reemplaza la liquidación de un profesional.
++        </p>
++      </div>
+ 
+-          </div>
+-        </div>
+-      )}
++      <ReportGuide isOpen={ayuda} onClose={() => setAyuda(false)} />
++      <BottomNav activeTab="reportes" />
+     </main>
+   )
+-}
+\ No newline at end of file
++}
+diff --git a/tests/reportes.test.js b/tests/reportes.test.js
+new file mode 100644
+index 0000000..856ac99
+--- /dev/null
++++ b/tests/reportes.test.js
+@@ -0,0 +1,96 @@
++import { describe, it, expect } from 'vitest'
++import { agruparPorAlicuota, agruparPorMedio, agruparPorDia, evaluarCalidad, conciliarCierres } from '../lib/domain/reportes'
++
++const credito = { nombre: 'Crédito', tipo: 'credito', comision_porcentaje: 3.5, plazo_acreditacion_dias: 30 }
++const efectivo = { nombre: 'Efectivo', tipo: 'efectivo', comision_porcentaje: 0, plazo_acreditacion_dias: 0 }
++
++let n = 0
++const tx = (over) => ({
++  id: `t-${++n}`, tipo: 'COBRO_RECIBIDO', monto: 1000, es_reversa: false, revertida: false,
++  creado_en: new Date(2026, 7, 10, 10, 0).toISOString(), medios_pago: efectivo,
++  tipo_comprobante: 'B', nro_comprobante: 1, alicuota_iva: 21, ...over,
++})
++
++describe('agruparPorAlicuota', () => {
++  it('separa 21 y 10.5 y ordena de mayor a menor', () => {
++    const r = agruparPorAlicuota([
++      { alicuota: 21, neto: 1000, iva: 210, total: 1210 },
++      { alicuota: 21, neto: 500, iva: 105, total: 605 },
++      { alicuota: 10.5, neto: 200, iva: 21, total: 221 },
++    ])
++    expect(r).toHaveLength(2)
++    expect(r[0]).toMatchObject({ alicuota: 21, neto: 1500, iva: 315, cantidad: 2 })
++    expect(r[1]).toMatchObject({ alicuota: 10.5, cantidad: 1 })
++  })
++})
++
++describe('agruparPorMedio', () => {
++  it('suma por medio, calcula comisión y excluye anuladas', () => {
++    const r = agruparPorMedio([
++      tx({ monto: 1000, medios_pago: credito }),
++      tx({ monto: 3000, medios_pago: credito }),
++      tx({ monto: 500, medios_pago: efectivo }),
++      tx({ monto: 9999, medios_pago: credito, revertida: true }),
++      tx({ monto: -9999, es_reversa: true }),
++    ])
++    expect(r).toHaveLength(2)
++    expect(r[0]).toMatchObject({ nombre: 'Crédito', total: 4000, comisiones: 140, neto: 3860, cantidad: 2 })
++    expect(r[1]).toMatchObject({ nombre: 'Efectivo', total: 500, comisiones: 0 })
++  })
++})
++
++describe('agruparPorDia', () => {
++  it('agrupa por fecha local y calcula resultado', () => {
++    const r = agruparPorDia([
++      tx({ monto: 1000, creado_en: new Date(2026, 7, 10, 9, 0).toISOString() }),
++      tx({ monto: 500, tipo: 'GASTO_REGISTRADO', creado_en: new Date(2026, 7, 10, 18, 0).toISOString() }),
++      // 22:30 hora local: sigue siendo el día 11, no el 12 en UTC
++      tx({ monto: 700, creado_en: new Date(2026, 7, 11, 22, 30).toISOString() }),
++    ])
++    expect(r).toHaveLength(2)
++    expect(r[0]).toMatchObject({ fecha: '2026-08-10', ventas: 1000, gastos: 500, resultado: 500 })
++    expect(r[1]).toMatchObject({ fecha: '2026-08-11', ventas: 700 })
++  })
++})
++
++describe('evaluarCalidad', () => {
++  it('avisa cuando faltan comprobantes', () => {
++    const c = evaluarCalidad([
++      tx({ tipo_comprobante: 'SIN_COMPROBANTE' }),
++      tx({ tipo_comprobante: 'SIN_COMPROBANTE' }),
++      tx({ tipo_comprobante: 'B', nro_comprobante: 5 }),
++    ])
++    expect(c.sinComprobante).toBe(2)
++    expect(c.avisos.some(a => a.nivel === 'alto')).toBe(true)
++  })
++
++  it('avisa comprobantes sin número y cuenta anuladas', () => {
++    const c = evaluarCalidad([
++      tx({ tipo_comprobante: 'A', nro_comprobante: null }),
++      tx({ revertida: true }),
++    ])
++    expect(c.sinNumero).toBe(1)
++    expect(c.anuladas).toBe(1)
++    expect(c.total).toBe(1)   // la anulada no cuenta como válida
++  })
++
++  it('sin movimientos lo dice explícitamente', () => {
++    expect(evaluarCalidad([]).avisos[0].nivel).toBe('info')
++  })
++})
++
++describe('conciliarCierres', () => {
++  it('separa faltantes, sobrantes y cierres sin conteo', () => {
++    const c = conciliarCierres([
++      { id: 1, diferencia_efectivo: -500 },
++      { id: 2, diferencia_efectivo: 0 },
++      { id: 3, diferencia_efectivo: 200 },
++      { id: 4, diferencia_efectivo: null },
++      { id: 5, diferencia_efectivo: -1200 },
++    ])
++    expect(c).toMatchObject({
++      cierres: 5, sinContar: 1, diasFaltante: 2, diasSobrante: 1, cuadrados: 1,
++      totalDiferencia: -1500, peorFaltante: -1200,
++    })
++  })
++})
+-- 
+2.43.0
+
