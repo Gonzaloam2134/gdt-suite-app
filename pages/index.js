@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
@@ -8,6 +8,14 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // Si ya hay sesión (por ejemplo, después de cambiar la contraseña desde el
+  // flujo de recuperación), no tiene sentido mostrar el formulario de login.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) router.replace('/locales')
+    })
+  }, [router])
 
   const handleLogin = async (e) => {
     e.preventDefault()

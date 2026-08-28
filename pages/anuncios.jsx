@@ -30,7 +30,7 @@ export default function CentroAnuncios() {
     const iconos = {
       warning: '⚠️',
       success: '✅',
-      feature: '',
+      feature: '🚀',
       urgent: '🚨',
       info: 'ℹ️'
     }

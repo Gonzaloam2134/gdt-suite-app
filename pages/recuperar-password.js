@@ -1,141 +1,104 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
 
+/**
+ * Pide el email y dispara el mail de recuperación. Antes esta página asumía
+ * que siempre se llegaba acá DESPUÉS de hacer clic en el link del mail (leía
+ * un token del hash de la URL) — pero es también el destino del botón
+ * "¿Olvidaste tu contraseña?" del login, que te trae ACÁ ANTES de tener
+ * ningún mail. Sin un token en el hash, la página vieja simplemente te
+ * mandaba de vuelta al login sin explicar nada: no había forma de pedir el
+ * mail de recuperación en ningún lado de la app.
+ */
 export default function RecuperarPassword() {
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
-  const [tokenValid, setTokenValid] = useState(false)
+  const [enviado, setEnviado] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    // Extraer el access_token del hash de la URL
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash
-      if (hash) {
-        const params = new URLSearchParams(hash.substring(1))
-        const accessToken = params.get('access_token')
-        const type = params.get('type')
-        
-        if (accessToken && type === 'recovery') {
-          // Establecer la sesión con el token de recuperación
-          supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: params.get('refresh_token') || ''
-          }).then(({ error }) => {
-            if (error) {
-              toast.error('Token inválido o expirado')
-              router.push('/')
-            } else {
-              setTokenValid(true)
-            }
-          })
-        } else {
-          toast.error('Link de recuperación inválido')
-          router.push('/')
-        }
-      } else {
-        router.push('/')
-      }
-    }
-  }, [router])
-
-  const handleUpdatePassword = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (password !== confirmPassword) {
-      toast.error('Las contraseñas no coinciden')
-      return
-    }
-
-    if (password.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres')
-      return
-    }
-
+    setLoading(true)
     try {
-      setLoading(true)
-      const { error } = await supabase.auth.updateUser({ 
-        password: password 
-      })
-      
+      const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo })
       if (error) throw error
-      
-      toast.success('✅ Contraseña actualizada correctamente')
-      
-      // Redirigir al login después de 2 segundos
-      setTimeout(() => {
-        router.push('/')
-      }, 2000)
+      setEnviado(true)
     } catch (err) {
-      toast.error('Error: ' + err.message)
+      console.error('Error al pedir recuperación:', err)
+      toast.error('No se pudo enviar el link: ' + (err.message || 'intentá de nuevo'))
     } finally {
       setLoading(false)
     }
   }
 
-  if (!tokenValid) {
+  if (enviado) {
     return (
-      <div className="min-h-screen bg-blue-500 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center">
-          <div className="text-6xl mb-4">🔐</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Verificando...</h1>
-          <p className="text-sm text-gray-600">Validando tu link de recuperación</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="text-6xl mb-4">📬</div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Revisá tu email</h1>
+          <p className="text-sm text-gray-600">
+            Si <strong>{email}</strong> tiene una cuenta, te mandamos un link para elegir una contraseña nueva.
+            Puede tardar unos minutos — revisá también la carpeta de spam.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="mt-6 w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+          >
+            Volver al login
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-blue-500 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full">
-        <div className="text-center mb-6">
-          <div className="text-6xl mb-4">🔐</div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Nueva contraseña</h1>
-          <p className="text-sm text-gray-600">Ingresá tu nueva contraseña</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <div className="text-6xl mb-3">🔐</div>
+          <h1 className="text-2xl font-bold text-gray-900 m-0">Recuperar contraseña</h1>
+          <p className="text-sm text-gray-500 mt-1">Te mandamos un link para elegir una nueva</p>
         </div>
 
-        <form onSubmit={handleUpdatePassword} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Nueva contraseña
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              Email
             </label>
             <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full p-4 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-base"
-              placeholder="Mínimo 6 caracteres"
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              minLength={6}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Confirmar contraseña
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              className="w-full p-4 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-base"
-              placeholder="Repetí la contraseña"
-              required
-              minLength={6}
+              autoFocus
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              placeholder="tu@email.com"
+              autoComplete="email"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full p-4 bg-blue-500 text-white rounded-lg font-bold text-lg cursor-pointer disabled:opacity-50 hover:bg-blue-600 transition-colors"
+            className="w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? 'Actualizando...' : 'Actualizar contraseña'}
+            {loading ? 'Enviando...' : 'Enviar link de recuperación'}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => router.push('/')}
+            className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer bg-none border-none underline"
+          >
+            Volver al login
+          </button>
+        </div>
       </div>
     </div>
   )

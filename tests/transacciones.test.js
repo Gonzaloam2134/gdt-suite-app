@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularComision, calcularIva, calcularTotalesDia, calcularAcreditacionesDia, calcularResumenPeriodo, efectivoEsperado } from '../lib/domain/transacciones'
+import { calcularComision, calcularIva, comisionDe, calcularTotalesDia, calcularAcreditacionesDia, calcularResumenPeriodo, efectivoEsperado } from '../lib/domain/transacciones'
 
 const efectivo = { nombre: 'Efectivo', tipo: 'efectivo', comision_porcentaje: 0, plazo_acreditacion_dias: 0 }
 const credito  = { nombre: 'Crédito',  tipo: 'credito',  comision_porcentaje: 3.5, plazo_acreditacion_dias: 30 }
@@ -16,6 +16,26 @@ describe('cálculos unitarios', () => {
   it('IVA 21% desde bruto', () => expect(calcularIva(1210, 21)).toEqual({ neto: 1000, iva: 210 }))
   it('IVA 10.5%', () => expect(calcularIva(1105, 10.5)).toEqual({ neto: 1000, iva: 105 }))
   it('IVA 0%', () => expect(calcularIva(1000, 0)).toEqual({ neto: 1000, iva: 0 }))
+})
+
+describe('comisionDe', () => {
+  it('respeta comision_monto guardada aunque sea 0, sin recalcular desde el medio actual', () => {
+    // Bug real que esto corrige: un cobro con 0% de comisión en su momento no
+    // debe "heredar" una comisión nueva si más tarde alguien edita el medio
+    // de pago y le sube el porcentaje.
+    const t = { monto: 1000, comision_monto: 0, medios_pago: { comision_porcentaje: 5 } }
+    expect(comisionDe(t)).toBe(0)
+  })
+
+  it('sin comision_monto guardada (fila vieja, columna ausente): deriva del medio', () => {
+    const t = { monto: 1000, medios_pago: { comision_porcentaje: 3.5 } }
+    expect(comisionDe(t)).toBe(35)
+  })
+
+  it('comision_monto guardada mayor a 0: la usa tal cual, ignora el medio', () => {
+    const t = { monto: 1000, comision_monto: 50, medios_pago: { comision_porcentaje: 99 } }
+    expect(comisionDe(t)).toBe(50)
+  })
 })
 
 describe('calcularTotalesDia', () => {
