@@ -5,7 +5,7 @@ import { calcularTotalesDia, calcularAcreditacionesDia } from '../lib/domain/tra
 import { hoyISO } from '../lib/dates'
 
 const VACIO = {
-  totales: { cobros: 0, gastos: 0, efectivoEnCaja: 0, disponibleHoy: 0, pendienteAcreditacion: 0, comisiones: 0, netoReal: 0 },
+  totales: { cobros: 0, gastos: 0, efectivoCobrado: 0, efectivoGastado: 0, disponibleHoy: 0, pendienteAcreditacion: 0, comisiones: 0, netoReal: 0 },
   cobros: [], gastos: [], acreditacionesHoy: [], desgloseMedios: [],
 }
 

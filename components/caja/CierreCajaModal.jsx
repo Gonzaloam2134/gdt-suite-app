@@ -33,7 +33,8 @@ export default function CierreCajaModal({ isOpen, onClose, onConfirmar, cajaAbie
           <h3 className="text-sm font-bold text-gray-900 mb-3 m-0">Resumen del día</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <Dato label="Monto inicial" valor={formatCurrency(cajaAbierta.monto_inicial_efectivo)} />
-            <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoEnCaja)}`} className="text-green-700" />
+            <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoCobrado)}`} className="text-green-700" />
+            <Dato label="Gastos en efectivo" valor={`-${formatCurrency(totales.efectivoGastado)}`} className="text-red-700" />
             <Dato label="Total cobros" valor={formatCurrency(totales.cobros)} className="text-green-700" />
             <Dato label="Total gastos" valor={`-${formatCurrency(totales.gastos)}`} className="text-red-700" />
             <div className="col-span-2 pt-2 border-t border-gray-300">

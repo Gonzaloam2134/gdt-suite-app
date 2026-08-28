@@ -45,7 +45,7 @@ describe('calcularTotalesDia', () => {
     const t = tx({ creado_en: new Date(2026, 7, 25, 22, 30).toISOString() })
     const { totales } = calcularTotalesDia([t], DIA)
     expect(totales.cobros).toBe(1000)
-    expect(totales.efectivoEnCaja).toBe(1000)
+    expect(totales.efectivoCobrado).toBe(1000)
   })
 
   it('efectivo va a caja; crédito (pendiente) no está disponible hoy; disponibleHoy ya no lo calcula esta función', () => {
@@ -55,7 +55,7 @@ describe('calcularTotalesDia', () => {
       tx({ monto: 3000, medios_pago: credito }),
     ], DIA)
     expect(r.totales.cobros).toBe(6000)
-    expect(r.totales.efectivoEnCaja).toBe(1000)
+    expect(r.totales.efectivoCobrado).toBe(1000)
     expect(r.totales.comisiones).toBe(105)
     expect(r.desgloseMedios[0].nombre).toBe('Crédito')
   })
@@ -82,7 +82,7 @@ describe('calcularTotalesDia', () => {
     const reversa = tx({ monto: -10000, es_reversa: true, reversa_de: 'orig' })
     const r = calcularTotalesDia([original, reversa], DIA)
     expect(r.totales.cobros).toBe(0)
-    expect(r.totales.efectivoEnCaja).toBe(0)
+    expect(r.totales.efectivoCobrado).toBe(0)
     expect(r.cobros).toHaveLength(1)              // el dueño la ve en la caja
     expect(r.cobros[0].anulada).toBe(true)
     expect(r.cobros[0].motivo_reversa).toBe('se cargó dos veces')
@@ -107,7 +107,7 @@ describe('calcularTotalesDia', () => {
   })
 
   it('efectivo esperado = inicial + efectivo del día', () => {
-    expect(efectivoEsperado(500, { efectivoEnCaja: 1000 })).toBe(1500)
+    expect(efectivoEsperado(500, { efectivoCobrado: 1000, efectivoGastado: 0 })).toBe(1500)
   })
 })
 
@@ -213,5 +213,68 @@ describe('calcularTotalesDia vs calcularResumenPeriodo — mismo dataset, mismo 
     // netoReal = cobros - comisiones - gastos; resultadoEjercicio = (totalFacturado - comisiones) - gastosOperativos.
     // Misma fórmula, escrita dos veces: tienen que dar lo mismo.
     expect(totales.netoReal).toBe(resumen.resultadoEjercicio)
+  })
+})
+
+describe('efectivo en caja (lo que hay físicamente en el cajón)', () => {
+  const DIA = '2026-08-25'
+  const efectivoMedio = { nombre: 'Efectivo', tipo: 'efectivo', comision_porcentaje: 0, plazo_acreditacion_dias: 0 }
+  const tarjeta = { nombre: 'Crédito', tipo: 'credito', comision_porcentaje: 3.5, plazo_acreditacion_dias: 30 }
+
+  let i = 0
+  const mov = (over) => ({
+    id: `e-${++i}`, tipo: 'COBRO_RECIBIDO', monto: 1000, es_reversa: false, revertida: false,
+    creado_en: new Date(2026, 7, 25, 11, 0).toISOString(), medios_pago: efectivoMedio, ...over,
+  })
+
+  it('caja recién abierta sin movimientos: el dueño ve el monto inicial', () => {
+    const { totales } = calcularTotalesDia([], DIA)
+    expect(efectivoEsperado(6000, totales)).toBe(6000)
+  })
+
+  it('los gastos pagados en efectivo salen del cajón', () => {
+    const { totales } = calcularTotalesDia([
+      mov({ monto: 4000 }),
+      mov({ tipo: 'GASTO_REGISTRADO', monto: 1500 }),
+    ], DIA)
+    expect(totales.efectivoCobrado).toBe(4000)
+    expect(totales.efectivoGastado).toBe(1500)
+    expect(efectivoEsperado(6000, totales)).toBe(8500)
+  })
+
+  it('un gasto pagado con transferencia NO descuenta del efectivo', () => {
+    const { totales } = calcularTotalesDia([
+      mov({ tipo: 'GASTO_REGISTRADO', monto: 2000, medios_pago: { nombre: 'Transferencia', tipo: 'transferencia' } }),
+    ], DIA)
+    expect(totales.efectivoGastado).toBe(0)
+    expect(efectivoEsperado(6000, totales)).toBe(6000)
+    expect(totales.gastos).toBe(2000)   // sí resta del resultado del día
+  })
+
+  it('los cobros con tarjeta no entran al cajón', () => {
+    const { totales } = calcularTotalesDia([mov({ monto: 10000, medios_pago: tarjeta })], DIA)
+    expect(totales.efectivoCobrado).toBe(0)
+    expect(efectivoEsperado(6000, totales)).toBe(6000)
+  })
+
+  it('un cobro en efectivo anulado no queda en el cajón', () => {
+    const { totales } = calcularTotalesDia([
+      mov({ id: 'orig', monto: 5000, revertida: true }),
+      mov({ monto: -5000, es_reversa: true, reversa_de: 'orig' }),
+    ], DIA)
+    expect(totales.efectivoCobrado).toBe(0)
+    expect(efectivoEsperado(6000, totales)).toBe(6000)
+  })
+
+  it('el número del cierre es el mismo que ve el dueño durante el día', () => {
+    const { totales } = calcularTotalesDia([
+      mov({ monto: 3000 }),
+      mov({ monto: 2000, medios_pago: tarjeta }),
+      mov({ tipo: 'GASTO_REGISTRADO', monto: 800 }),
+    ], DIA)
+    const loQueVeEnLaTarjeta = efectivoEsperado(6000, totales)
+    const loQueUsaElCierre = efectivoEsperado(6000, totales)
+    expect(loQueVeEnLaTarjeta).toBe(loQueUsaElCierre)
+    expect(loQueVeEnLaTarjeta).toBe(8200)   // 6000 + 3000 - 800
   })
 })

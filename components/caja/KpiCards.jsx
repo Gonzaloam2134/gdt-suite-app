@@ -1,5 +1,7 @@
 import KpiCard from './KpiCard'
 import { usePreferencia } from '../../hooks/usePreferencia'
+import { efectivoEsperado } from '../../lib/domain/transacciones'
+import { formatCurrency } from '../../lib/format'
 
 const Lista = ({ items }) => <ul className="space-y-1 list-disc list-inside m-0">{items.map(i => <li key={i}>{i}</li>)}</ul>
 
@@ -10,7 +12,7 @@ const Lista = ({ items }) => <ul className="space-y-1 list-disc list-inside m-0"
  * Colapsar de a una obligaría a recordar seis estados; colapsar todo junto
  * escondería justo lo que se viene a mirar. La elección queda guardada.
  */
-export default function KpiCards({ totales, cantidadCobros, cantidadGastos }) {
+export default function KpiCards({ totales, cantidadCobros, cantidadGastos, cajaAbierta }) {
   const [abiertos, setAbiertos] = usePreferencia('caja.kpis', { resultado: true, plata: true })
   const alternar = (grupo) => setAbiertos(a => ({ ...a, [grupo]: !a[grupo] }))
 
@@ -23,9 +25,26 @@ export default function KpiCards({ totales, cantidadCobros, cantidadGastos }) {
       ayuda: <><div className="font-semibold mb-1">Cobros − comisiones − gastos</div><div>Lo que te queda limpio del día.</div></> },
   ]
 
+  // "En caja" es el efectivo que debería estar FÍSICAMENTE en el cajón ahora mismo,
+  // no solo lo cobrado hoy: si el dueño abrió con $6.000, tiene que verlos.
+  const inicial = Number(cajaAbierta?.monto_inicial_efectivo) || 0
+  const enCaja = cajaAbierta ? efectivoEsperado(inicial, totales) : 0
+
+  const detalleEnCaja = cajaAbierta
+    ? [
+        `${formatCurrency(inicial)} inicial`,
+        totales.efectivoCobrado > 0 ? `+ ${formatCurrency(totales.efectivoCobrado)} cobrado` : null,
+        totales.efectivoGastado > 0 ? `− ${formatCurrency(totales.efectivoGastado)} gastos` : null,
+      ].filter(Boolean).join(' ')
+    : 'La caja está cerrada'
+
   const plata = [
-    { key: 'efectivo', titulo: '🏦 En caja', valor: totales.efectivoEnCaja, detalle: 'Solo efectivo', tono: 'azul',
-      ayuda: <Lista items={['Solo los cobros en efectivo', 'Es lo que tenés que contar al cerrar', 'No incluye tarjetas ni transferencias']} /> },
+    { key: 'efectivo', titulo: '🏦 En caja', valor: enCaja, detalle: detalleEnCaja, tono: 'azul',
+      ayuda: <Lista items={[
+        'El efectivo que debería haber en el cajón ahora',
+        'Monto de apertura, más cobros en efectivo, menos gastos pagados en efectivo',
+        'Es contra este número que vas a contar al cerrar la caja',
+      ]} /> },
     { key: 'disponible', titulo: '✅ Disponible', valor: totales.disponibleHoy, detalle: 'Se acreditó hoy', tono: 'esmeralda',
       ayuda: <Lista items={['Tarjetas y QR que acreditan hoy', 'Ya con la comisión descontada', 'Plata que podés usar']} /> },
     { key: 'pendiente', titulo: '⏳ Pendiente', valor: totales.pendienteAcreditacion, detalle: 'Por acreditar', tono: 'ambar',

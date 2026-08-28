@@ -43,7 +43,8 @@ export default function CierreCajaAnteriorModal({ isOpen, onClose, onConfirmar, 
               <Dato label="Monto inicial" valor={formatCurrency(caja.monto_inicial_efectivo)} />
               <Dato label="Total cobros" valor={formatCurrency(totales.cobros)} className="text-green-700" />
               <Dato label="Total gastos" valor={`-${formatCurrency(totales.gastos)}`} className="text-red-700" />
-              <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoEnCaja)}`} className="text-green-700" />
+              <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoCobrado)}`} className="text-green-700" />
+            <Dato label="Gastos en efectivo" valor={`-${formatCurrency(totales.efectivoGastado)}`} className="text-red-700" />
             </div>
           </div>
         )}
