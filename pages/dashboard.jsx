@@ -103,6 +103,7 @@ export default function Dashboard() {
               totales={totales}
               cantidadCobros={cobros.filter(c => !c.anulada).length}
               cantidadGastos={gastos.filter(g => !g.anulada).length}
+              cajaAbierta={caja.cajaAbierta}
             />
             <ListaTransacciones tipo="cobro" items={cobros} onReversar={setAReversar} />
             <ListaTransacciones tipo="gasto" items={gastos} onReversar={setAReversar} />
