@@ -1,0 +1,189 @@
+From 5afa1a2ecdb4cd7f14fdf57e3dc8c3e844ce2d27 Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Fri, 28 Aug 2026 17:41:19 +0000
+Subject: [PATCH] feat: guia de arqueo y cierre de caja accesible desde Ayuda;
+ aclarar que Neto no incluye el monto inicial
+
+---
+ components/caja/GuiaArqueoModal.jsx | 115 ++++++++++++++++++++++++++++
+ components/caja/KpiCards.jsx        |   4 +-
+ pages/dashboard.jsx                 |   5 +-
+ 3 files changed, 121 insertions(+), 3 deletions(-)
+ create mode 100644 components/caja/GuiaArqueoModal.jsx
+
+diff --git a/components/caja/GuiaArqueoModal.jsx b/components/caja/GuiaArqueoModal.jsx
+new file mode 100644
+index 0000000..9e2bf4d
+--- /dev/null
++++ b/components/caja/GuiaArqueoModal.jsx
+@@ -0,0 +1,115 @@
++import { useState } from 'react'
++import Modal from '../ui/Modal'
++
++const PASOS = [
++  {
++    icono: '🔓',
++    titulo: '1. Al abrir la caja',
++    puntos: [
++      'Contá el efectivo que hay en el cajón antes de empezar a vender.',
++      'Cargá ese número en "Efectivo inicial" al abrir la caja.',
++      'Es la base contra la que se compara todo lo demás en el día.',
++    ],
++  },
++  {
++    icono: '💰',
++    titulo: '2. Durante el día',
++    puntos: [
++      'Cada cobro y gasto se registra con el botón +Cobro o +Gasto, en el momento en que pasa.',
++      '"En caja" muestra el efectivo que debería haber ahora mismo: inicial + cobrado en efectivo − gastado en efectivo.',
++      'Si en algún momento contás el cajón y no coincide con "En caja", ahí mismo podés revisar los últimos movimientos antes de que se acumule el desvío.',
++    ],
++  },
++  {
++    icono: '🧮',
++    titulo: '3. El arqueo (contar antes de cerrar)',
++    puntos: [
++      'Contá todo el efectivo físico del cajón: billetes y monedas, separados por tipo si te ayuda a no perderte.',
++      'Sumalo todo. Ese es el número que vas a cargar como "efectivo contado" al cerrar.',
++      'Hacelo siempre, aunque tengas apuro: es lo único que te dice si hay un error o un faltante real, no solo lo que el sistema calcula.',
++    ],
++  },
++  {
++    icono: '🔒',
++    titulo: '4. Cerrar la caja',
++    puntos: [
++      'Apretá "Cerrar caja". Vas a ver el resumen del día: inicial, cobros, gastos, y el efectivo esperado.',
++      'Cargá el efectivo que contaste en el paso anterior.',
++      'El sistema te muestra la diferencia: si cuadra, si falta o si sobra.',
++    ],
++  },
++  {
++    icono: '⚖️',
++    titulo: '5. Si no cuadra',
++    puntos: [
++      'Un desvío chico y ocasional es normal: vueltos, redondeos.',
++      'Si falta seguido o el monto es grande, revisá: ¿se registraron todos los cobros y gastos del día? ¿Se pagó algo en efectivo sin cargarlo?',
++      'Podés dejarlo anotado en "Observaciones" al cerrar, así queda el registro para revisarlo después.',
++      'Cerrar con diferencia no rompe nada: el número queda guardado tal como es, para que sea información real y no una caja "forzada" a cuadrar.',
++    ],
++  },
++]
++
++/**
++ * Guía siempre accesible desde el botón Ayuda de la caja.
++ * No reemplaza el soporte: al final ofrece contactar si la duda persiste.
++ */
++export default function GuiaArqueoModal({ isOpen, onClose, onContactar }) {
++  const [paso, setPaso] = useState(0)
++  const actual = PASOS[paso]
++  const esUltimo = paso === PASOS.length - 1
++
++  const cerrar = () => { setPaso(0); onClose() }
++
++  return (
++    <Modal isOpen={isOpen} onClose={cerrar} size="lg"
++      title={`${actual.icono} ${actual.titulo}`}
++      subtitle={`Paso ${paso + 1} de ${PASOS.length}`}
++      headerClassName="bg-slate-800 text-white"
++      footer={
++        <div className="w-full flex items-center justify-between gap-3">
++          <button onClick={() => setPaso(p => Math.max(0, p - 1))} disabled={paso === 0}
++            className="px-4 py-2 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">
++            ← Anterior
++          </button>
++          <div className="flex gap-1.5">
++            {PASOS.map((_, i) => (
++              <span key={i} className={`w-2 h-2 rounded-full ${i === paso ? 'bg-blue-500' : 'bg-gray-200'}`} />
++            ))}
++          </div>
++          {esUltimo ? (
++            <button onClick={cerrar}
++              className="px-4 py-2 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
++              Listo
++            </button>
++          ) : (
++            <button onClick={() => setPaso(p => Math.min(PASOS.length - 1, p + 1))}
++              className="px-4 py-2 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
++              Siguiente →
++            </button>
++          )}
++        </div>
++      }>
++      <ul className="space-y-3 m-0 pl-0 list-none">
++        {actual.puntos.map((p, i) => (
++          <li key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
++            <span className="shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold mt-0.5">
++              {i + 1}
++            </span>
++            {p}
++          </li>
++        ))}
++      </ul>
++
++      {esUltimo && onContactar && (
++        <div className="mt-5 pt-4 border-t border-gray-200 text-center">
++          <p className="text-xs text-gray-500 m-0 mb-2">¿Seguís con dudas?</p>
++          <button onClick={onContactar}
++            className="text-sm text-blue-600 font-semibold bg-transparent border-none cursor-pointer hover:underline">
++            Escribinos una consulta
++          </button>
++        </div>
++      )}
++    </Modal>
++  )
++}
+diff --git a/components/caja/KpiCards.jsx b/components/caja/KpiCards.jsx
+index 7d7dd6b..3b63953 100644
+--- a/components/caja/KpiCards.jsx
++++ b/components/caja/KpiCards.jsx
+@@ -21,8 +21,8 @@ export default function KpiCards({ totales, cantidadCobros, cantidadGastos, caja
+       ayuda: <Lista items={['Todo lo cobrado hoy', 'Efectivo, tarjetas y transferencias', 'Monto bruto, sin descontar comisiones']} /> },
+     { key: 'gastos', titulo: '💸 Gastos', valor: totales.gastos, detalle: `${cantidadGastos} movimientos`, tono: 'rojo',
+       ayuda: <Lista items={['Todo lo que saliste a pagar hoy', 'Proveedores, servicios, retiros']} /> },
+-    { key: 'neto', titulo: '📈 Neto', valor: totales.netoReal, detalle: 'Resultado del día', tono: 'verde', negativo: totales.netoReal < 0,
+-      ayuda: <><div className="font-semibold mb-1">Cobros − comisiones − gastos</div><div>Lo que te queda limpio del día.</div></> },
++    { key: 'neto', titulo: '📈 Neto', valor: totales.netoReal, detalle: 'Resultado del día · no incluye el monto inicial', tono: 'verde', negativo: totales.netoReal < 0,
++      ayuda: <><div className="font-semibold mb-1">Cobros − comisiones − gastos</div><div>Lo que te queda limpio del día. No suma el efectivo con el que abriste: eso no es ganancia, es plata que ya tenías.</div></> },
+   ]
+ 
+   // "En caja" es el efectivo que debería estar FÍSICAMENTE en el cajón ahora mismo,
+diff --git a/pages/dashboard.jsx b/pages/dashboard.jsx
+index 9a162ad..a0a65d5 100644
+--- a/pages/dashboard.jsx
++++ b/pages/dashboard.jsx
+@@ -26,6 +26,7 @@ import HistorialCierresModal from '../components/caja/HistorialCierresModal'
+ import MovimientoModal from '../components/MovimientoModal'
+ import ReversaModal from '../components/ReversaModal'
+ import ContactModal from '../components/ContactModal'
++import GuiaArqueoModal from '../components/caja/GuiaArqueoModal'
+ 
+ export default function Dashboard() {
+   const { user, checking } = useAuthGuard()
+@@ -82,7 +83,7 @@ export default function Dashboard() {
+         <AvisoCajaHuerfana fechaApertura={caja.huerfana.fecha_apertura} onResolver={() => setModal('cierre-huerfana')} />
+       )}
+ 
+-      <EstadoCaja cajaAbierta={caja.cajaAbierta} onAyuda={() => setModal('ayuda')} />
++      <EstadoCaja cajaAbierta={caja.cajaAbierta} onAyuda={() => setModal('guia')} />
+ 
+       <CajaAcciones
+         cajaAbierta={caja.cajaAbierta}
+@@ -122,6 +123,7 @@ export default function Dashboard() {
+         cajaAbierta={caja.cajaAbierta} totales={totales} procesando={caja.procesando}
+         onConfirmar={({ efectivoFisico, observaciones }) =>
+           caja.cerrar({ efectivoFisico, observaciones, totales, cantidadTransacciones: transacciones.length })}
++        onVerGuia={() => setModal('guia')}
+       />
+       <CierreCajaAnteriorModal
+         isOpen={modal === 'cierre-huerfana'} onClose={cerrarModal}
+@@ -137,6 +139,7 @@ export default function Dashboard() {
+       <MovimientoModal tipo="cobro" isOpen={modal === 'cobro'} onClose={cerrarModal} localId={localId} userId={user?.id} local={local} onSuccess={recargar} />
+       <MovimientoModal tipo="gasto" isOpen={modal === 'gasto'} onClose={cerrarModal} localId={localId} userId={user?.id} local={local} onSuccess={recargar} />
+       <ReversaModal isOpen={!!aReversar} onClose={() => setAReversar(null)} transaccion={aReversar} userId={user?.id} onReversaExitosa={recargar} />
++      <GuiaArqueoModal isOpen={modal === 'guia'} onClose={cerrarModal} onContactar={() => setModal('ayuda')} />
+       <ContactModal isOpen={modal === 'ayuda'} onClose={cerrarModal} user={user} localId={localId} paginaOrigen="dashboard" />
+ 
+       <BottomNav activeTab="caja" />
+-- 
+2.43.0
+
