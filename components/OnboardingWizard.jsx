@@ -141,11 +141,25 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                 >
                   <option value="Gastronomía">Gastronomía</option>
-                  <option value="Retail">Retail / Tienda</option>
-                  <option value="Servicios">Servicios</option>
-                  <option value="Salud">Salud / Estética</option>
-                  <option value="Otro">Otro</option>
+                  <option value="Indumentaria y Calzado">Indumentaria y Calzado</option>
+                  <option value="Alimentos y Bebidas">Alimentos y Bebidas (Almacén, Panadería, etc.)</option>
+                  <option value="Salud y Belleza">Salud y Belleza</option>
+                  <option value="Servicios Profesionales">Servicios Profesionales</option>
+                  <option value="Tecnología y Comunicaciones">Tecnología y Comunicaciones</option>
+                  <option value="Ferreteria">Ferreteria</option>
+                  <option value="Pintureria">Pintureria</option>
+                  <option value="Materiales Electricos">Materiales Electricos</option>
+                  <option value="Hogar y Construcción">Hogar y Construcción</option>
+                  <option value="Automotor">Automotor</option>
+                  <option value="Educación y Cultura">Educación y Cultura</option>
+                  <option value="Deporte y Recreación">Deporte y Recreación</option>
+                  <option value="Mascotas">Mascotas</option>
+                  <option value="Servicios del Hogar">Servicios del Hogar</option>
+                  <option value="Entretenimiento">Entretenimiento</option>
+                  <option value="Inmobiliaria">Inmobiliaria</option>
+                  <option value="Otros">Otros</option>
                 </select>
+              
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Condición Fiscal</label>
