@@ -21,8 +21,8 @@ export default function KpiCards({ totales, cantidadCobros, cantidadGastos, caja
       ayuda: <Lista items={['Todo lo cobrado hoy', 'Efectivo, tarjetas y transferencias', 'Monto bruto, sin descontar comisiones']} /> },
     { key: 'gastos', titulo: '💸 Gastos', valor: totales.gastos, detalle: `${cantidadGastos} movimientos`, tono: 'rojo',
       ayuda: <Lista items={['Todo lo que saliste a pagar hoy', 'Proveedores, servicios, retiros']} /> },
-    { key: 'neto', titulo: '📈 Neto', valor: totales.netoReal, detalle: 'Resultado del día', tono: 'verde', negativo: totales.netoReal < 0,
-      ayuda: <><div className="font-semibold mb-1">Cobros − comisiones − gastos</div><div>Lo que te queda limpio del día.</div></> },
+    { key: 'neto', titulo: '📈 Neto', valor: totales.netoReal, detalle: 'Resultado del día · no incluye el monto inicial', tono: 'verde', negativo: totales.netoReal < 0,
+      ayuda: <><div className="font-semibold mb-1">Cobros − comisiones − gastos</div><div>Lo que te queda limpio del día. No suma el efectivo con el que abriste: eso no es ganancia, es plata que ya tenías.</div></> },
   ]
 
   // "En caja" es el efectivo que debería estar FÍSICAMENTE en el cajón ahora mismo,

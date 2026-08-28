@@ -26,6 +26,7 @@ import HistorialCierresModal from '../components/caja/HistorialCierresModal'
 import MovimientoModal from '../components/MovimientoModal'
 import ReversaModal from '../components/ReversaModal'
 import ContactModal from '../components/ContactModal'
+import GuiaArqueoModal from '../components/caja/GuiaArqueoModal'
 
 export default function Dashboard() {
   const { user, checking } = useAuthGuard()
@@ -82,7 +83,7 @@ export default function Dashboard() {
         <AvisoCajaHuerfana fechaApertura={caja.huerfana.fecha_apertura} onResolver={() => setModal('cierre-huerfana')} />
       )}
 
-      <EstadoCaja cajaAbierta={caja.cajaAbierta} onAyuda={() => setModal('ayuda')} />
+      <EstadoCaja cajaAbierta={caja.cajaAbierta} onAyuda={() => setModal('guia')} />
 
       <CajaAcciones
         cajaAbierta={caja.cajaAbierta}
@@ -122,6 +123,7 @@ export default function Dashboard() {
         cajaAbierta={caja.cajaAbierta} totales={totales} procesando={caja.procesando}
         onConfirmar={({ efectivoFisico, observaciones }) =>
           caja.cerrar({ efectivoFisico, observaciones, totales, cantidadTransacciones: transacciones.length })}
+        onVerGuia={() => setModal('guia')}
       />
       <CierreCajaAnteriorModal
         isOpen={modal === 'cierre-huerfana'} onClose={cerrarModal}
@@ -137,6 +139,7 @@ export default function Dashboard() {
       <MovimientoModal tipo="cobro" isOpen={modal === 'cobro'} onClose={cerrarModal} localId={localId} userId={user?.id} local={local} onSuccess={recargar} />
       <MovimientoModal tipo="gasto" isOpen={modal === 'gasto'} onClose={cerrarModal} localId={localId} userId={user?.id} local={local} onSuccess={recargar} />
       <ReversaModal isOpen={!!aReversar} onClose={() => setAReversar(null)} transaccion={aReversar} userId={user?.id} onReversaExitosa={recargar} />
+      <GuiaArqueoModal isOpen={modal === 'guia'} onClose={cerrarModal} onContactar={() => setModal('ayuda')} />
       <ContactModal isOpen={modal === 'ayuda'} onClose={cerrarModal} user={user} localId={localId} paginaOrigen="dashboard" />
 
       <BottomNav activeTab="caja" />
