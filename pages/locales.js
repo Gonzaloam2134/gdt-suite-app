@@ -24,6 +24,7 @@ import ResumenGlobal from '../components/locales/ResumenGlobal'
 import AnunciosModal from '../components/locales/AnunciosModal'
 import OnboardingWizard from '../components/OnboardingWizard'
 import ContactModal from '../components/ContactModal'
+import InstalarAppBanner from '../components/layout/InstalarAppBanner'
 
 /** Pantalla de inicio: cómo viene el día en cada local y desde dónde se entra a todo. */
 export default function MisLocales() {
@@ -108,6 +109,7 @@ export default function MisLocales() {
       <AppHeader titulo="Mis locales" locales={locales} localId={null} />
 
       <div className="max-w-5xl mx-auto p-3 md:p-4 space-y-4">
+        <InstalarAppBanner />
         <ResumenGlobal totales={totales} cantidadLocales={locales.length} cantidadAbiertas={abiertas.size} />
 
         {locales.length === 0 ? (

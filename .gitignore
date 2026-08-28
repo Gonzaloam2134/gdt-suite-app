@@ -4,3 +4,10 @@ node_modules/
 .env*.local
 *.log
 .DS_Store
+
+# Artefactos generados por next-pwa en cada build: no versionar
+public/sw.js
+public/workbox-*.js
+public/worker-*.js
+public/sw.js.map
+public/workbox-*.js.map
