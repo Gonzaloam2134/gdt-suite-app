@@ -5,6 +5,7 @@ import { useClickOutside } from '../../hooks/useClickOutside'
 import { useSignOut } from '../../hooks/useSignOut'
 import { ROLES } from '../../lib/constants/roles'
 import SelectorLocal from './SelectorLocal'
+import GuiaInstalacionModal from './GuiaInstalacionModal'
 
 /**
  * Cabecera común: título de la pantalla, selector de local siempre a mano
@@ -15,6 +16,7 @@ export default function AppHeader({ titulo, subtitulo, locales = [], localId, on
   const signOut = useSignOut()
   const { hasRole, esSuperUser } = useUserRole()
   const [menu, setMenu] = useState(false)
+  const [guiaInstalacion, setGuiaInstalacion] = useState(false)
   const ref = useRef(null)
   useClickOutside(ref, () => setMenu(false), menu)
 
@@ -49,6 +51,7 @@ export default function AppHeader({ titulo, subtitulo, locales = [], localId, on
               className="p-2 bg-gray-100 text-gray-600 border-none rounded-lg cursor-pointer hover:bg-gray-200 leading-none">☰</button>
             {menu && (
               <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-50">
+                <ItemMenu onClick={() => { setMenu(false); setGuiaInstalacion(true) }}>📲 Instalar app</ItemMenu>
                 <ItemMenu onClick={() => ir('/anuncios')}>Novedades</ItemMenu>
                 {esSuperUser && <ItemMenu onClick={() => ir('/superadmin')}>Panel global</ItemMenu>}
                 <hr className="my-1 border-gray-200" />
@@ -58,6 +61,8 @@ export default function AppHeader({ titulo, subtitulo, locales = [], localId, on
           </div>
         </div>
       </div>
+
+      <GuiaInstalacionModal isOpen={guiaInstalacion} onClose={() => setGuiaInstalacion(false)} />
 
       {/* En mobile el título va debajo, porque arriba manda el selector de local */}
       <div className="md:hidden px-3 pb-2">

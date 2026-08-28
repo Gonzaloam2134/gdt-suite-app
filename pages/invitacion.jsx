@@ -6,6 +6,7 @@ import { getSession } from '../lib/services/auth'
 import { useUserRole } from '../lib/UserRoleContext'
 import { LABEL_ROL } from '../lib/constants/roles'
 import LoadingScreen from '../components/ui/LoadingScreen'
+import AvisoAbrirEnChrome from '../components/layout/AvisoAbrirEnChrome'
 
 /**
  * Pantalla que abre quien recibe el link de invitación.
@@ -69,6 +70,10 @@ export default function Invitacion() {
           {invitacion.rol === 'cajero'
             ? 'Como cajero vas a poder abrir y cerrar la caja, y registrar cobros y gastos.'
             : 'Como empleado vas a poder ver el registro de tu propia actividad.'}
+        </div>
+
+        <div className="mt-4 text-left">
+          <AvisoAbrirEnChrome />
         </div>
 
         {autenticado ? (
