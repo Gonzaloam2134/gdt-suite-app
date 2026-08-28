@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { getSuscripcion } from '../lib/services/suscripciones'
+import { estadoEfectivo } from '../lib/domain/suscripciones'
 
 const MENSAJE_SUSPENDIDO = 'Local suspendido. Regularizá el pago para acceder.'
+const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 30 días terminó. Escribinos para seguir usando este local.'
 const MENSAJE_RESTRINGIDO = 'Acceso restringido: solo podés ver Reportes.'
 
 /**
@@ -33,16 +35,19 @@ export function useSuscripcionGuard(localId, modo = 'total') {
     if (!localId) { if (montado.current) { setEstado(null); setChecking(false) }; return }
     setChecking(true)
     let valor = 'active'
+    let vencioPrueba = false
     try {
       const sub = await getSuscripcion(localId)
-      valor = sub?.estado || 'active'
+      const efectivo = estadoEfectivo(sub)
+      valor = efectivo.estado
+      vencioPrueba = efectivo.vencioPrueba
     } catch (err) {
       console.error('[useSuscripcionGuard]', err)
     }
     if (!montado.current) return
     setEstado(valor)
     if (valor === 'suspended') {
-      toast.error(MENSAJE_SUSPENDIDO)
+      toast.error(vencioPrueba ? MENSAJE_PRUEBA_VENCIDA : MENSAJE_SUSPENDIDO)
       router.replace('/locales')
     } else if (valor === 'restricted' && modo === 'total') {
       toast(MENSAJE_RESTRINGIDO, { icon: '⚠️' })

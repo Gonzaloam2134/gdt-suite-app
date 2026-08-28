@@ -2,8 +2,9 @@ import { formatCurrency } from '../../lib/format'
 import { LABEL_ROL } from '../../lib/constants/roles'
 
 /** Tarjeta de un local con lo que pasó hoy. El dueño entra y ya sabe cómo viene el día. */
-export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo }) {
+export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo, diasRestantesPrueba }) {
   const r = resumen || { ventas: 0, gastos: 0, movimientos: 0 }
+  const avisarPrueba = !deshabilitado && diasRestantesPrueba !== null && diasRestantesPrueba !== undefined && diasRestantesPrueba <= 7
 
   return (
     <div className={`bg-white rounded-xl border-2 overflow-hidden transition-colors ${
@@ -40,6 +41,13 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
 
         {deshabilitado && motivo && (
           <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-3 m-0">{motivo}</p>
+        )}
+        {avisarPrueba && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 mt-3 m-0">
+            {diasRestantesPrueba <= 0
+              ? 'Tu prueba vence hoy.'
+              : `Prueba gratuita: te quedan ${diasRestantesPrueba} día${diasRestantesPrueba === 1 ? '' : 's'}.`}
+          </p>
         )}
       </button>
 

@@ -9,7 +9,8 @@ import { useAnuncios } from '../hooks/useAnuncios'
 import { crearLocal } from '../lib/services/locales'
 import { agregarOwner } from '../lib/services/miembros'
 import { crearMediosPago } from '../lib/services/mediosPago'
-import { crearSuscripcionFree, getSuscripcion } from '../lib/services/suscripciones'
+import { crearSuscripcionPrueba, getSuscripcion } from '../lib/services/suscripciones'
+import { estadoEfectivo } from '../lib/domain/suscripciones'
 import { registrarAccion } from '../lib/services/auditoria'
 import { ACCIONES } from '../lib/constants/auditoria'
 import { ROLES } from '../lib/constants/roles'
@@ -46,7 +47,7 @@ export default function MisLocales() {
   // Estado de suscripción de cada local: define si se puede entrar
   useEffect(() => {
     if (!locales.length) return
-    Promise.all(locales.map(l => getSuscripcion(l.id).then(s => [l.id, s?.estado || 'active']).catch(() => [l.id, 'active'])))
+    Promise.all(locales.map(l => getSuscripcion(l.id).then(s => [l.id, s]).catch(() => [l.id, null])))
       .then(pares => setSuscripciones(Object.fromEntries(pares)))
   }, [locales])
 
@@ -58,8 +59,11 @@ export default function MisLocales() {
   }
 
   const entrar = async (local, destino = '/dashboard') => {
-    const estado = suscripciones[local.id]
-    if (estado === 'suspended') { toast.error('Local suspendido. Regularizá el pago para acceder.'); return }
+    const { estado, vencioPrueba } = estadoEfectivo(suscripciones[local.id])
+    if (estado === 'suspended') {
+      toast.error(vencioPrueba ? 'Tu prueba de 30 días terminó. Escribinos para seguir usando este local.' : 'Local suspendido. Regularizá el pago para acceder.')
+      return
+    }
     await cambiarLocal(local.id)
     if (estado === 'restricted') {
       toast('Acceso restringido: solo podés ver Reportes.', { icon: '⚠️' })
@@ -78,7 +82,7 @@ export default function MisLocales() {
         creadoPor: user.id,
       })
       await agregarOwner(local.id, user.id)
-      await crearSuscripcionFree(local.id)
+      await crearSuscripcionPrueba(local.id, 30)
 
       const medios = (datos.mediosPago || []).filter(m => m.habilitado)
       if (medios.length) await crearMediosPago(local.id, medios, user.id)
@@ -119,18 +123,24 @@ export default function MisLocales() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {locales.map(local => (
-                <LocalCard
-                  key={local.id}
-                  local={local}
-                  resumen={resumen[local.id]}
-                  cajaAbierta={abiertas.has(local.id)}
-                  onEntrar={() => entrar(local)}
-                  onAdmin={local.rol === ROLES.OWNER ? () => entrar(local, '/admin') : null}
-                  deshabilitado={suscripciones[local.id] === 'suspended'}
-                  motivo={suscripciones[local.id] === 'suspended' ? 'Local suspendido por falta de pago.' : null}
-                />
-              ))}
+              {locales.map(local => {
+                const sub = estadoEfectivo(suscripciones[local.id])
+                return (
+                  <LocalCard
+                    key={local.id}
+                    local={local}
+                    resumen={resumen[local.id]}
+                    cajaAbierta={abiertas.has(local.id)}
+                    onEntrar={() => entrar(local)}
+                    onAdmin={local.rol === ROLES.OWNER ? () => entrar(local, '/admin') : null}
+                    deshabilitado={sub.estado === 'suspended'}
+                    motivo={sub.estado === 'suspended'
+                      ? (sub.vencioPrueba ? 'Tu prueba de 30 días terminó.' : 'Local suspendido por falta de pago.')
+                      : null}
+                    diasRestantesPrueba={sub.diasRestantes}
+                  />
+                )
+              })}
             </div>
 
             {puedeCrear && (
