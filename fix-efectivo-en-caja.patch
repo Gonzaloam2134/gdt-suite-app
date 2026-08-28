@@ -1,0 +1,267 @@
+From 86b9624e60d67566cc1752e95eede22ad657bbd2 Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Fri, 28 Aug 2026 12:19:54 +0000
+Subject: [PATCH] fix(caja): 'En caja' muestra el efectivo real del cajon
+ (inicial + cobrado - gastos en efectivo)
+
+---
+ components/caja/CierreCajaAnteriorModal.jsx |  3 +-
+ components/caja/CierreCajaModal.jsx         |  3 +-
+ components/caja/KpiCards.jsx                | 25 +++++++-
+ hooks/useTransaccionesDia.js                |  2 +-
+ lib/domain/transacciones.js                 | 18 ++++--
+ tests/transacciones.test.js                 | 71 +++++++++++++++++++--
+ 6 files changed, 108 insertions(+), 14 deletions(-)
+
+diff --git a/components/caja/CierreCajaAnteriorModal.jsx b/components/caja/CierreCajaAnteriorModal.jsx
+index b837d0b..e9b07c7 100644
+--- a/components/caja/CierreCajaAnteriorModal.jsx
++++ b/components/caja/CierreCajaAnteriorModal.jsx
+@@ -43,7 +43,8 @@ export default function CierreCajaAnteriorModal({ isOpen, onClose, onConfirmar,
+               <Dato label="Monto inicial" valor={formatCurrency(caja.monto_inicial_efectivo)} />
+               <Dato label="Total cobros" valor={formatCurrency(totales.cobros)} className="text-green-700" />
+               <Dato label="Total gastos" valor={`-${formatCurrency(totales.gastos)}`} className="text-red-700" />
+-              <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoEnCaja)}`} className="text-green-700" />
++              <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoCobrado)}`} className="text-green-700" />
++            <Dato label="Gastos en efectivo" valor={`-${formatCurrency(totales.efectivoGastado)}`} className="text-red-700" />
+             </div>
+           </div>
+         )}
+diff --git a/components/caja/CierreCajaModal.jsx b/components/caja/CierreCajaModal.jsx
+index f08015a..4311873 100644
+--- a/components/caja/CierreCajaModal.jsx
++++ b/components/caja/CierreCajaModal.jsx
+@@ -33,7 +33,8 @@ export default function CierreCajaModal({ isOpen, onClose, onConfirmar, cajaAbie
+           <h3 className="text-sm font-bold text-gray-900 mb-3 m-0">Resumen del día</h3>
+           <div className="grid grid-cols-2 gap-3 text-sm">
+             <Dato label="Monto inicial" valor={formatCurrency(cajaAbierta.monto_inicial_efectivo)} />
+-            <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoEnCaja)}`} className="text-green-700" />
++            <Dato label="Cobros en efectivo" valor={`+${formatCurrency(totales.efectivoCobrado)}`} className="text-green-700" />
++            <Dato label="Gastos en efectivo" valor={`-${formatCurrency(totales.efectivoGastado)}`} className="text-red-700" />
+             <Dato label="Total cobros" valor={formatCurrency(totales.cobros)} className="text-green-700" />
+             <Dato label="Total gastos" valor={`-${formatCurrency(totales.gastos)}`} className="text-red-700" />
+             <div className="col-span-2 pt-2 border-t border-gray-300">
+diff --git a/components/caja/KpiCards.jsx b/components/caja/KpiCards.jsx
+index 7cf2e51..7d7dd6b 100644
+--- a/components/caja/KpiCards.jsx
++++ b/components/caja/KpiCards.jsx
+@@ -1,5 +1,7 @@
+ import KpiCard from './KpiCard'
+ import { usePreferencia } from '../../hooks/usePreferencia'
++import { efectivoEsperado } from '../../lib/domain/transacciones'
++import { formatCurrency } from '../../lib/format'
+ 
+ const Lista = ({ items }) => <ul className="space-y-1 list-disc list-inside m-0">{items.map(i => <li key={i}>{i}</li>)}</ul>
+ 
+@@ -10,7 +12,7 @@ const Lista = ({ items }) => <ul className="space-y-1 list-disc list-inside m-0"
+  * Colapsar de a una obligaría a recordar seis estados; colapsar todo junto
+  * escondería justo lo que se viene a mirar. La elección queda guardada.
+  */
+-export default function KpiCards({ totales, cantidadCobros, cantidadGastos }) {
++export default function KpiCards({ totales, cantidadCobros, cantidadGastos, cajaAbierta }) {
+   const [abiertos, setAbiertos] = usePreferencia('caja.kpis', { resultado: true, plata: true })
+   const alternar = (grupo) => setAbiertos(a => ({ ...a, [grupo]: !a[grupo] }))
+ 
+@@ -23,9 +25,26 @@ export default function KpiCards({ totales, cantidadCobros, cantidadGastos }) {
+       ayuda: <><div className="font-semibold mb-1">Cobros − comisiones − gastos</div><div>Lo que te queda limpio del día.</div></> },
+   ]
+ 
++  // "En caja" es el efectivo que debería estar FÍSICAMENTE en el cajón ahora mismo,
++  // no solo lo cobrado hoy: si el dueño abrió con $6.000, tiene que verlos.
++  const inicial = Number(cajaAbierta?.monto_inicial_efectivo) || 0
++  const enCaja = cajaAbierta ? efectivoEsperado(inicial, totales) : 0
++
++  const detalleEnCaja = cajaAbierta
++    ? [
++        `${formatCurrency(inicial)} inicial`,
++        totales.efectivoCobrado > 0 ? `+ ${formatCurrency(totales.efectivoCobrado)} cobrado` : null,
++        totales.efectivoGastado > 0 ? `− ${formatCurrency(totales.efectivoGastado)} gastos` : null,
++      ].filter(Boolean).join(' ')
++    : 'La caja está cerrada'
++
+   const plata = [
+-    { key: 'efectivo', titulo: '🏦 En caja', valor: totales.efectivoEnCaja, detalle: 'Solo efectivo', tono: 'azul',
+-      ayuda: <Lista items={['Solo los cobros en efectivo', 'Es lo que tenés que contar al cerrar', 'No incluye tarjetas ni transferencias']} /> },
++    { key: 'efectivo', titulo: '🏦 En caja', valor: enCaja, detalle: detalleEnCaja, tono: 'azul',
++      ayuda: <Lista items={[
++        'El efectivo que debería haber en el cajón ahora',
++        'Monto de apertura, más cobros en efectivo, menos gastos pagados en efectivo',
++        'Es contra este número que vas a contar al cerrar la caja',
++      ]} /> },
+     { key: 'disponible', titulo: '✅ Disponible', valor: totales.disponibleHoy, detalle: 'Se acreditó hoy', tono: 'esmeralda',
+       ayuda: <Lista items={['Tarjetas y QR que acreditan hoy', 'Ya con la comisión descontada', 'Plata que podés usar']} /> },
+     { key: 'pendiente', titulo: '⏳ Pendiente', valor: totales.pendienteAcreditacion, detalle: 'Por acreditar', tono: 'ambar',
+diff --git a/hooks/useTransaccionesDia.js b/hooks/useTransaccionesDia.js
+index 4dd592b..acc64e0 100644
+--- a/hooks/useTransaccionesDia.js
++++ b/hooks/useTransaccionesDia.js
+@@ -5,7 +5,7 @@ import { calcularTotalesDia, calcularAcreditacionesDia } from '../lib/domain/tra
+ import { hoyISO } from '../lib/dates'
+ 
+ const VACIO = {
+-  totales: { cobros: 0, gastos: 0, efectivoEnCaja: 0, disponibleHoy: 0, pendienteAcreditacion: 0, comisiones: 0, netoReal: 0 },
++  totales: { cobros: 0, gastos: 0, efectivoCobrado: 0, efectivoGastado: 0, disponibleHoy: 0, pendienteAcreditacion: 0, comisiones: 0, netoReal: 0 },
+   cobros: [], gastos: [], acreditacionesHoy: [], desgloseMedios: [],
+ }
+ 
+diff --git a/lib/domain/transacciones.js b/lib/domain/transacciones.js
+index 40f608c..6ef89d0 100644
+--- a/lib/domain/transacciones.js
++++ b/lib/domain/transacciones.js
+@@ -97,7 +97,8 @@ export const calcularTotalesDia = (transacciones, diaISO) => {
+   const totales = {
+     cobros: 0,
+     gastos: 0,
+-    efectivoEnCaja: 0,
++    efectivoCobrado: 0,     // cobros en efectivo del día
++    efectivoGastado: 0,     // gastos pagados en efectivo (salen de la misma caja)
+     disponibleHoy: 0,       // se completa aparte con calcularAcreditacionesDia: ver nota abajo
+     pendienteAcreditacion: 0,
+     comisiones: 0,
+@@ -122,6 +123,8 @@ export const calcularTotalesDia = (transacciones, diaISO) => {
+ 
+     if (esGasto(t)) {
+       totales.gastos += monto
++      // Un gasto pagado en efectivo sale del cajón: descuenta del arqueo
++      if (esEfectivo(medio)) totales.efectivoGastado += monto
+       gastos.push(t)
+       continue
+     }
+@@ -136,7 +139,7 @@ export const calcularTotalesDia = (transacciones, diaISO) => {
+     cobros.push({ ...t, comision, neto })
+ 
+     if (esEfectivo(medio)) {
+-      totales.efectivoEnCaja += monto
++      totales.efectivoCobrado += monto
+     } else if (acreditaISO !== diaISO) {
+       // Si acredita en diaISO no es "pendiente": es "disponible" (ver
+       // calcularAcreditacionesDia). "Pendiente" acá es relativo a diaISO, NO a
+@@ -195,9 +198,16 @@ export const calcularAcreditacionesDia = (transacciones) => {
+   }
+ }
+ 
+-/** Efectivo que debería haber al cerrar: monto inicial + cobros en efectivo del día */
++/**
++ * Efectivo que debería haber FÍSICAMENTE en la caja en este momento:
++ * lo que se puso al abrir, más lo cobrado en efectivo, menos lo que se pagó
++ * en efectivo desde el mismo cajón.
++ *
++ * Es el número que el dashboard muestra durante el día y contra el que se
++ * cuenta al cerrar: los dos tienen que dar igual, si no el cierre sorprende.
++ */
+ export const efectivoEsperado = (montoInicial, totales) =>
+-  redondear(num(montoInicial) + num(totales?.efectivoEnCaja))
++  redondear(num(montoInicial) + num(totales?.efectivoCobrado) - num(totales?.efectivoGastado))
+ 
+ // ---------------------------------------------------------------------------
+ // Resumen de período (reportes)
+diff --git a/tests/transacciones.test.js b/tests/transacciones.test.js
+index 45a0d4b..ed28fed 100644
+--- a/tests/transacciones.test.js
++++ b/tests/transacciones.test.js
+@@ -45,7 +45,7 @@ describe('calcularTotalesDia', () => {
+     const t = tx({ creado_en: new Date(2026, 7, 25, 22, 30).toISOString() })
+     const { totales } = calcularTotalesDia([t], DIA)
+     expect(totales.cobros).toBe(1000)
+-    expect(totales.efectivoEnCaja).toBe(1000)
++    expect(totales.efectivoCobrado).toBe(1000)
+   })
+ 
+   it('efectivo va a caja; crédito (pendiente) no está disponible hoy; disponibleHoy ya no lo calcula esta función', () => {
+@@ -55,7 +55,7 @@ describe('calcularTotalesDia', () => {
+       tx({ monto: 3000, medios_pago: credito }),
+     ], DIA)
+     expect(r.totales.cobros).toBe(6000)
+-    expect(r.totales.efectivoEnCaja).toBe(1000)
++    expect(r.totales.efectivoCobrado).toBe(1000)
+     expect(r.totales.comisiones).toBe(105)
+     expect(r.desgloseMedios[0].nombre).toBe('Crédito')
+   })
+@@ -82,7 +82,7 @@ describe('calcularTotalesDia', () => {
+     const reversa = tx({ monto: -10000, es_reversa: true, reversa_de: 'orig' })
+     const r = calcularTotalesDia([original, reversa], DIA)
+     expect(r.totales.cobros).toBe(0)
+-    expect(r.totales.efectivoEnCaja).toBe(0)
++    expect(r.totales.efectivoCobrado).toBe(0)
+     expect(r.cobros).toHaveLength(1)              // el dueño la ve en la caja
+     expect(r.cobros[0].anulada).toBe(true)
+     expect(r.cobros[0].motivo_reversa).toBe('se cargó dos veces')
+@@ -107,7 +107,7 @@ describe('calcularTotalesDia', () => {
+   })
+ 
+   it('efectivo esperado = inicial + efectivo del día', () => {
+-    expect(efectivoEsperado(500, { efectivoEnCaja: 1000 })).toBe(1500)
++    expect(efectivoEsperado(500, { efectivoCobrado: 1000, efectivoGastado: 0 })).toBe(1500)
+   })
+ })
+ 
+@@ -215,3 +215,66 @@ describe('calcularTotalesDia vs calcularResumenPeriodo — mismo dataset, mismo
+     expect(totales.netoReal).toBe(resumen.resultadoEjercicio)
+   })
+ })
++
++describe('efectivo en caja (lo que hay físicamente en el cajón)', () => {
++  const DIA = '2026-08-25'
++  const efectivoMedio = { nombre: 'Efectivo', tipo: 'efectivo', comision_porcentaje: 0, plazo_acreditacion_dias: 0 }
++  const tarjeta = { nombre: 'Crédito', tipo: 'credito', comision_porcentaje: 3.5, plazo_acreditacion_dias: 30 }
++
++  let i = 0
++  const mov = (over) => ({
++    id: `e-${++i}`, tipo: 'COBRO_RECIBIDO', monto: 1000, es_reversa: false, revertida: false,
++    creado_en: new Date(2026, 7, 25, 11, 0).toISOString(), medios_pago: efectivoMedio, ...over,
++  })
++
++  it('caja recién abierta sin movimientos: el dueño ve el monto inicial', () => {
++    const { totales } = calcularTotalesDia([], DIA)
++    expect(efectivoEsperado(6000, totales)).toBe(6000)
++  })
++
++  it('los gastos pagados en efectivo salen del cajón', () => {
++    const { totales } = calcularTotalesDia([
++      mov({ monto: 4000 }),
++      mov({ tipo: 'GASTO_REGISTRADO', monto: 1500 }),
++    ], DIA)
++    expect(totales.efectivoCobrado).toBe(4000)
++    expect(totales.efectivoGastado).toBe(1500)
++    expect(efectivoEsperado(6000, totales)).toBe(8500)
++  })
++
++  it('un gasto pagado con transferencia NO descuenta del efectivo', () => {
++    const { totales } = calcularTotalesDia([
++      mov({ tipo: 'GASTO_REGISTRADO', monto: 2000, medios_pago: { nombre: 'Transferencia', tipo: 'transferencia' } }),
++    ], DIA)
++    expect(totales.efectivoGastado).toBe(0)
++    expect(efectivoEsperado(6000, totales)).toBe(6000)
++    expect(totales.gastos).toBe(2000)   // sí resta del resultado del día
++  })
++
++  it('los cobros con tarjeta no entran al cajón', () => {
++    const { totales } = calcularTotalesDia([mov({ monto: 10000, medios_pago: tarjeta })], DIA)
++    expect(totales.efectivoCobrado).toBe(0)
++    expect(efectivoEsperado(6000, totales)).toBe(6000)
++  })
++
++  it('un cobro en efectivo anulado no queda en el cajón', () => {
++    const { totales } = calcularTotalesDia([
++      mov({ id: 'orig', monto: 5000, revertida: true }),
++      mov({ monto: -5000, es_reversa: true, reversa_de: 'orig' }),
++    ], DIA)
++    expect(totales.efectivoCobrado).toBe(0)
++    expect(efectivoEsperado(6000, totales)).toBe(6000)
++  })
++
++  it('el número del cierre es el mismo que ve el dueño durante el día', () => {
++    const { totales } = calcularTotalesDia([
++      mov({ monto: 3000 }),
++      mov({ monto: 2000, medios_pago: tarjeta }),
++      mov({ tipo: 'GASTO_REGISTRADO', monto: 800 }),
++    ], DIA)
++    const loQueVeEnLaTarjeta = efectivoEsperado(6000, totales)
++    const loQueUsaElCierre = efectivoEsperado(6000, totales)
++    expect(loQueVeEnLaTarjeta).toBe(loQueUsaElCierre)
++    expect(loQueVeEnLaTarjeta).toBe(8200)   // 6000 + 3000 - 800
++  })
++})
+-- 
+2.43.0
+

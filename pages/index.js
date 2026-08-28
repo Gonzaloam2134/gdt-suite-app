@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
@@ -8,6 +8,14 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // Si ya hay sesión (por ejemplo, después de cambiar la contraseña desde el
+  // flujo de recuperación), no tiene sentido mostrar el formulario de login.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) router.replace('/locales')
+    })
+  }, [router])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -21,8 +29,10 @@ export default function Login() {
 
       if (error) throw error
 
-      toast.success('✅ Bienvenido!')
-      router.push('/locales')
+      toast.success('Bienvenido')
+      // Si llegó desde un link de invitación, lo devolvemos ahí para aceptarla
+      const { invitacion } = router.query
+      router.push(invitacion ? `/invitacion?token=${invitacion}` : '/locales')
     } catch (err) {
       console.error('Error al iniciar sesión:', err)
       toast.error('Error: ' + (err.message || 'Credenciales inválidas'))
@@ -32,7 +42,8 @@ export default function Login() {
   }
 
   const handleSignUp = () => {
-    router.push('/registro')
+    const { invitacion } = router.query
+    router.push(invitacion ? `/registro?invitacion=${invitacion}` : '/registro')
   }
 
   return (

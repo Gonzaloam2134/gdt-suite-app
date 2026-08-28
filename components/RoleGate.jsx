@@ -1,29 +1,20 @@
-import { useUserRole } from '../lib/useUserRole'
+import { useUserRole } from '../lib/UserRoleContext'
 
 /**
- * Componente que muestra/oculta contenido según el rol del usuario.
- * 
- * Fallback de emergencia: Si no se puede determinar el rol (error de RLS),
- * se asume que el usuario es 'owner' para no bloquear la UI.
+ * Muestra `children` solo si el usuario tiene uno de los roles permitidos.
+ * FAIL-CLOSED: mientras carga o si el rol es desconocido, no muestra nada.
+ * Super user ve todo. Sin allowedRoles, solo exige estar autenticado con rol.
+ *
+ * Usalo para ocultar accesos secundarios (ítems de menú, links). Para acciones
+ * principales de una pantalla, no lo uses: preferí leer hasRole() y explicar por
+ * qué la acción no está disponible. Una pantalla sin botones y sin motivo deja
+ * al usuario sin saber qué hacer.
  */
-export default function RoleGate({ children, allowedRoles = [] }) {
-  const { role, globalRole, loading } = useUserRole()
-
-  // 1. Mientras carga, mostramos todo (evita parpadeos)
-  if (loading) return children
-  
-  // 2. Super user ve todo
-  if (globalRole === 'super_user') return children
-  
-  // 3. Si no hay restricciones, mostramos todo
-  if (!allowedRoles || allowedRoles.length === 0) return children
-  
-  // 4. FALLBACK DE EMERGENCIA: Si role es null (error de RLS), asumir owner
-  const effectiveRole = role || 'owner'
-  
-  // 5. Verificación con el rol efectivo
-  if (effectiveRole && allowedRoles.includes(effectiveRole)) return children
-  
-  // 6. Si nada coincide, ocultar
-  return null
+export default function RoleGate({ children, allowedRoles = [], fallback = null }) {
+  const { role, esSuperUser, loading } = useUserRole()
+  if (loading) return fallback
+  if (esSuperUser) return children
+  if (!role) return fallback
+  if (allowedRoles.length === 0) return children
+  return allowedRoles.includes(role) ? children : fallback
 }

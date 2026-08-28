@@ -1,96 +1,97 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from './supabaseClient'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/router'
+import { getSession, getPerfil } from './services/auth'
+import { getRolEnLocal } from './services/miembros'
+import { ROLES_GLOBALES } from './constants/roles'
 
 const UserRoleContext = createContext(null)
 
+const leerLocalActivo = () => (typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null)
+
+/**
+ * Único origen de verdad sobre quién es el usuario y qué rol tiene en el local activo.
+ * FAIL-CLOSED: si no se puede determinar el rol, role = null y la UI no muestra nada privilegiado.
+ */
 export function UserRoleProvider({ children }) {
-  const [role, setRole] = useState('owner') // ✅ Fallback seguro por defecto
-  const [globalRole, setGlobalRole] = useState('owner')
+  const router = useRouter()
+  const localIdCargado = useRef(null)
   const [userId, setUserId] = useState(null)
+  const [perfil, setPerfil] = useState(null)
+  const [globalRole, setGlobalRole] = useState(null)
+  const [role, setRole] = useState(null)
+  const [activeLocalId, setActiveLocalId] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadRole = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session?.user) {
-          setLoading(false)
-          return
-        }
+  const cargar = useCallback(async () => {
+    setLoading(true)
+    try {
+      const session = await getSession()
+      if (!session?.user) { setUserId(null); setRole(null); setGlobalRole(null); return }
+      setUserId(session.user.id)
 
-        setUserId(session.user.id)
+      const p = await getPerfil(session.user.id)
+      setPerfil(p)
+      setGlobalRole(p?.rol_global ?? null)
 
-        // 1. Cargar rol global (usamos maybeSingle para evitar error si no existe la fila)
-        const { data: perfil } = await supabase
-          .from('perfiles')
-          .select('rol_global')
-          .eq('id', session.user.id)
-          .maybeSingle() // ✅ CAMBIO CLAVE: No lanza error si hay 0 filas
+      const localId = leerLocalActivo()
+      setActiveLocalId(localId)
+      localIdCargado.current = localId
 
-        if (perfil?.rol_global) {
-          setGlobalRole(perfil.rol_global)
-        }
+      if (p?.rol_global === ROLES_GLOBALES.SUPER_USER) { setRole('super_user'); return }
+      if (!localId) { setRole(null); return }
 
-        // Si es super_user, tiene acceso total
-        if (perfil?.rol_global === 'super_user') {
-          setRole('super_user')
-          setLoading(false)
-          return
-        }
-
-        // 2. Cargar rol en el local activo
-        const activeLocalId = typeof window !== 'undefined' 
-          ? localStorage.getItem('activeLocalId') 
-          : null
-
-        if (!activeLocalId) {
-          setLoading(false)
-          return
-        }
-
-        const { data: miembro } = await supabase
-          .from('miembros_locales')
-          .select('rol')
-          .eq('local_id', activeLocalId)
-          .eq('user_id', session.user.id)
-          .eq('activo', true)
-          .maybeSingle() // ✅ CAMBIO CLAVE: No lanza error si no es miembro aún
-
-        if (miembro?.rol) {
-          setRole(miembro.rol)
-        } else {
-          console.warn('⚠️ Usuario no encontrado en miembros_locales. Usando fallback: owner')
-          // Se mantiene el fallback 'owner' definido al inicio
-        }
-        
-      } catch (err) {
-        console.error('❌ [UserRole] Error fatal:', err)
-      } finally {
-        setLoading(false)
-      }
+      setRole(await getRolEnLocal(session.user.id, localId))
+    } catch (err) {
+      console.error('[UserRole] error cargando rol:', err)
+      setRole(null)
+    } finally {
+      setLoading(false)
     }
-
-    loadRole()
   }, [])
 
-  const hasRole = (allowedRoles) => {
+  useEffect(() => { cargar() }, [cargar])
+
+  /**
+   * El local activo vive en localStorage y puede cambiar por navegación de cliente
+   * (elegir un local en /locales y entrar al dashboard). Sin esto el provider
+   * conservaría el rol calculado con el local anterior — o sin local — y RoleGate
+   * escondería las acciones aunque el usuario sea owner.
+   */
+  useEffect(() => {
+    const revisar = () => {
+      if (leerLocalActivo() !== localIdCargado.current) cargar()
+    }
+    revisar()
+    router.events.on('routeChangeComplete', revisar)
+    window.addEventListener('focus', revisar)
+    return () => {
+      router.events.off('routeChangeComplete', revisar)
+      window.removeEventListener('focus', revisar)
+    }
+  }, [router.events, cargar])
+
+  /** Llamar después de cambiar de local (localStorage) para recargar el rol */
+  const cambiarLocal = useCallback((localId) => {
+    localStorage.setItem('activeLocalId', localId)
+    return cargar()
+  }, [cargar])
+
+  const esSuperUser = globalRole === ROLES_GLOBALES.SUPER_USER
+  const hasRole = useCallback((allowed = []) => {
+    if (esSuperUser) return true
     if (!role) return false
-    if (globalRole === 'super_user') return true
-    return allowedRoles.includes(role)
-  }
+    return allowed.includes(role)
+  }, [role, esSuperUser])
 
   return (
-    <UserRoleContext.Provider value={{ role, globalRole, userId, loading, hasRole }}>
+    <UserRoleContext.Provider value={{ userId, perfil, role, globalRole, esSuperUser, activeLocalId, loading, hasRole, cambiarLocal, recargar: cargar }}>
       {children}
     </UserRoleContext.Provider>
   )
 }
 
 export function useUserRole() {
-  const context = useContext(UserRoleContext)
-  if (!context) {
-    throw new Error('useUserRole debe usarse dentro de UserRoleProvider')
-  }
-  return context
+  const ctx = useContext(UserRoleContext)
+  if (!ctx) throw new Error('useUserRole debe usarse dentro de UserRoleProvider')
+  return ctx
 }

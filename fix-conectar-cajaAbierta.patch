@@ -1,0 +1,25 @@
+From 55e13c445a3fc43fdfc053e6a028ff5841d08692 Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Fri, 28 Aug 2026 15:30:59 +0000
+Subject: [PATCH] fix: conectar cajaAbierta a KpiCards (mi patch anterior
+ calculaba bien pero nunca llegaba a la pantalla)
+
+---
+ pages/dashboard.jsx | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/pages/dashboard.jsx b/pages/dashboard.jsx
+index d0b2967..9a162ad 100644
+--- a/pages/dashboard.jsx
++++ b/pages/dashboard.jsx
+@@ -103,6 +103,7 @@ export default function Dashboard() {
+               totales={totales}
+               cantidadCobros={cobros.filter(c => !c.anulada).length}
+               cantidadGastos={gastos.filter(g => !g.anulada).length}
++              cajaAbierta={caja.cajaAbierta}
+             />
+             <ListaTransacciones tipo="cobro" items={cobros} onReversar={setAReversar} />
+             <ListaTransacciones tipo="gasto" items={gastos} onReversar={setAReversar} />
+-- 
+2.43.0
+
