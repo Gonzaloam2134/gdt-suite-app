@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useAuthGuard } from '../hooks/useAuthGuard'
+import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
 import { useAdminData } from '../hooks/useAdminData'
 import { ROLES } from '../lib/constants/roles'
 import { useMisLocales } from '../hooks/useMisLocales'
@@ -26,6 +27,15 @@ export default function AdminPanel() {
   const router = useRouter()
   const { checking } = useAuthGuard()
   const { role, userId, activeLocalId, esSuperUser, loading: cargandoRol } = useUserRole()
+  // El super admin no queda bloqueado por la suscripción: administra el local
+  // desde acá y desde /superadmin, no tendría sentido que lo echen de los dos.
+  // OJO: hay que esperar `cargandoRol` antes de decidir esto — `esSuperUser`
+  // arranca en `false` mientras el contexto todavía no resolvió la sesión, y
+  // `getSuscripcion` (una sola consulta) puede responder antes que las tres
+  // del contexto. Mirar solo `esSuperUser` dejaba pasar la carrera: un super
+  // admin real podía ser echado del local que estaba administrando antes de
+  // que la app se enterara de que lo era.
+  const suscripcion = useSuscripcionGuard(cargandoRol ? null : (esSuperUser ? null : activeLocalId), 'total')
   const { local, stats, miembros, inactivos, invitaciones, mediosPago, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar } = useAdminData()
   const { locales } = useMisLocales(userId)
   const [tab, setTab] = useState(router.query.tab || 'resumen')
@@ -37,7 +47,7 @@ export default function AdminPanel() {
     if (!cargandoRol && esSuperUser && !activeLocalId) router.replace('/superadmin')
   }, [cargandoRol, esSuperUser, activeLocalId, router])
 
-  if (checking || cargandoRol || loading) return <LoadingScreen mensaje="Cargando panel…" />
+  if (checking || cargandoRol || loading || suscripcion.checking || suscripcion.debeRedirigir) return <LoadingScreen mensaje="Cargando panel…" />
 
   if (!activeLocalId) {
     return (

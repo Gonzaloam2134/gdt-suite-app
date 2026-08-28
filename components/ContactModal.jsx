@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
+import { crearContacto } from '../lib/services/contactos'
 
 const TIPOS_CONSULTA = [
   { id: 'soporte', label: '🔧 Soporte técnico', desc: 'Reportar un error o bug' },
@@ -35,7 +35,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
     try {
       setEnviando(true)
 
-      const { error } = await supabase.from('contactos').insert([{
+      await crearContacto({
         user_id: user?.id,
         local_id: localId || null,
         tipo_consulta: tipo,
@@ -43,9 +43,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
         mensaje: mensaje.trim(),
         pagina_origen: paginaOrigen || 'desconocida',
         estado: 'pendiente'
-      }])
-
-      if (error) throw error
+      })
 
       setEnviado(true)
       toast.success('✅ Consulta enviada correctamente')

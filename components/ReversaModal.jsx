@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import Modal from './ui/Modal'
-import { registrarReversa } from '../lib/services/transacciones'
+import { registrarReversa, getTransaccion } from '../lib/services/transacciones'
 import { registrarAccion } from '../lib/services/auditoria'
 import { ACCIONES } from '../lib/constants/auditoria'
 import { formatCurrency, formatHora } from '../lib/format'
+import { mensajeError } from '../lib/errorMessage'
 
 /** Anula una transacción con un asiento inverso. La original nunca se borra. */
 export default function ReversaModal({ isOpen, onClose, transaccion, userId, onReversaExitosa }) {
@@ -18,6 +19,17 @@ export default function ReversaModal({ isOpen, onClose, transaccion, userId, onR
     if (!motivo.trim()) return toast.error('Indicá el motivo de la cancelación')
     setGuardando(true)
     try {
+      // Revalida justo antes de escribir: si alguien más ya la canceló mientras
+      // este modal estaba abierto, evita una segunda reversa duplicada. No elimina
+      // la ventana de carrera del todo (para eso hace falta un constraint en la
+      // base), pero la reduce a lo mínimo.
+      const actual = await getTransaccion(transaccion.id)
+      if (actual?.revertida) {
+        toast.error('Esta transacción ya fue cancelada por otra persona')
+        onReversaExitosa?.()
+        cerrar()
+        return
+      }
       const reversa = await registrarReversa(transaccion, motivo)
       await registrarAccion({
         localId: transaccion.local_id, userId, accion: ACCIONES.REVERSA_REGISTRADA,
@@ -28,7 +40,7 @@ export default function ReversaModal({ isOpen, onClose, transaccion, userId, onR
       onReversaExitosa?.()
       cerrar()
     } catch (err) {
-      toast.error(`No se pudo cancelar: ${err.message}`)
+      toast.error(`No se pudo cancelar: ${mensajeError(err)}`)
     } finally { setGuardando(false) }
   }
 

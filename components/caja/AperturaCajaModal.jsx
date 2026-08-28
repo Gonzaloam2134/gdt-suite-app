@@ -5,7 +5,10 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirmar, proces
   const [monto, setMonto] = useState('')
 
   const cerrar = () => { setMonto(''); onClose() }
-  const confirmar = async () => { if (await onConfirmar(monto)) cerrar() }
+  const confirmar = async () => {
+    if (procesando) return
+    if (await onConfirmar(monto)) cerrar()
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={cerrar} title="🔓 Abrir caja" subtitle="Con cuánto efectivo empezás el día"

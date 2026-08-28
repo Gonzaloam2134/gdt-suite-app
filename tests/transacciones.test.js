@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularComision, calcularIva, calcularTotalesDia, calcularResumenPeriodo, efectivoEsperado } from '../lib/domain/transacciones'
+import { calcularComision, calcularIva, calcularTotalesDia, calcularAcreditacionesDia, calcularResumenPeriodo, efectivoEsperado } from '../lib/domain/transacciones'
 
 const efectivo = { nombre: 'Efectivo', tipo: 'efectivo', comision_porcentaje: 0, plazo_acreditacion_dias: 0 }
 const credito  = { nombre: 'Crédito',  tipo: 'credito',  comision_porcentaje: 3.5, plazo_acreditacion_dias: 30 }
@@ -28,7 +28,7 @@ describe('calcularTotalesDia', () => {
     expect(totales.efectivoEnCaja).toBe(1000)
   })
 
-  it('efectivo va a caja; débito se acredita hoy; crédito queda pendiente neto de comisión', () => {
+  it('efectivo va a caja; crédito (pendiente) no está disponible hoy; disponibleHoy ya no lo calcula esta función', () => {
     const r = calcularTotalesDia([
       tx({ monto: 1000, medios_pago: efectivo }),
       tx({ monto: 2000, medios_pago: debito }),
@@ -36,11 +36,18 @@ describe('calcularTotalesDia', () => {
     ], DIA)
     expect(r.totales.cobros).toBe(6000)
     expect(r.totales.efectivoEnCaja).toBe(1000)
-    expect(r.totales.disponibleHoy).toBe(2000)
-    expect(r.totales.pendienteAcreditacion).toBe(3000 - 105)
     expect(r.totales.comisiones).toBe(105)
-    expect(r.acreditacionesHoy).toHaveLength(1)
     expect(r.desgloseMedios[0].nombre).toBe('Crédito')
+  })
+
+  it('débito con plazo 0 acredita hoy: no queda pendiente (lo cuenta calcularAcreditacionesDia, no esta función)', () => {
+    const r = calcularTotalesDia([tx({ monto: 2000, medios_pago: debito })], DIA)
+    expect(r.totales.pendienteAcreditacion).toBe(0)
+  })
+
+  it('crédito con plazo > 0 sí queda pendiente, neto de comisión', () => {
+    const r = calcularTotalesDia([tx({ monto: 3000, medios_pago: credito })], DIA)
+    expect(r.totales.pendienteAcreditacion).toBe(3000 - 105)
   })
 
   it('gastos restan del neto real', () => {
@@ -84,6 +91,42 @@ describe('calcularTotalesDia', () => {
   })
 })
 
+describe('calcularAcreditacionesDia', () => {
+  // Reproduce el bug real: una venta con tarjeta de crédito de HACE 2 DÍAS que
+  // recién acredita HOY. `listarAcreditacionesDia` la trae porque filtra por
+  // fecha de acreditación, no por fecha de creación — por eso acá llega aunque
+  // `creado_en` sea de anteayer.
+  it('cuenta una venta de días anteriores que acredita hoy (el bug de "Disponible" en $0)', () => {
+    const ventaVieja = tx({
+      monto: 3000, medios_pago: credito,
+      creado_en: new Date(2026, 7, 23, 11, 0).toISOString(), // anteayer
+      fecha_acreditacion_estimada: '2026-08-25',
+    })
+    const { disponibleHoy, acreditacionesHoy } = calcularAcreditacionesDia([ventaVieja])
+    expect(disponibleHoy).toBe(3000 - 105)
+    expect(acreditacionesHoy).toHaveLength(1)
+  })
+
+  it('excluye efectivo (no es "acreditación", ya está en la mano)', () => {
+    const { disponibleHoy, acreditacionesHoy } = calcularAcreditacionesDia([tx({ monto: 1000, medios_pago: efectivo })])
+    expect(disponibleHoy).toBe(0)
+    expect(acreditacionesHoy).toHaveLength(0)
+  })
+
+  it('excluye anuladas y asientos inversos', () => {
+    const original = tx({ id: 'o', monto: 1000, medios_pago: debito, revertida: true })
+    const reversa = tx({ monto: -1000, medios_pago: debito, es_reversa: true, reversa_de: 'o' })
+    const { disponibleHoy, acreditacionesHoy } = calcularAcreditacionesDia([original, reversa])
+    expect(disponibleHoy).toBe(0)
+    expect(acreditacionesHoy).toHaveLength(0)
+  })
+
+  it('usa comision_monto guardada si existe', () => {
+    const { disponibleHoy } = calcularAcreditacionesDia([tx({ monto: 1000, medios_pago: credito, comision_monto: 50 })])
+    expect(disponibleHoy).toBe(950)
+  })
+})
+
 describe('calcularResumenPeriodo', () => {
   it('lee monto_iva/monto_neto guardados', () => {
     const { resumen, libroVentas } = calcularResumenPeriodo([
@@ -119,5 +162,36 @@ describe('calcularResumenPeriodo', () => {
     ])
     expect(resumen.totalFacturado).toBe(0)
     expect(resumen.cantidadVentas).toBe(0)
+  })
+})
+
+/**
+ * Dashboard (calcularTotalesDia) y Admin/Reportes (calcularResumenPeriodo) son
+ * dos implementaciones separadas que nadie fuerza a coincidir: cada una filtra
+ * reversas/anuladas y calcula comisión por su cuenta. Este test no prueba una
+ * corrección puntual — prueba que, sobre el MISMO día, las dos siguen dando el
+ * mismo número. Si alguna cambia de fórmula sin que la otra la siga, esto rompe.
+ */
+describe('calcularTotalesDia vs calcularResumenPeriodo — mismo dataset, mismo día', () => {
+  it('cobros, gastos y neto coinciden entre las dos funciones', () => {
+    const DIA = '2026-08-25'
+    const transacciones = [
+      tx({ monto: 1000, medios_pago: efectivo }),
+      tx({ monto: 2000, medios_pago: debito }),
+      tx({ monto: 3000, medios_pago: credito }),
+      tx({ tipo: 'GASTO_REGISTRADO', monto: 800 }),
+      // una cancelada y su asiento inverso: ambas funciones deben excluirlas igual
+      tx({ id: 'orig', monto: 500, revertida: true }),
+      tx({ monto: -500, es_reversa: true, reversa_de: 'orig' }),
+    ]
+
+    const { totales } = calcularTotalesDia(transacciones, DIA)
+    const { resumen } = calcularResumenPeriodo(transacciones)
+
+    expect(totales.cobros).toBe(resumen.totalFacturado)
+    expect(totales.gastos).toBe(resumen.gastosOperativos)
+    // netoReal = cobros - comisiones - gastos; resultadoEjercicio = (totalFacturado - comisiones) - gastosOperativos.
+    // Misma fórmula, escrita dos veces: tienen que dar lo mismo.
+    expect(totales.netoReal).toBe(resumen.resultadoEjercicio)
   })
 })

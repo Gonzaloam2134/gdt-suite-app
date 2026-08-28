@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { listarTransaccionesDia } from '../lib/services/transacciones'
-import { calcularTotalesDia } from '../lib/domain/transacciones'
+import { listarTransaccionesDia, listarAcreditacionesDia } from '../lib/services/transacciones'
+import { calcularTotalesDia, calcularAcreditacionesDia } from '../lib/domain/transacciones'
 import { hoyISO } from '../lib/dates'
 
 const VACIO = {
@@ -9,24 +9,41 @@ const VACIO = {
   cobros: [], gastos: [], acreditacionesHoy: [], desgloseMedios: [],
 }
 
-/** Transacciones del día + totales calculados. Toda la aritmética vive en lib/domain. */
+/**
+ * Transacciones del día + totales calculados. Toda la aritmética vive en lib/domain.
+ *
+ * "Disponible hoy" y "Acreditaciones del día" salen de una consulta aparte
+ * (`listarAcreditacionesDia`, filtrada por fecha de acreditación) porque esa
+ * plata puede venir de ventas de días anteriores, no solo de las de hoy.
+ */
 export function useTransaccionesDia(localId, diaISO = hoyISO()) {
   const [datos, setDatos] = useState(VACIO)
   const [transacciones, setTransacciones] = useState([])
   const [loading, setLoading] = useState(true)
+  const montado = useRef(true)
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   const cargar = useCallback(async () => {
     if (!localId) return
     setLoading(true)
     try {
-      const filas = await listarTransaccionesDia(localId, diaISO)
+      const [filas, acreditan] = await Promise.all([
+        listarTransaccionesDia(localId, diaISO),
+        listarAcreditacionesDia(localId, diaISO),
+      ])
+      if (!montado.current) return
+      const base = calcularTotalesDia(filas, diaISO)
+      const { disponibleHoy, acreditacionesHoy } = calcularAcreditacionesDia(acreditan)
       setTransacciones(filas)
-      setDatos(calcularTotalesDia(filas, diaISO))
+      setDatos({ ...base, totales: { ...base.totales, disponibleHoy }, acreditacionesHoy })
     } catch (err) {
+      if (!montado.current) return
       console.error('[useTransaccionesDia]', err)
       toast.error('No se pudieron cargar los movimientos del día')
       setDatos(VACIO)
-    } finally { setLoading(false) }
+    } finally {
+      if (montado.current) setLoading(false)
+    }
   }, [localId, diaISO])
 
   useEffect(() => { cargar() }, [cargar])

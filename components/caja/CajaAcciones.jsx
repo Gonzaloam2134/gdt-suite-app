@@ -5,7 +5,7 @@ import { ROLES_OPERAN_CAJA } from '../../lib/constants/roles'
  * Barra de acciones del día. Solo owner y cajero operan la caja (coincide con la RLS).
  * Si el usuario no puede operar, lo decimos: una barra vacía no explica nada.
  */
-export default function CajaAcciones({ cajaAbierta, onAbrir, onCerrar, onHistorial, onCobro, onGasto }) {
+export default function CajaAcciones({ cajaAbierta, huerfana, onAbrir, onCerrar, onHistorial, onCobro, onGasto }) {
   const { hasRole, loading } = useUserRole()
   const puedeOperar = hasRole(ROLES_OPERAN_CAJA)
 
@@ -15,7 +15,8 @@ export default function CajaAcciones({ cajaAbierta, onAbrir, onCerrar, onHistori
         <div className="flex items-center gap-2">
           {puedeOperar && (cajaAbierta
             ? <button onClick={onCerrar} className="px-3 py-2 bg-orange-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-orange-600 shadow-sm">🔒 Cerrar caja</button>
-            : <button onClick={onAbrir} className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-emerald-600 shadow-sm">🔓 Abrir caja</button>)}
+            : <button onClick={onAbrir} disabled={!!huerfana} title={huerfana ? 'Cerrá la caja anterior antes de abrir la de hoy' : ''}
+                className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-emerald-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">🔓 Abrir caja</button>)}
           <button onClick={onHistorial} title="Historial de cierres"
             className="px-3 py-2 bg-indigo-100 text-indigo-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-indigo-200">
             📋 <span className="hidden md:inline">Historial</span>

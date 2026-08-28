@@ -9,6 +9,7 @@ import { ALICUOTAS_IVA, TIPOS_COMPROBANTE, COMPROBANTE_POR_CONDICION, discrimina
 import { calcularIva, calcularComision } from '../lib/domain/transacciones'
 import { formatCurrency } from '../lib/format'
 import { iconoMedio } from '../lib/constants/mediosPago'
+import { mensajeError } from '../lib/errorMessage'
 
 const CONFIG = {
   cobro: { titulo: '💵 Registrar cobro', header: 'bg-green-600 text-white', boton: 'bg-green-500 hover:bg-green-600',
@@ -45,8 +46,10 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
     setAlicuota(conIva ? 21 : 0)
   }, [isOpen, localId, local?.condicion_fiscal, conIva])
 
+  const MONTO_MAXIMO = 99999999.99 // límite razonable para no persistir errores de tipeo (ej: notación científica)
+
   const medio = useMemo(() => medios.find(m => m.id === medioId), [medios, medioId])
-  const montoNum = parseFloat(monto) || 0
+  const montoNum = Number.isFinite(parseFloat(monto)) ? parseFloat(monto) : 0
   const previa = useMemo(() => {
     if (!montoNum) return null
     const { neto, iva } = calcularIva(montoNum, conIva ? alicuota : 0)
@@ -60,7 +63,8 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
   const guardar = async (e) => {
     e?.preventDefault()
     if (!medioId) return toast.error(`Elegí ${cfg.etiquetaMedio.toLowerCase()}`)
-    if (montoNum <= 0) return toast.error('Ingresá un monto mayor a cero')
+    if (!Number.isFinite(montoNum) || montoNum <= 0) return toast.error('Ingresá un monto mayor a cero')
+    if (montoNum > MONTO_MAXIMO) return toast.error(`El monto no puede superar ${formatCurrency(MONTO_MAXIMO)}`)
 
     setGuardando(true)
     try {
@@ -77,7 +81,7 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
       onSuccess?.()
       cerrar()
     } catch (err) {
-      toast.error(`No se pudo guardar: ${err.message}`)
+      toast.error(`No se pudo guardar: ${mensajeError(err)}`)
       setGuardando(false)
     }
   }

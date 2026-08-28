@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getMembresias } from '../lib/services/miembros'
 import { getLocales } from '../lib/services/locales'
@@ -33,8 +33,14 @@ export function useReportes(userId) {
     [localId, locales],
   )
 
+  // Evita que la respuesta de un período/local viejo pise a la del que el
+  // usuario eligió después (si cambia de preset rápido y las respuestas llegan
+  // fuera de orden).
+  const peticionActual = useRef(0)
+
   const cargar = useCallback(async () => {
     if (!localIds.length) { setLoading(false); return }
+    const idPeticion = ++peticionActual.current
     setLoading(true)
     try {
       const { inicio, fin } = rangoEntre(periodo.desde, periodo.hasta)
@@ -42,13 +48,17 @@ export function useReportes(userId) {
         listarTransaccionesPeriodo(localIds, periodo.desde, periodo.hasta),
         listarCierres(localIds, { inicio, fin, limite: 200 }),
       ])
+      if (idPeticion !== peticionActual.current) return
       setTransacciones(tx)
       setCierres(cj)
     } catch (err) {
+      if (idPeticion !== peticionActual.current) return
       toast.error(`No se pudo generar el reporte: ${err.message}`)
       setTransacciones([])
       setCierres([])
-    } finally { setLoading(false) }
+    } finally {
+      if (idPeticion === peticionActual.current) setLoading(false)
+    }
   }, [localIds, periodo])
 
   useEffect(() => { cargar() }, [cargar])
@@ -59,7 +69,7 @@ export function useReportes(userId) {
    * mezclarían criterios y el número no significaría nada.
    */
   const localActual = localId === 'todos'
-    ? { id: 'todos', nombre: 'Todos los locales', condicion_fiscal: locales.every(l => discriminaIva(l.condicion_fiscal)) ? 'Responsable Inscripto' : 'Mixto' }
+    ? { id: 'todos', nombre: 'Todos los locales', condicion_fiscal: locales.length > 0 && locales.every(l => discriminaIva(l.condicion_fiscal)) ? 'Responsable Inscripto' : 'Mixto' }
     : locales.find(l => l.id === localId)
 
   const datos = useMemo(() => {
