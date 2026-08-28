@@ -1,0 +1,31 @@
+name: Fix efectivo en caja
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'auditoria'
+
+jobs:
+  aplicar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Aplicar
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git am --keep-cr fix-efectivo-en-caja.patch || git apply --3way fix-efectivo-en-caja.patch
+          git rm -f --ignore-unmatch fix-efectivo-en-caja.patch .github/workflows/aplicar-patch.yml
+          git commit -am "chore: limpiar patch aplicado" || true
+
+      - name: Instalar y testear
+        run: |
+          npm install
+          npm test
+
+      - name: Push
+        run: git push origin HEAD:auditoria-2
