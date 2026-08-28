@@ -1,0 +1,106 @@
+From 2e347063d0d81f62f83e2300a920afb22f55ef9d Mon Sep 17 00:00:00 2001
+From: claude <claude@local>
+Date: Fri, 28 Aug 2026 18:07:38 +0000
+Subject: [PATCH] fix: registro no promete cuenta creada si falta confirmar el
+ email; se conserva el token de invitacion en la vuelta
+
+---
+ pages/registro.js | 51 +++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 45 insertions(+), 6 deletions(-)
+
+diff --git a/pages/registro.js b/pages/registro.js
+index ac941a7..b8e68ea 100644
+--- a/pages/registro.js
++++ b/pages/registro.js
+@@ -8,6 +8,7 @@ export default function Registro() {
+   const [password, setPassword] = useState('')
+   const [nombre, setNombre] = useState('')
+   const [loading, setLoading] = useState(false)
++  const [pendienteConfirmacion, setPendienteConfirmacion] = useState(false)
+   const router = useRouter()
+ 
+   // Si viene de un link de invitación, precargamos el email y volvemos ahí al terminar
+@@ -20,21 +21,37 @@ export default function Registro() {
+ 
+     try {
+       // 1. Crear usuario en Supabase Auth
++      // emailRedirectTo: si el link de confirmación se abre en otro dispositivo
++      // o el proyecto exige confirmar el email, esto evita perder el token de
++      // invitación en el camino — vuelve exactamente a donde hacía falta.
++      const destinoTrasConfirmar = typeof window !== 'undefined'
++        ? `${window.location.origin}${invitacion ? `/invitacion?token=${invitacion}` : '/locales'}`
++        : undefined
++
+       const { data: authData, error: authError } = await supabase.auth.signUp({
+         email: email.trim(),
+         password: password,
+         options: {
+-          data: {
+-            nombre: nombre.trim(),
+-          },
++          data: { nombre: nombre.trim() },
++          emailRedirectTo: destinoTrasConfirmar,
+         },
+       })
+ 
+       if (authError) throw authError
+       if (!authData.user) throw new Error('No se pudo crear el usuario')
+ 
+-      // El trigger on_auth_user_created ya crea el perfil; acá solo completamos el nombre.
+-      await supabase.from('perfiles').update({ nombre: nombre.trim() }).eq('id', authData.user.id)
++      // El trigger on_auth_user_created ya crea el perfil y toma el nombre de
++      // options.data.nombre (raw_user_meta_data). No hace falta escribirlo de
++      // nuevo acá — y si el proyecto exige confirmar el email, todavía no hay
++      // sesión en este punto, así que ese update fallaría en silencio por RLS.
++
++      if (!authData.session) {
++        // El proyecto requiere confirmar el email antes de dar sesión.
++        // Sin esto, el código anterior mostraba "Cuenta creada" y redirigía
++        // como si ya hubiera sesión, y el usuario rebotaba sin entender por qué.
++        setPendienteConfirmacion(true)
++        return
++      }
+ 
+       toast.success('Cuenta creada')
+ 
+@@ -42,7 +59,7 @@ export default function Registro() {
+       setTimeout(() => {
+         router.push(invitacion ? `/invitacion?token=${invitacion}` : '/locales')
+       }, 1200)
+-      
++
+       } catch (err) {
+     console.error('Error al registrar:', err)
+     
+@@ -63,6 +80,28 @@ export default function Registro() {
+   }
+   }
+ 
++  if (pendienteConfirmacion) {
++    return (
++      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
++        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
++          <div className="text-6xl mb-4">📬</div>
++          <h1 className="text-xl font-bold text-gray-900 mb-2">Confirmá tu email</h1>
++          <p className="text-sm text-gray-600">
++            Te mandamos un link a <strong>{email}</strong> para activar tu cuenta.
++            Abrilo desde el mismo celular o compu donde querés seguir usando la app.
++            Puede tardar unos minutos — revisá también la carpeta de spam.
++          </p>
++          <button
++            onClick={() => router.push('/')}
++            className="mt-6 w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
++          >
++            Ya confirmé, ir a iniciar sesión
++          </button>
++        </div>
++      </div>
++    )
++  }
++
+   return (
+     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
+       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+-- 
+2.43.0
+
