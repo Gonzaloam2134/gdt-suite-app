@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { getCajaAbiertaLocal, abrirCaja, cerrarCaja, listarCierres } from '../lib/services/cierresCaja'
+import { getCajaAbiertaLocal, abrirCaja, cerrarCaja, corregirMontoInicial, listarCierres } from '../lib/services/cierresCaja'
 import { registrarAccion } from '../lib/services/auditoria'
 import { ACCIONES } from '../lib/constants/auditoria'
 import { efectivoEsperado } from '../lib/domain/transacciones'
@@ -127,6 +127,37 @@ export function useCaja({ localId, userId, onCambio }) {
     } finally { if (montado.current) setProcesando(false) }
   }
 
+  /**
+   * Corrige el monto inicial de la caja abierta (de hoy o huérfana): un
+   * error de tipeo al abrir no debería obligar a cerrar y volver a abrir.
+   * No se puede corregir una caja ya cerrada — ese cierre ya quedó conciliado
+   * contra el monto original y cambiarlo después falsearía el historial.
+   */
+  const corregirInicial = async (nuevoMonto) => {
+    const objetivo = cajaAbierta || huerfana
+    if (!objetivo) { toast.error('No hay ninguna caja abierta para corregir'); return false }
+    const monto = parseFloat(nuevoMonto)
+    if (!Number.isFinite(monto) || monto < 0) { toast.error('Ingresá un monto válido'); return false }
+    if (monto === Number(objetivo.monto_inicial_efectivo)) return true   // sin cambios, nada que hacer
+
+    setProcesando(true)
+    try {
+      const anterior = Number(objetivo.monto_inicial_efectivo)
+      await corregirMontoInicial(objetivo.id, monto)
+      if (montado.current) setCaja({ ...objetivo, monto_inicial_efectivo: monto })
+      await registrarAccion({
+        localId, userId, accion: ACCIONES.MONTO_INICIAL_CORREGIDO,
+        detalles: { anterior, nuevo: monto },
+      })
+      toast.success('Monto inicial corregido')
+      await onCambio?.()
+      return true
+    } catch (err) {
+      toast.error(`No se pudo corregir: ${mensajeError(err)}`)
+      return false
+    } finally { if (montado.current) setProcesando(false) }
+  }
+
   const cargarHistorial = async () => {
     try {
       const filas = await listarCierres(localId)
@@ -138,5 +169,5 @@ export function useCaja({ localId, userId, onCambio }) {
     }
   }
 
-  return { cajaAbierta, huerfana, historial, procesando, abrir, cerrar, cerrarHuerfana, cargarHistorial, verificar }
+  return { cajaAbierta, huerfana, historial, procesando, abrir, cerrar, cerrarHuerfana, corregirInicial, cargarHistorial, verificar }
 }

@@ -266,6 +266,21 @@ describe('efectivo en caja (lo que hay físicamente en el cajón)', () => {
     expect(efectivoEsperado(6000, totales)).toBe(6000)
   })
 
+  it('corregir el monto inicial no toca lo ya cobrado/gastado, solo desplaza el esperado', () => {
+    // Simula el caso de uso: se abrió con $6.000 por error de tipeo (debía ser $600),
+    // ya se cargaron movimientos, y recién ahí se corrige. El esperado tiene que
+    // reflejar la corrección sin recalcular ni un centavo de lo ya registrado.
+    const { totales } = calcularTotalesDia([
+      mov({ monto: 3000 }),
+      mov({ tipo: 'GASTO_REGISTRADO', monto: 500 }),
+    ], DIA)
+    expect(efectivoEsperado(6000, totales)).toBe(8500)   // con el error
+    expect(efectivoEsperado(600, totales)).toBe(3100)    // corregido a $600
+    // Los totales del día (lo cobrado y gastado) son los mismos en los dos casos
+    expect(totales.efectivoCobrado).toBe(3000)
+    expect(totales.efectivoGastado).toBe(500)
+  })
+
   it('el número del cierre es el mismo que ve el dueño durante el día', () => {
     const { totales } = calcularTotalesDia([
       mov({ monto: 3000 }),

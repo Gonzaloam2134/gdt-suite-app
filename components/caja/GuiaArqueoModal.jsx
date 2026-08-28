@@ -9,6 +9,7 @@ const PASOS = [
       'Contá el efectivo que hay en el cajón antes de empezar a vender.',
       'Cargá ese número en "Efectivo inicial" al abrir la caja.',
       'Es la base contra la que se compara todo lo demás en el día.',
+      'Si te equivocás al cargarlo, no hace falta cerrar y volver a abrir: tocá "¿Te equivocaste?" al lado de "Caja abierta desde..." y corregilo ahí mismo.',
     ],
   },
   {
