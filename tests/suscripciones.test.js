@@ -36,10 +36,18 @@ describe('estadoEfectivo — prueba gratuita', () => {
     expect(r.diasRestantes).toBe(0)
   })
 
-  it('prueba vencida AYER: se trata como suspendida, marcada como vencimiento de prueba', () => {
+  it('prueba vencida AYER: pasa a restringida (solo reportes), no bloquea todo', () => {
     const r = estadoEfectivo(prueba('2026-08-27'), '2026-08-28')
-    expect(r.estado).toBe('suspended')
+    expect(r.estado).toBe('restricted')
     expect(r.vencioPrueba).toBe(true)
+  })
+
+  it('el dueño de una prueba vencida SIEMPRE puede seguir viendo sus reportes', () => {
+    // restricted, no suspended: es la garantía de que nunca queda encerrado
+    // sin poder descargar lo que cargó.
+    const r = estadoEfectivo(prueba('2026-08-01'), '2026-08-28')
+    expect(r.estado).not.toBe('suspended')
+    expect(r.estado).toBe('restricted')
   })
 
   it('una prueba que el super admin ya suspendió a mano no se reescribe como "vencioPrueba"', () => {

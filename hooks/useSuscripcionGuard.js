@@ -5,7 +5,7 @@ import { getSuscripcion } from '../lib/services/suscripciones'
 import { estadoEfectivo } from '../lib/domain/suscripciones'
 
 const MENSAJE_SUSPENDIDO = 'Local suspendido. Regularizá el pago para acceder.'
-const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 30 días terminó. Escribinos para seguir usando este local.'
+const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 30 días terminó. Podés seguir viendo tus reportes; escribinos para seguir usando la caja.'
 const MENSAJE_RESTRINGIDO = 'Acceso restringido: solo podés ver Reportes.'
 
 /**
@@ -47,10 +47,10 @@ export function useSuscripcionGuard(localId, modo = 'total') {
     if (!montado.current) return
     setEstado(valor)
     if (valor === 'suspended') {
-      toast.error(vencioPrueba ? MENSAJE_PRUEBA_VENCIDA : MENSAJE_SUSPENDIDO)
+      toast.error(MENSAJE_SUSPENDIDO)
       router.replace('/locales')
     } else if (valor === 'restricted' && modo === 'total') {
-      toast(MENSAJE_RESTRINGIDO, { icon: '⚠️' })
+      toast(vencioPrueba ? MENSAJE_PRUEBA_VENCIDA : MENSAJE_RESTRINGIDO, { icon: '⚠️' })
       router.replace('/reportes')
     }
     setChecking(false)

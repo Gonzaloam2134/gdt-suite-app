@@ -61,12 +61,14 @@ export default function MisLocales() {
   const entrar = async (local, destino = '/dashboard') => {
     const { estado, vencioPrueba } = estadoEfectivo(suscripciones[local.id])
     if (estado === 'suspended') {
-      toast.error(vencioPrueba ? 'Tu prueba de 30 días terminó. Escribinos para seguir usando este local.' : 'Local suspendido. Regularizá el pago para acceder.')
+      toast.error('Local suspendido. Regularizá el pago para acceder.')
       return
     }
     await cambiarLocal(local.id)
     if (estado === 'restricted') {
-      toast('Acceso restringido: solo podés ver Reportes.', { icon: '⚠️' })
+      toast(vencioPrueba
+        ? 'Tu prueba de 30 días terminó. Podés ver tus reportes; escribinos para seguir usando la caja.'
+        : 'Acceso restringido: solo podés ver Reportes.', { icon: '⚠️' })
       router.push('/reportes')
       return
     }
@@ -134,10 +136,9 @@ export default function MisLocales() {
                     onEntrar={() => entrar(local)}
                     onAdmin={local.rol === ROLES.OWNER ? () => entrar(local, '/admin') : null}
                     deshabilitado={sub.estado === 'suspended'}
-                    motivo={sub.estado === 'suspended'
-                      ? (sub.vencioPrueba ? 'Tu prueba de 30 días terminó.' : 'Local suspendido por falta de pago.')
-                      : null}
+                    motivo={sub.estado === 'suspended' ? 'Local suspendido por falta de pago.' : null}
                     diasRestantesPrueba={sub.diasRestantes}
+                    pruebaVencida={sub.vencioPrueba}
                   />
                 )
               })}

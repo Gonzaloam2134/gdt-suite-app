@@ -2,9 +2,10 @@ import { formatCurrency } from '../../lib/format'
 import { LABEL_ROL } from '../../lib/constants/roles'
 
 /** Tarjeta de un local con lo que pasó hoy. El dueño entra y ya sabe cómo viene el día. */
-export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo, diasRestantesPrueba }) {
+export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo, diasRestantesPrueba, pruebaVencida }) {
   const r = resumen || { ventas: 0, gastos: 0, movimientos: 0 }
-  const avisarPrueba = !deshabilitado && diasRestantesPrueba !== null && diasRestantesPrueba !== undefined && diasRestantesPrueba <= 7
+  const avisarPrueba = !deshabilitado && !pruebaVencida
+    && diasRestantesPrueba !== null && diasRestantesPrueba !== undefined && diasRestantesPrueba <= 7
 
   return (
     <div className={`bg-white rounded-xl border-2 overflow-hidden transition-colors ${
@@ -47,6 +48,11 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
             {diasRestantesPrueba <= 0
               ? 'Tu prueba vence hoy.'
               : `Prueba gratuita: te quedan ${diasRestantesPrueba} día${diasRestantesPrueba === 1 ? '' : 's'}.`}
+          </p>
+        )}
+        {!deshabilitado && pruebaVencida && (
+          <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded p-2 mt-3 m-0">
+            Tu prueba terminó. Podés entrar a ver y descargar tus reportes. Escribinos para seguir usando la caja.
           </p>
         )}
       </button>
