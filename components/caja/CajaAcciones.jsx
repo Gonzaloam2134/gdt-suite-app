@@ -1,13 +1,17 @@
 import { useUserRole } from '../../lib/UserRoleContext'
-import { ROLES_OPERAN_CAJA } from '../../lib/constants/roles'
+import { ROLES_OPERAN_CAJA, ROLES_REGISTRAN_COBRO } from '../../lib/constants/roles'
 
 /**
- * Barra de acciones del día. Solo owner y cajero operan la caja (coincide con la RLS).
- * Si el usuario no puede operar, lo decimos: una barra vacía no explica nada.
+ * Barra de acciones del día.
+ * - Owner y cajero: abren/cierran caja, cargan cobros y gastos.
+ * - Empleado: solo carga cobros (ej. vendedor de mostrador). No abre ni
+ *   cierra caja, no paga gastos — eso lo maneja quien tiene el cajón.
+ * Si el usuario no puede hacer nada acá, lo decimos: una barra vacía no explica nada.
  */
 export default function CajaAcciones({ cajaAbierta, huerfana, onAbrir, onCerrar, onHistorial, onCobro, onGasto }) {
   const { hasRole, loading } = useUserRole()
   const puedeOperar = hasRole(ROLES_OPERAN_CAJA)
+  const puedeCobrar = hasRole(ROLES_REGISTRAN_COBRO)
 
   return (
     <div className="bg-white border-b border-gray-200">
@@ -23,12 +27,14 @@ export default function CajaAcciones({ cajaAbierta, huerfana, onAbrir, onCerrar,
           </button>
         </div>
 
-        {puedeOperar ? (
+        {puedeCobrar ? (
           <div className="flex items-center gap-2">
-            <button onClick={onCobro} disabled={!cajaAbierta} title={cajaAbierta ? '' : 'Abrí la caja para registrar cobros'}
+            <button onClick={onCobro} disabled={!cajaAbierta} title={cajaAbierta ? '' : 'Falta que abran la caja para registrar cobros'}
               className="px-4 py-2 bg-green-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-green-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">+ Cobro</button>
-            <button onClick={onGasto} disabled={!cajaAbierta} title={cajaAbierta ? '' : 'Abrí la caja para registrar gastos'}
-              className="px-4 py-2 bg-red-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-red-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">+ Gasto</button>
+            {puedeOperar && (
+              <button onClick={onGasto} disabled={!cajaAbierta} title={cajaAbierta ? '' : 'Abrí la caja para registrar gastos'}
+                className="px-4 py-2 bg-red-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-red-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">+ Gasto</button>
+            )}
           </div>
         ) : !loading && (
           <p className="text-xs text-gray-500 m-0">Podés ver la caja, pero no registrar movimientos en este local.</p>

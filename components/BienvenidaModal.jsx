@@ -27,11 +27,13 @@ const CONTENIDO = {
   [ROLES.EMPLEADO]: {
     titulo: '👋 Bienvenido al equipo',
     proposito: 'Esta app lleva el control de la caja del local, día a día.',
-    rol: 'Podés ver cómo viene el día. Cargar cobros, gastos y cerrar la caja lo hacen el dueño y los cajeros.',
+    rol: 'Cargás los cobros de tus ventas, ahí nomás en el momento. Abrir o cerrar la caja y pagar gastos lo hace el dueño o un cajero.',
     pasos: [
-      'Entrá cuando quieras ver los números del día.',
-      'En Admin → "Mi actividad" vas a encontrar el registro de lo que hiciste vos en el sistema.',
+      'Con la caja ya abierta, cada venta la cargás con +Cobro, al momento de cobrarla.',
+      'Elegís el medio de pago (efectivo, tarjeta, etc.) y listo.',
+      'En Admin → "Mi actividad" vas a encontrar el registro de tus propios cobros.',
     ],
+    nota: 'No podés abrir ni cerrar la caja, cargar gastos, ni cancelar un cobro — para eso, avisale al dueño o a un cajero.',
   },
 }
 

@@ -69,7 +69,7 @@ export default function Invitacion() {
         <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-left text-xs text-gray-600">
           {invitacion.rol === 'cajero'
             ? 'Como cajero vas a poder abrir y cerrar la caja, y registrar cobros y gastos.'
-            : 'Como empleado vas a poder ver el registro de tu propia actividad.'}
+            : 'Como empleado vas a poder cargar los cobros de tus ventas. Abrir/cerrar caja y los gastos los maneja el dueño o un cajero.'}
         </div>
 
         <div className="mt-4 text-left">

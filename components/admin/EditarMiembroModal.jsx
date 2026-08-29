@@ -41,7 +41,7 @@ export default function EditarMiembroModal({ isOpen, onClose, miembro, onGuardar
             {ROLES_INVITABLES.map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
           </select>
           <p className="text-xs text-gray-500 mt-2 m-0">
-            El cajero puede registrar cobros y gastos y operar la caja. El empleado solo ve su propia actividad.
+            El cajero abre/cierra caja y carga cobros y gastos. El empleado solo carga cobros — no gastos, no abre ni cierra caja.
           </p>
           {rol !== miembro.rol && (
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 m-0">
