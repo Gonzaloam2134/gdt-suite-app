@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
+import { listarPlanes } from '../lib/services/planes'
+import { SEGMENTO, LABEL_SEGMENTO, DESCRIPCION_SEGMENTO } from '../lib/constants/planes'
+import { formatCurrency } from '../lib/format'
+
+const ORDEN_SEGMENTOS = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
 
 // Iconos automáticos por tipo de medio de pago
 const ICONOS_POR_TIPO = {
@@ -23,6 +28,12 @@ const MEDIOS_PRESET = [
 
 export default function OnboardingWizard({ onComplete, onCancel, userEmail, preloadedData, skipScaleStep = false }) {
   const [step, setStep] = useState(skipScaleStep ? 1 : 1) // Si skipScaleStep es true, empezamos en 1 pero saltaremos el 2
+  const [precios, setPrecios] = useState([])
+
+  // Se trae una sola vez, para mostrar en el resumen final qué pasa cuando
+  // termine la prueba. Si falla, el resumen sigue mostrando el texto sin
+  // precios — no vale la pena bloquear la creación del local por esto.
+  useEffect(() => { listarPlanes().then(setPrecios).catch(() => {}) }, [])
   const [formData, setFormData] = useState(preloadedData || {
     businessName: '',
     rubro: 'Gastronomía',
@@ -122,6 +133,13 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
           {/* PASO 1: Datos del negocio */}
           {step === 1 && (
             <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-900 m-0">
+                  🎁 Arrancás con <strong>30 días de prueba gratis</strong>, con todo desbloqueado.
+                  Sin tarjeta, sin compromiso.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre del Negocio *</label>
                 <input
@@ -326,6 +344,32 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                       Podés agregar o modificar medios de pago en cualquier momento desde el <strong>Panel de Administración</strong>.
                     </span>
                   </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                  <p className="text-sm font-bold text-blue-900 m-0 mb-1">🎁 30 días de prueba gratis</p>
+                  <p className="text-xs text-blue-800 m-0 mb-3">
+                    Todo desbloqueado desde el primer día. Cuando termine, tus reportes siguen
+                    disponibles siempre — elegís seguir con uno de estos planes cuando quieras:
+                  </p>
+                  <div className="space-y-2">
+                    {ORDEN_SEGMENTOS.map(seg => {
+                      const precio = precios.find(p => p.segmento === seg && p.ciclo === 'mensual')
+                      return (
+                        <div key={seg} className="flex items-start justify-between gap-3 text-xs bg-white rounded-lg p-2 border border-blue-100">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-gray-900">{LABEL_SEGMENTO[seg]}</span>
+                            <span className="block text-gray-500">{DESCRIPCION_SEGMENTO[seg]}</span>
+                          </div>
+                          {precio && (
+                            <span className="shrink-0 font-bold text-blue-700 whitespace-nowrap">
+                              {formatCurrency(precio.precio)}<span className="font-normal text-gray-400">/mes</span>
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
