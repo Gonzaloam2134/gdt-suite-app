@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useSignOut } from '../hooks/useSignOut'
 import { useReportes } from '../hooks/useReportes'
+import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
@@ -21,6 +22,10 @@ export default function Reportes() {
   const signOut = useSignOut()
   const { user, checking } = useAuthGuard()
   const r = useReportes(user?.id)
+  // 'solo-reportes': nunca redirige, solo informa. Reportes tiene que quedar
+  // siempre accesible aunque la prueba haya vencido o el pago esté al día
+  // pero el segmento cambió — es la garantía que definimos con las suscripciones.
+  const guard = useSuscripcionGuard(r.localId !== 'todos' ? r.localId : null, 'solo-reportes')
   const [ayuda, setAyuda] = useState(false)
   const [exportando, setExportando] = useState(null)
 
@@ -83,6 +88,20 @@ export default function Reportes() {
 
       <div className="max-w-7xl mx-auto p-3 md:p-4 space-y-4">
         <FiltrosReporte periodo={r.periodo} onPreset={r.aplicarPreset} onFechas={r.aplicarFechas} />
+
+        {guard.estado === 'restricted' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-blue-900 m-0">
+              {guard.vencioPrueba
+                ? 'Tu prueba de 30 días terminó. Podés ver y exportar tus reportes cuando quieras.'
+                : 'Este local tiene el acceso restringido a solo Reportes.'}
+            </p>
+            <a href="/planes"
+              className="text-xs font-bold text-blue-700 bg-white border border-blue-300 rounded px-3 py-1.5 hover:bg-blue-100 shrink-0">
+              Ver planes →
+            </a>
+          </div>
+        )}
 
         <AvisosCalidad calidad={r.calidad} />
 

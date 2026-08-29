@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
+import { LABEL_SEGMENTO, LABEL_CICLO } from '../lib/constants/planes'
 import { useSignOut } from '../hooks/useSignOut'
 import { useSuperAdminData } from '../hooks/useSuperAdminData'
 import { cambiarEstadoSuscripcion } from '../lib/services/suscripciones'
@@ -572,7 +573,15 @@ export default function SuperAdmin() {
                           </div>
                           <div className="text-xs text-gray-600 space-y-1">
                             <div>👤 Owner: {sub.ownerEmail}</div>
-                            <div>📦 Plan: <span className="font-semibold uppercase">{sub.plan}</span></div>
+                            <div>
+                              📦 Plan: <span className="font-semibold uppercase">{sub.plan}</span>
+                              {sub.plan === 'pago' && sub.segmento && (
+                                <span className="ml-1 text-gray-500">
+                                  · {LABEL_SEGMENTO[sub.segmento] || sub.segmento}
+                                  {sub.ciclo && ` (${LABEL_CICLO[sub.ciclo] || sub.ciclo})`}
+                                </span>
+                              )}
+                            </div>
                             <div>📅 Vencimiento: {sub.fecha_vencimiento ? new Date(sub.fecha_vencimiento).toLocaleDateString('es-AR') : 'Sin fecha'}</div>
                           </div>
                         </div>

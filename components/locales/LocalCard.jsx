@@ -52,10 +52,19 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
         )}
         {!deshabilitado && pruebaVencida && (
           <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded p-2 mt-3 m-0">
-            Tu prueba terminó. Podés entrar a ver y descargar tus reportes. Escribinos para seguir usando la caja.
+            Tu prueba terminó. Podés entrar a ver y descargar tus reportes.
           </p>
         )}
       </button>
+
+      {!deshabilitado && pruebaVencida && (
+        <div className="px-4 pb-3 -mt-1">
+          <a href="/planes"
+            className="block text-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1.5 hover:bg-blue-100">
+            Ver planes →
+          </a>
+        </div>
+      )}
 
       {!deshabilitado && (
         <div className="flex border-t border-gray-100">

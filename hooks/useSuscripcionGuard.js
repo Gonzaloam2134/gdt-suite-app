@@ -27,6 +27,7 @@ const MENSAJE_RESTRINGIDO = 'Acceso restringido: solo podés ver Reportes.'
 export function useSuscripcionGuard(localId, modo = 'total') {
   const router = useRouter()
   const [estado, setEstado] = useState(null)
+  const [vencioPrueba, setVencioPrueba] = useState(false)
   const [checking, setChecking] = useState(true)
   const montado = useRef(true)
   useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
@@ -35,22 +36,23 @@ export function useSuscripcionGuard(localId, modo = 'total') {
     if (!localId) { if (montado.current) { setEstado(null); setChecking(false) }; return }
     setChecking(true)
     let valor = 'active'
-    let vencioPrueba = false
+    let venciendo = false
     try {
       const sub = await getSuscripcion(localId)
       const efectivo = estadoEfectivo(sub)
       valor = efectivo.estado
-      vencioPrueba = efectivo.vencioPrueba
+      venciendo = efectivo.vencioPrueba
     } catch (err) {
       console.error('[useSuscripcionGuard]', err)
     }
     if (!montado.current) return
     setEstado(valor)
+    setVencioPrueba(venciendo)
     if (valor === 'suspended') {
       toast.error(MENSAJE_SUSPENDIDO)
       router.replace('/locales')
     } else if (valor === 'restricted' && modo === 'total') {
-      toast(vencioPrueba ? MENSAJE_PRUEBA_VENCIDA : MENSAJE_RESTRINGIDO, { icon: '⚠️' })
+      toast(venciendo ? MENSAJE_PRUEBA_VENCIDA : MENSAJE_RESTRINGIDO, { icon: '⚠️' })
       router.replace('/reportes')
     }
     setChecking(false)
@@ -60,5 +62,5 @@ export function useSuscripcionGuard(localId, modo = 'total') {
 
   const debeRedirigir = estado === 'suspended' || (estado === 'restricted' && modo === 'total')
 
-  return { estado, checking, debeRedirigir }
+  return { estado, checking, debeRedirigir, vencioPrueba }
 }
