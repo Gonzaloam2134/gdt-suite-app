@@ -35,8 +35,8 @@ export default function AdminPanel() {
   // del contexto. Mirar solo `esSuperUser` dejaba pasar la carrera: un super
   // admin real podía ser echado del local que estaba administrando antes de
   // que la app se enterara de que lo era.
-  const suscripcion = useSuscripcionGuard(cargandoRol ? null : (esSuperUser ? null : activeLocalId), 'total')
-  const { local, stats, miembros, inactivos, invitaciones, mediosPago, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar } = useAdminData()
+  const guardSuscripcion = useSuscripcionGuard(cargandoRol ? null : (esSuperUser ? null : activeLocalId), 'total')
+  const { local, stats, miembros, inactivos, invitaciones, mediosPago, suscripcion, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar } = useAdminData()
   const { locales } = useMisLocales(userId)
   const [tab, setTab] = useState(router.query.tab || 'resumen')
 
@@ -47,7 +47,7 @@ export default function AdminPanel() {
     if (!cargandoRol && esSuperUser && !activeLocalId) router.replace('/superadmin')
   }, [cargandoRol, esSuperUser, activeLocalId, router])
 
-  if (checking || cargandoRol || loading || suscripcion.checking || suscripcion.debeRedirigir) return <LoadingScreen mensaje="Cargando panel…" />
+  if (checking || cargandoRol || loading || guardSuscripcion.checking || guardSuscripcion.debeRedirigir) return <LoadingScreen mensaje="Cargando panel…" />
 
   if (!activeLocalId) {
     return (
@@ -90,7 +90,7 @@ export default function AdminPanel() {
           <ResumenTab stats={stats} logs={logs} periodo={periodo} onPreset={aplicarPreset} onFechas={aplicarFechas} />
         )}
         {tab === 'miembros' && (
-          <MiembrosTab miembros={miembros} inactivos={inactivos} invitaciones={invitaciones}
+          <MiembrosTab miembros={miembros} inactivos={inactivos} invitaciones={invitaciones} suscripcion={suscripcion}
             localId={activeLocalId} userId={userId} onCambio={recargar} />
         )}
         {tab === 'medios-pago' && (

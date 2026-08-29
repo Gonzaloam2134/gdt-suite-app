@@ -6,6 +6,7 @@ import { listarMiembros, listarMiembrosInactivos, listarInvitaciones } from '../
 import { listarMediosPago } from '../lib/services/mediosPago'
 import { listarTransaccionesPeriodo } from '../lib/services/transacciones'
 import { listarLogs } from '../lib/services/auditoria'
+import { getSuscripcion } from '../lib/services/suscripciones'
 import { calcularResumenPeriodo } from '../lib/domain/transacciones'
 import { rangoEntre, periodoRapido } from '../lib/dates'
 import { discriminaIva } from '../lib/constants/transacciones'
@@ -23,6 +24,7 @@ export function useAdminData() {
   const [inactivos, setInactivos] = useState([])
   const [invitaciones, setInvitaciones] = useState([])
   const [mediosPago, setMediosPago] = useState([])
+  const [suscripcion, setSuscripcion] = useState(null)
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -49,16 +51,18 @@ export function useAdminData() {
       setLogs(await listarLogs({ localId: activeLocalId, inicio, fin, userId: esOwner ? null : userId }))
 
       if (esOwner) {
-        const [m, inac, inv, mp] = await Promise.all([
+        const [m, inac, inv, mp, sub] = await Promise.all([
           listarMiembros(activeLocalId),
           listarMiembrosInactivos(activeLocalId),
           listarInvitaciones(activeLocalId),
           listarMediosPago(activeLocalId),
+          getSuscripcion(activeLocalId),
         ])
         setMiembros(m)
         setInactivos(inac)
         setInvitaciones(inv)
         setMediosPago(mp)
+        setSuscripcion(sub)
       }
     } catch (err) {
       console.error('[useAdminData]', err)
@@ -71,5 +75,5 @@ export function useAdminData() {
   const aplicarPreset = (preset) => setPeriodo({ ...periodoRapido(preset), preset })
   const aplicarFechas = (desde, hasta) => setPeriodo({ desde, hasta, preset: 'personalizado' })
 
-  return { local, stats, miembros, inactivos, invitaciones, mediosPago, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar: cargar }
+  return { local, stats, miembros, inactivos, invitaciones, mediosPago, suscripcion, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar: cargar }
 }

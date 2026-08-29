@@ -5,6 +5,9 @@ import { actualizarPerfil } from '../../lib/services/auth'
 import { registrarAccion } from '../../lib/services/auditoria'
 import { ACCIONES } from '../../lib/constants/auditoria'
 import { ROLES, ROLES_INVITABLES, LABEL_ROL } from '../../lib/constants/roles'
+import { LABEL_SEGMENTO } from '../../lib/constants/planes'
+import { superaLimiteEquipo, equipoIlimitado } from '../../lib/domain/planes'
+import { mensajeError } from '../../lib/errorMessage'
 import { formatFecha } from '../../lib/format'
 import EditarMiembroModal from './EditarMiembroModal'
 import InvitacionesPendientes from './InvitacionesPendientes'
@@ -15,7 +18,7 @@ import Modal from '../ui/Modal'
 const COLOR_ROL = { owner: 'bg-purple-100 text-purple-800', cajero: 'bg-blue-100 text-blue-800', empleado: 'bg-gray-100 text-gray-800' }
 const ICONO_ROL = { owner: '👑', cajero: '💼', empleado: '👷' }
 
-export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [], localId, userId, onCambio }) {
+export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [], suscripcion, localId, userId, onCambio }) {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState(ROLES.CAJERO)
@@ -26,6 +29,12 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
   const [recienCreada, setRecienCreada] = useState(null)
   const [verInactivos, setVerInactivos] = useState(false)
   const [rolYaAsignado, setRolYaAsignado] = useState(null)
+
+  // Durante la prueba gratuita no hay segmento todavía: no se limita nada.
+  // El límite solo aplica una vez que el local está en un plan pago.
+  const segmento = suscripcion?.plan === 'pago' ? suscripcion.segmento : null
+  const personasActivas = miembros.length + (invitaciones.filter(i => i.estado === 'pendiente').length)
+  const sinCupo = segmento && superaLimiteEquipo(segmento, personasActivas)
 
   /**
    * Una persona tiene el mismo rol en todos sus locales. Si ya participa en otro,
@@ -44,6 +53,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
   const invitar = async (e) => {
     e.preventDefault()
     if (!email.trim()) return toast.error('Ingresá el email de la persona')
+    if (sinCupo) return toast.error(`Tu plan ${LABEL_SEGMENTO[segmento]} permite solo al dueño operando. Actualizá a Negocio para sumar gente.`)
     setInvitando(true)
     try {
       const inv = await crearInvitacion({ localId, email, nombre, rol, invitadoPor: userId })
@@ -55,7 +65,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
     } catch (err) {
       toast.error(err.message?.includes('duplicate') || err.message?.includes('unica')
         ? 'Ya hay una invitación pendiente para ese email en este local'
-        : `No se pudo invitar: ${err.message}`)
+        : mensajeError(err))
     } finally { setInvitando(false) }
   }
 
@@ -107,8 +117,19 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
       <form onSubmit={invitar} className="bg-white p-4 rounded-xl border border-gray-200">
         <h3 className="text-base font-bold text-gray-900 mb-1 m-0">Sumar a alguien al local</h3>
         <p className="text-xs text-gray-500 mb-3 m-0">
-          Le llega un mail, y además vas a poder copiar el link o mandárselo por WhatsApp.
+          Se genera un link de acceso que le mandás por WhatsApp o le copiás. El link vence en 7 días.
         </p>
+
+        {sinCupo && (
+          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm font-semibold text-amber-900 m-0">
+              Tu plan {LABEL_SEGMENTO[segmento]} llegó al límite de personas operando.
+            </p>
+            <p className="text-xs text-amber-800 mt-1 m-0">
+              Para sumar más gente, <a href="/planes" className="font-semibold underline">actualizá a un plan sin límite de equipo</a>.
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_1fr_auto] gap-3">
           <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
             placeholder="Nombre (opcional)" aria-label="Nombre"
@@ -123,8 +144,8 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
             className="p-2.5 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500">
             {ROLES_INVITABLES.map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
           </select>
-          <button type="submit" disabled={invitando}
-            className="px-5 py-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 disabled:opacity-50">
+          <button type="submit" disabled={invitando || sinCupo} title={sinCupo ? 'Llegaste al límite de tu plan' : ''}
+            className="px-5 py-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
             {invitando ? 'Creando…' : 'Sumar'}
           </button>
         </div>
