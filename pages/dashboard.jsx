@@ -28,11 +28,13 @@ import ReversaModal from '../components/ReversaModal'
 import ContactModal from '../components/ContactModal'
 import GuiaArqueoModal from '../components/caja/GuiaArqueoModal'
 import EditarMontoInicialModal from '../components/caja/EditarMontoInicialModal'
+import BienvenidaModal from '../components/BienvenidaModal'
+import { marcarBienvenidaVista } from '../lib/services/auth'
 
 export default function Dashboard() {
   const { user, checking } = useAuthGuard()
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
-  const { esSuperUser, loading: cargandoRol } = useUserRole()
+  const { esSuperUser, loading: cargandoRol, role, perfil, userId, recargar: recargarRol } = useUserRole()
   // El super admin no queda bloqueado por la suscripción de un local: la
   // administra desde /superadmin, no tiene sentido que lo eche del panel que
   // usa para revisarlo. OJO: hay que esperar a que el rol termine de cargar
@@ -56,7 +58,11 @@ export default function Dashboard() {
   const diaHuerfanaISO = caja.huerfana ? aFechaISO(new Date(caja.huerfana.fecha_apertura)) : null
   const datosHuerfana = useTransaccionesDia(caja.huerfana ? localId : null, diaHuerfanaISO || fechaISO)
 
-  const [modal, setModal] = useState(null)   // apertura | cierre | cierre-huerfana | historial | cobro | gasto | ayuda
+  const [modal, setModal] = useState(null)   // apertura | cierre | cierre-huerfana | historial | cobro | gasto | ayuda | guia | editar-inicial | bienvenida
+  // Primera vez que esta persona llega a la caja: se marca en la cuenta, no
+  // en el dispositivo, para que no vuelva a aparecer al entrar desde otro celular.
+  const [bienvenidaCerrada, setBienvenidaCerrada] = useState(false)
+  const mostrarBienvenida = !cargandoRol && perfil && !perfil.bienvenida_vista_en && !bienvenidaCerrada
   const [aReversar, setAReversar] = useState(null)
   const cerrarModal = () => setModal(null)
 
@@ -147,6 +153,15 @@ export default function Dashboard() {
         onGuardar={caja.corregirInicial} procesando={caja.procesando}
       />
       <ContactModal isOpen={modal === 'ayuda'} onClose={cerrarModal} user={user} localId={localId} paginaOrigen="dashboard" />
+
+      <BienvenidaModal
+        isOpen={!!mostrarBienvenida}
+        rol={role}
+        onClose={() => {
+          setBienvenidaCerrada(true)   // se oculta al instante, sin esperar la red
+          marcarBienvenidaVista(userId).then(recargarRol).catch(() => {})
+        }}
+      />
 
       <BottomNav activeTab="caja" />
     </main>
