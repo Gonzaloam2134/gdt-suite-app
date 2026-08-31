@@ -4,13 +4,13 @@ import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useMisLocales } from '../hooks/useMisLocales'
 import { listarPlanes } from '../lib/services/planes'
-import { SEGMENTO, CICLO, LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO } from '../lib/constants/planes'
+import { SEGMENTO, CICLO, LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO, CARACTERISTICAS_SEGMENTO } from '../lib/constants/planes'
 import { formatCurrency } from '../lib/format'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
 
-const ORDEN = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
+const SEGMENTOS = Object.values(SEGMENTO)
 
 /**
  * Vidriera de precios. El botón de pago se conecta cuando esté Mercado Pago
@@ -39,6 +39,15 @@ export default function Planes() {
   if (checking || cargando) return <LoadingScreen mensaje="Cargando planes…" />
 
   const precioDe = (segmento) => precios.find(p => p.segmento === segmento && p.ciclo === ciclo)
+
+  // De más barato a más caro, siempre — según el precio real de la base, no
+  // un orden fijo en el código. Si el día de mañana cambiás los precios y el
+  // orden relativo se invierte, la vidriera se reordena sola.
+  const orden = [...SEGMENTOS].sort((a, b) => {
+    const pa = precios.find(p => p.segmento === a && p.ciclo === 'mensual')?.precio ?? 0
+    const pb = precios.find(p => p.segmento === b && p.ciclo === 'mensual')?.precio ?? 0
+    return pa - pb
+  })
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20 md:pb-10">
@@ -70,13 +79,14 @@ export default function Planes() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {ORDEN.map(segmento => {
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+          {orden.map(segmento => {
             const precio = precioDe(segmento)
             return (
               <div key={segmento} className="bg-white rounded-xl border-2 border-gray-200 p-5 flex flex-col">
                 <h2 className="text-lg font-bold text-gray-900 m-0">{LABEL_SEGMENTO[segmento]}</h2>
-                <p className="text-xs text-gray-500 mt-1 mb-4 flex-1">{DESCRIPCION_SEGMENTO[segmento]}</p>
+                <p className="text-xs text-gray-500 mt-1 mb-3">{DESCRIPCION_SEGMENTO[segmento]}</p>
+
                 <div className="text-2xl font-extrabold text-gray-900 mb-1">
                   {precio ? formatCurrency(precio.precio) : '—'}
                   <span className="text-xs font-normal text-gray-400"> /{ciclo === 'mensual' ? 'mes' : 'año'}</span>
@@ -84,8 +94,18 @@ export default function Planes() {
                 {segmento === SEGMENTO.MULTI_LOCAL && (
                   <p className="text-xs text-gray-400 mb-3 m-0">Por cada local además del primero</p>
                 )}
+
+                <ul className="flex-1 space-y-1.5 my-3 pl-0 list-none">
+                  {CARACTERISTICAS_SEGMENTO[segmento].map((c, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                      <span className="text-green-600 shrink-0 mt-0.5">✓</span>
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+
                 <button disabled
-                  className="mt-4 w-full p-2.5 bg-gray-100 text-gray-400 border-none rounded-lg text-sm font-bold cursor-not-allowed">
+                  className="mt-3 w-full p-2.5 bg-gray-100 text-gray-400 border-none rounded-lg text-sm font-bold cursor-not-allowed">
                   Próximamente
                 </button>
               </div>

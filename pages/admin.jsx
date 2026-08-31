@@ -14,12 +14,14 @@ import Tabs from '../components/admin/Tabs'
 import ResumenTab from '../components/admin/ResumenTab'
 import MiembrosTab from '../components/admin/MiembrosTab'
 import MediosPagoTab from '../components/admin/MediosPagoTab'
+import SuscripcionTab from '../components/admin/SuscripcionTab'
 import ListaLogs from '../components/admin/ListaLogs'
 
 const TABS_OWNER = [
   { id: 'resumen', label: '📊 Resumen' },
   { id: 'miembros', label: '👥 Miembros' },
   { id: 'medios-pago', label: '💳 Medios de pago' },
+  { id: 'suscripcion', label: '💎 Suscripción' },
   { id: 'logs', label: '📋 Auditoría' },
 ]
 
@@ -96,6 +98,7 @@ export default function AdminPanel() {
         {tab === 'medios-pago' && (
           <MediosPagoTab mediosPago={mediosPago} localId={activeLocalId} userId={userId} onCambio={recargar} />
         )}
+        {tab === 'suscripcion' && <SuscripcionTab suscripcion={suscripcion} />}
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>
 
