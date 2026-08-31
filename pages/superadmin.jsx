@@ -6,7 +6,7 @@ import { useUserRole } from '../lib/UserRoleContext'
 import { LABEL_SEGMENTO, LABEL_CICLO } from '../lib/constants/planes'
 import { useSignOut } from '../hooks/useSignOut'
 import { useSuperAdminData } from '../hooks/useSuperAdminData'
-import { cambiarEstadoSuscripcion } from '../lib/services/suscripciones'
+import { cambiarEstadoSuscripcion, cambiarEstadoCuenta } from '../lib/services/suscripciones'
 import { responderContacto } from '../lib/services/contactos'
 import { actualizarUsuario, guardarConfigGlobal } from '../lib/services/superadmin'
 import { crearAnuncio } from '../lib/services/anuncios'
@@ -106,7 +106,7 @@ export default function SuperAdmin() {
   const confirmarCambioSuscripcion = async () => {
     if (!confirmarSuscripcion) return
     try {
-      await cambiarEstadoSuscripcion(confirmarSuscripcion.localId, confirmarSuscripcion.nuevoEstado)
+      await cambiarEstadoCuenta(confirmarSuscripcion.ownerId, confirmarSuscripcion.nuevoEstado)
       toast.success(`✅ Estado actualizado a ${confirmarSuscripcion.nuevoEstado}`)
       setConfirmarSuscripcion(null)
       await recargar()
@@ -559,7 +559,10 @@ export default function SuperAdmin() {
                       <div className="flex flex-col md:flex-row justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-bold text-gray-900">{sub.locales?.nombre}</h4>
+                            <h4 className="font-bold text-gray-900">
+                              {sub.locales?.[0]?.nombre || 'Sin local'}
+                              {sub.cantidadLocales > 1 && <span className="text-gray-400 font-normal"> +{sub.cantidadLocales - 1} más</span>}
+                            </h4>
                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                               sub.estado === 'active' ? 'bg-green-100 text-green-700' :
                               sub.estado === 'restricted' ? 'bg-amber-100 text-amber-700' :
@@ -589,7 +592,7 @@ export default function SuperAdmin() {
                         <div className="flex flex-col gap-2 min-w-[200px]">
                           {sub.estado !== 'active' && (
                             <button
-                              onClick={() => setConfirmarSuscripcion({ localId: sub.local_id, nombreLocal: sub.locales?.nombre, nuevoEstado: 'active' })}
+                              onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'active' })}
                               className="px-3 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
                             >
                               ✅ Activar / Desbloquear
@@ -597,7 +600,7 @@ export default function SuperAdmin() {
                           )}
                           {sub.estado !== 'restricted' && (
                             <button
-                              onClick={() => setConfirmarSuscripcion({ localId: sub.local_id, nombreLocal: sub.locales?.nombre, nuevoEstado: 'restricted' })}
+                              onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'restricted' })}
                               className="px-3 py-2 bg-amber-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-600"
                             >
                               🟡 Restringir (Solo Reportes)
@@ -605,7 +608,7 @@ export default function SuperAdmin() {
                           )}
                           {sub.estado !== 'suspended' && (
                             <button
-                              onClick={() => setConfirmarSuscripcion({ localId: sub.local_id, nombreLocal: sub.locales?.nombre, nuevoEstado: 'suspended' })}
+                              onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'suspended' })}
                               className="px-3 py-2 bg-red-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-red-600"
                             >
                               🔴 Suspender Acceso Total

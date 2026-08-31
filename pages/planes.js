@@ -64,8 +64,8 @@ export default function Planes() {
           </div>
         ) : (
           <div className="text-center">
-            <h1 className="text-xl font-bold text-gray-900 m-0">Elegí el plan de tu local</h1>
-            <p className="text-sm text-gray-500 mt-1 m-0">Cada local paga el suyo. Si ya tenés otro local pago, este sale con descuento.</p>
+            <h1 className="text-xl font-bold text-gray-900 m-0">Elegí tu plan</h1>
+            <p className="text-sm text-gray-500 mt-1 m-0">Pagás una vez por tu cuenta — Básico y Negocio cubren un local, Multi-local no tiene límite.</p>
           </div>
         )}
 
@@ -91,9 +91,9 @@ export default function Planes() {
                   {precio ? formatCurrency(precio.precio) : '—'}
                   <span className="text-xs font-normal text-gray-400"> /{ciclo === 'mensual' ? 'mes' : 'año'}</span>
                 </div>
-                {segmento === SEGMENTO.MULTI_LOCAL && (
-                  <p className="text-xs text-gray-400 mb-3 m-0">Por cada local además del primero</p>
-                )}
+                <p className="text-xs text-gray-400 mb-3 m-0">
+                  {segmento === SEGMENTO.MULTI_LOCAL ? 'Cubre todos tus locales, sin límite' : 'Cubre un solo local'}
+                </p>
 
                 <ul className="flex-1 space-y-1.5 my-3 pl-0 list-none">
                   {CARACTERISTICAS_SEGMENTO[segmento].map((c, i) => (

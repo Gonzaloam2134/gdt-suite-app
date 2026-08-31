@@ -15,6 +15,8 @@ const ESTILO_ESTADO = {
  * el botón de pago en /planes todavía dice "Próximamente".
  */
 export default function SuscripcionTab({ suscripcion }) {
+  // Este panel muestra la cuenta, no solo este local: si tenés más de un
+  // local, todos comparten la misma suscripción — pagás una vez.
   const { estado, vencioPrueba, diasRestantes } = estadoEfectivo(suscripcion)
   const esPrueba = suscripcion?.plan === 'trial'
   const esPago = suscripcion?.plan === 'pago'

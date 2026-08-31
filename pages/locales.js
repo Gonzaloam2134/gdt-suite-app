@@ -9,8 +9,10 @@ import { useAnuncios } from '../hooks/useAnuncios'
 import { crearLocal } from '../lib/services/locales'
 import { agregarOwner } from '../lib/services/miembros'
 import { crearMediosPago } from '../lib/services/mediosPago'
-import { crearSuscripcionPrueba, getSuscripcion } from '../lib/services/suscripciones'
+import { getSuscripcion } from '../lib/services/suscripciones'
 import { estadoEfectivo } from '../lib/domain/suscripciones'
+import { superaLimiteLocales } from '../lib/domain/planes'
+import { LABEL_SEGMENTO } from '../lib/constants/planes'
 import { registrarAccion } from '../lib/services/auditoria'
 import { ACCIONES } from '../lib/constants/auditoria'
 import { ROLES } from '../lib/constants/roles'
@@ -86,7 +88,9 @@ export default function MisLocales() {
         creadoPor: user.id,
       })
       await agregarOwner(local.id, user.id)
-      await crearSuscripcionPrueba(local.id, 30)
+      // La prueba de 30 días se crea sola (trigger crear_prueba_si_no_existe)
+      // al insertar el primer local del dueño; en el segundo local en
+      // adelante no hace nada, porque ya existe — un solo período por cuenta.
 
       const medios = (datos.mediosPago || []).filter(m => m.habilitado)
       if (medios.length) await crearMediosPago(local.id, medios, user.id)
@@ -103,7 +107,13 @@ export default function MisLocales() {
     }
   }
 
-  const puedeCrear = locales.length === 0 || locales.some(l => l.rol === ROLES.OWNER)
+  const localesPropios = locales.filter(l => l.rol === ROLES.OWNER)
+  // La suscripción es por cuenta: cualquiera de mis locales propios devuelve
+  // la misma fila, así que alcanza con mirar la del primero.
+  const segmentoCuenta = suscripciones[localesPropios[0]?.id]?.plan === 'pago' ? suscripciones[localesPropios[0]?.id].segmento : null
+
+  const sinCupoLocales = localesPropios.length > 0 && segmentoCuenta && superaLimiteLocales(segmentoCuenta, localesPropios.length)
+  const puedeCrear = locales.length === 0 || (localesPropios.length > 0 && !sinCupoLocales)
 
   return (
     <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
@@ -148,11 +158,20 @@ export default function MisLocales() {
               })}
             </div>
 
-            {puedeCrear && (
+            {puedeCrear ? (
               <button onClick={() => setOnboarding(true)}
                 className="w-full p-3 bg-white text-blue-700 border-2 border-dashed border-blue-300 rounded-xl text-sm font-bold cursor-pointer hover:bg-blue-50">
                 + Agregar otro local
               </button>
+            ) : sinCupoLocales && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                <p className="text-sm text-amber-900 m-0">
+                  Tu plan {LABEL_SEGMENTO[segmentoCuenta]} permite un solo local.
+                </p>
+                <a href="/planes" className="text-sm font-bold text-blue-700 hover:underline">
+                  Actualizá a Multi-local para abrir otro →
+                </a>
+              </div>
             )}
           </>
         )}
