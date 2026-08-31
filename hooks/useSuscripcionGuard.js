@@ -5,7 +5,7 @@ import { getSuscripcion } from '../lib/services/suscripciones'
 import { estadoEfectivo } from '../lib/domain/suscripciones'
 
 const MENSAJE_SUSPENDIDO = 'Local suspendido. Regularizá el pago para acceder.'
-const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 30 días terminó. Podés seguir viendo tus reportes; escribinos para seguir usando la caja.'
+const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 30 días terminó. Elegí tu plan para seguir usando la caja.'
 const MENSAJE_RESTRINGIDO = 'Acceso restringido: solo podés ver Reportes.'
 
 /**
@@ -52,8 +52,17 @@ export function useSuscripcionGuard(localId, modo = 'total') {
       toast.error(MENSAJE_SUSPENDIDO)
       router.replace('/locales')
     } else if (valor === 'restricted' && modo === 'total') {
-      toast(venciendo ? MENSAJE_PRUEBA_VENCIDA : MENSAJE_RESTRINGIDO, { icon: '⚠️' })
-      router.replace('/reportes')
+      if (venciendo) {
+        // Prueba vencida: se lleva directo a elegir plan, no a Reportes con
+        // un aviso pasivo. Reportes sigue a un clic (nav de AppHeader/BottomNav,
+        // que nunca se gatean por suscripción) — la garantía de "siempre podés
+        // ver tus reportes" sigue en pie, solo cambia cuál es la pantalla default.
+        toast(MENSAJE_PRUEBA_VENCIDA, { icon: '⚠️' })
+        router.replace(`/planes?local=${localId}&motivo=prueba-vencida`)
+      } else {
+        toast(MENSAJE_RESTRINGIDO, { icon: '⚠️' })
+        router.replace('/reportes')
+      }
     }
     setChecking(false)
   }, [localId, modo, router])

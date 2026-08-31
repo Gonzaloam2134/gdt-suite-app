@@ -2,26 +2,35 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
+import { useMisLocales } from '../hooks/useMisLocales'
 import { listarPlanes } from '../lib/services/planes'
 import { SEGMENTO, CICLO, LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO } from '../lib/constants/planes'
 import { formatCurrency } from '../lib/format'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
+import BottomNav from '../components/layout/BottomNav'
 
 const ORDEN = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
 
 /**
  * Vidriera de precios. El botón de pago se conecta cuando esté Mercado Pago
- * (Parte 2) — por ahora, si alguien llega acá porque tocó el límite de su
- * plan, al menos entiende qué opciones tiene y por qué.
+ * (Parte 2) — por ahora, si alguien llega acá porque venció su prueba o
+ * tocó el límite de su plan, al menos entiende qué opciones tiene y por qué.
+ *
+ * Lleva BottomNav y el nav de AppHeader igual que cualquier otra pantalla:
+ * si alguien aterriza acá por el vencimiento de la prueba, tiene que poder
+ * seguir a Reportes en un toque — nunca queda encerrado eligiendo un plan.
  */
 export default function Planes() {
   const router = useRouter()
-  const { checking } = useAuthGuard()
+  const { user, checking } = useAuthGuard()
   const { activeLocalId } = useUserRole()
+  const { locales } = useMisLocales(user?.id)
   const [ciclo, setCiclo] = useState(CICLO.MENSUAL)
   const [precios, setPrecios] = useState([])
   const [cargando, setCargando] = useState(true)
+
+  const vieneDePruebaVencida = router.query.motivo === 'prueba-vencida'
 
   useEffect(() => {
     listarPlanes().then(setPrecios).finally(() => setCargando(false))
@@ -32,14 +41,24 @@ export default function Planes() {
   const precioDe = (segmento) => precios.find(p => p.segmento === segmento && p.ciclo === ciclo)
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-10">
-      <AppHeader titulo="Planes" locales={[]} localId={null} />
+    <main className="min-h-screen bg-slate-100 pb-20 md:pb-10">
+      <AppHeader titulo="Planes" locales={locales} localId={activeLocalId} />
 
       <div className="max-w-4xl mx-auto p-4 space-y-6">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-gray-900 m-0">Elegí el plan de tu local</h1>
-          <p className="text-sm text-gray-500 mt-1 m-0">Cada local paga el suyo. Si ya tenés otro local pago, este sale con descuento.</p>
-        </div>
+        {vieneDePruebaVencida ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+            <h1 className="text-lg font-bold text-blue-900 m-0">Tu prueba de 30 días terminó</h1>
+            <p className="text-sm text-blue-800 mt-1 m-0">
+              Elegí un plan para seguir abriendo caja y cargando cobros. Mientras tanto, tus reportes
+              siguen siempre disponibles desde el menú de arriba.
+            </p>
+          </div>
+        ) : (
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-gray-900 m-0">Elegí el plan de tu local</h1>
+            <p className="text-sm text-gray-500 mt-1 m-0">Cada local paga el suyo. Si ya tenés otro local pago, este sale con descuento.</p>
+          </div>
+        )}
 
         <div className="flex justify-center gap-2">
           {Object.values(CICLO).map(c => (
@@ -75,10 +94,15 @@ export default function Planes() {
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          ¿Ya sos parte de un local? <button onClick={() => router.push(activeLocalId ? '/dashboard' : '/locales')}
-            className="text-blue-600 font-semibold bg-transparent border-none cursor-pointer hover:underline">Volver</button>
+          ¿Querés ver tus reportes primero?{' '}
+          <button onClick={() => router.push('/reportes')}
+            className="text-blue-600 font-semibold bg-transparent border-none cursor-pointer hover:underline">
+            Ir a Reportes
+          </button>
         </p>
       </div>
+
+      <BottomNav activeTab="planes" />
     </main>
   )
 }
