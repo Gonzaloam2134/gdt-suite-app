@@ -9,7 +9,7 @@ import { useSuperAdminData } from '../hooks/useSuperAdminData'
 import { cambiarEstadoSuscripcion, cambiarEstadoCuenta } from '../lib/services/suscripciones'
 import { responderContacto } from '../lib/services/contactos'
 import { actualizarUsuario, guardarConfigGlobal } from '../lib/services/superadmin'
-import { crearAnuncio } from '../lib/services/anuncios'
+import { crearAnuncio, actualizarAnuncio, cambiarActivoAnuncio, eliminarAnuncio } from '../lib/services/anuncios'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
 
@@ -55,6 +55,9 @@ export default function SuperAdmin() {
 
   // Anuncios
   const [nuevoAnuncio, setNuevoAnuncio] = useState({ titulo: '', mensaje: '', tipo: 'info' })
+  const [editandoAnuncio, setEditandoAnuncio] = useState(null)   // { id, titulo, mensaje, tipo } o null
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+  const [aEliminarAnuncio, setAEliminarAnuncio] = useState(null)
   const [publicando, setPublicando] = useState(false)
 
   useEffect(() => {
@@ -136,6 +139,40 @@ export default function SuperAdmin() {
     } catch (err) {
       toast.error('Error: ' + err.message)
     } finally { setPublicando(false) }
+  }
+
+  const handleGuardarEdicion = async () => {
+    if (!editandoAnuncio.titulo.trim() || !editandoAnuncio.mensaje.trim()) return toast.error('Completá título y mensaje')
+    setGuardandoEdicion(true)
+    try {
+      await actualizarAnuncio(editandoAnuncio.id, editandoAnuncio)
+      toast.success('Anuncio actualizado')
+      setEditandoAnuncio(null)
+      await recargar()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    } finally { setGuardandoEdicion(false) }
+  }
+
+  const handleToggleActivo = async (anuncio) => {
+    try {
+      await cambiarActivoAnuncio(anuncio.id, !anuncio.activo)
+      toast.success(anuncio.activo ? 'Anuncio ocultado' : 'Anuncio reactivado')
+      await recargar()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleEliminarAnuncio = async () => {
+    try {
+      await eliminarAnuncio(aEliminarAnuncio.id)
+      toast.success('Anuncio eliminado')
+      setAEliminarAnuncio(null)
+      await recargar()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
   }
 
   if (checking || cargandoRol || !esSuperUser) return <LoadingScreen mensaje="Verificando acceso…" icono="👑" />
@@ -752,21 +789,69 @@ export default function SuperAdmin() {
             <div className="space-y-3">
               <h3 className="text-base font-bold text-gray-900">Anuncios publicados ({anuncios.length})</h3>
               {anuncios.map(anuncio => (
-                <div key={anuncio.id} className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="text-2xl">
-                      {anuncio.tipo === 'info' ? 'ℹ️' :
-                       anuncio.tipo === 'warning' ? '⚠️' :
-                       anuncio.tipo === 'success' ? '✅' : '🚀'}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-gray-900 text-sm mb-1">{anuncio.titulo}</h4>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{anuncio.mensaje}</p>
-                      <div className="text-xs text-gray-500 mt-2">
-                        Publicado: {new Date(anuncio.creado_en).toLocaleString('es-AR')}
+                <div key={anuncio.id} className={`bg-white rounded-lg border p-4 ${anuncio.activo ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}>
+                  {editandoAnuncio?.id === anuncio.id ? (
+                    <div className="space-y-3">
+                      <input type="text" value={editandoAnuncio.titulo}
+                        onChange={(e) => setEditandoAnuncio({ ...editandoAnuncio, titulo: e.target.value })}
+                        placeholder="Título" className="w-full p-2 border border-gray-300 rounded-md text-sm" />
+                      <textarea value={editandoAnuncio.mensaje} rows={3}
+                        onChange={(e) => setEditandoAnuncio({ ...editandoAnuncio, mensaje: e.target.value })}
+                        placeholder="Mensaje" className="w-full p-2 border border-gray-300 rounded-md text-sm resize-vertical" />
+                      <select value={editandoAnuncio.tipo}
+                        onChange={(e) => setEditandoAnuncio({ ...editandoAnuncio, tipo: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded-md text-sm">
+                        <option value="info">ℹ️ Info</option>
+                        <option value="warning">⚠️ Advertencia</option>
+                        <option value="success">✅ Éxito</option>
+                        <option value="feature">🚀 Novedad</option>
+                      </select>
+                      <div className="flex gap-2">
+                        <button onClick={handleGuardarEdicion} disabled={guardandoEdicion}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600 disabled:opacity-50">
+                          {guardandoEdicion ? 'Guardando…' : 'Guardar cambios'}
+                        </button>
+                        <button onClick={() => setEditandoAnuncio(null)}
+                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200">
+                          Cancelar
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <div className="text-2xl">
+                        {anuncio.tipo === 'info' ? 'ℹ️' :
+                         anuncio.tipo === 'warning' ? '⚠️' :
+                         anuncio.tipo === 'success' ? '✅' : '🚀'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-gray-900 text-sm mb-1 m-0">{anuncio.titulo}</h4>
+                          {!anuncio.activo && (
+                            <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase">Oculto</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{anuncio.mensaje}</p>
+                        <div className="text-xs text-gray-500 mt-2">
+                          Publicado: {new Date(anuncio.creado_en).toLocaleString('es-AR')}
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => setEditandoAnuncio({ id: anuncio.id, titulo: anuncio.titulo, mensaje: anuncio.mensaje, tipo: anuncio.tipo })}
+                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold cursor-pointer hover:bg-blue-200">
+                            Editar
+                          </button>
+                          <button onClick={() => handleToggleActivo(anuncio)}
+                            className="px-3 py-1 bg-amber-100 text-amber-700 rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">
+                            {anuncio.activo ? 'Ocultar' : 'Reactivar'}
+                          </button>
+                          <button onClick={() => setAEliminarAnuncio(anuncio)}
+                            className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold cursor-pointer hover:bg-red-200">
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {anuncios.length === 0 && (
@@ -791,6 +876,12 @@ export default function SuperAdmin() {
         title="Cambiar estado de suscripción"
         message={`¿Confirmás cambiar el estado de "${confirmarSuscripcion?.nombreLocal}" a "${confirmarSuscripcion?.nuevoEstado?.toUpperCase()}"?`}
         confirmLabel="Cambiar estado" />
+
+      <ConfirmDialog isOpen={!!aEliminarAnuncio} onClose={() => setAEliminarAnuncio(null)} onConfirm={handleEliminarAnuncio}
+        danger
+        title="Eliminar anuncio"
+        message={`¿Confirmás eliminar "${aEliminarAnuncio?.titulo}"? No se puede deshacer.`}
+        confirmLabel="Eliminar" />
     </main>
   )
 }
