@@ -4,6 +4,7 @@ import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useMisLocales } from '../hooks/useMisLocales'
 import { listarPlanes } from '../lib/services/planes'
+import { supabase } from '../lib/supabaseClient'
 import { SEGMENTO, CICLO, LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO, CARACTERISTICAS_SEGMENTO } from '../lib/constants/planes'
 import { formatCurrency } from '../lib/format'
 import LoadingScreen from '../components/ui/LoadingScreen'
@@ -13,9 +14,10 @@ import BottomNav from '../components/layout/BottomNav'
 const SEGMENTOS = Object.values(SEGMENTO)
 
 /**
- * Vidriera de precios. El botón de pago se conecta cuando esté Mercado Pago
- * (Parte 2) — por ahora, si alguien llega acá porque venció su prueba o
- * tocó el límite de su plan, al menos entiende qué opciones tiene y por qué.
+ * Vidriera de precios, con el botón de pago conectado a Mercado Pago:
+ * crea la suscripción del lado del servidor (pages/api/suscripcion/crear.js)
+ * y redirige al checkout. La activación real la hace el webhook, no esta
+ * pantalla.
  *
  * Lleva BottomNav y el nav de AppHeader igual que cualquier otra pantalla:
  * si alguien aterriza acá por el vencimiento de la prueba, tiene que poder
@@ -29,12 +31,36 @@ export default function Planes() {
   const [ciclo, setCiclo] = useState(CICLO.MENSUAL)
   const [precios, setPrecios] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [pagando, setPagando] = useState(null) // segmento en proceso de pago, o null
+  const [errorPago, setErrorPago] = useState('')
 
   const vieneDePruebaVencida = router.query.motivo === 'prueba-vencida'
 
   useEffect(() => {
     listarPlanes().then(setPrecios).finally(() => setCargando(false))
   }, [])
+
+  const elegirPlan = async (segmento) => {
+    setErrorPago('')
+    setPagando(segmento)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/suscripcion/crear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ segmento, ciclo }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'No se pudo iniciar el pago')
+      window.location.href = data.initPoint
+    } catch (err) {
+      setErrorPago(err.message || 'No se pudo iniciar el pago. Probá de nuevo.')
+      setPagando(null)
+    }
+  }
 
   if (checking || cargando) return <LoadingScreen mensaje="Cargando planes…" />
 
@@ -66,6 +92,12 @@ export default function Planes() {
           <div className="text-center">
             <h1 className="text-xl font-bold text-gray-900 m-0">Elegí tu plan</h1>
             <p className="text-sm text-gray-500 mt-1 m-0">Pagás una vez por tu cuenta — Básico y Negocio cubren un local, Multi-local no tiene límite.</p>
+          </div>
+        )}
+
+        {errorPago && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center text-sm text-red-700">
+            {errorPago}
           </div>
         )}
 
@@ -104,9 +136,9 @@ export default function Planes() {
                   ))}
                 </ul>
 
-                <button disabled
-                  className="mt-3 w-full p-2.5 bg-gray-100 text-gray-400 border-none rounded-lg text-sm font-bold cursor-not-allowed">
-                  Próximamente
+                <button onClick={() => elegirPlan(segmento)} disabled={pagando !== null}
+                  className="mt-3 w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
+                  {pagando === segmento ? 'Redirigiendo…' : 'Elegir plan'}
                 </button>
               </div>
             )
