@@ -10,9 +10,11 @@ const ESTILO_ESTADO = {
 }
 
 /**
- * Estado de la suscripción del local, visible solo para el dueño. Mientras
- * no esté conectado Mercado Pago, "Ver planes" es el único paso posible —
- * el botón de pago en /planes todavía dice "Próximamente".
+ * Estado de la suscripción del local, visible solo para el dueño. La
+ * cancelación real de un plan pago se hace del lado de Mercado Pago —
+ * ver el bloque "¿Cómo cancelo?" más abajo — porque son dos sistemas
+ * separados: cancelar en MP no actualiza esta pantalla al instante,
+ * depende de que llegue la notificación (webhook) correspondiente.
  */
 export default function SuscripcionTab({ suscripcion }) {
   // Este panel muestra la cuenta, no solo este local: si tenés más de un
@@ -83,6 +85,29 @@ export default function SuscripcionTab({ suscripcion }) {
           className="mt-4 block w-full text-center p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold hover:bg-blue-600">
           {esPago ? 'Cambiar de plan' : 'Ver planes'}
         </a>
+
+        {esPago && (
+          <details className="mt-3 border border-gray-200 rounded-lg">
+            <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">
+              ¿Cómo cancelo mi suscripción?
+            </summary>
+            <div className="p-3 pt-0 space-y-2">
+              <p className="text-xs text-gray-600 m-0">
+                La cancelación se hace desde Mercado Pago, no desde acá:
+              </p>
+              <ol className="text-xs text-gray-600 pl-4 m-0 space-y-1">
+                <li>Abrí la app de Mercado Pago (o entrá a mercadopago.com desde una compu).</li>
+                <li>Andá a <strong>"Tus suscripciones"</strong>.</li>
+                <li>Elegí la suscripción de GDT Suite y tocá <strong>"Cancelar suscripción"</strong>.</li>
+              </ol>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 m-0">
+                Puede tardar unos minutos en reflejarse acá — esta pantalla se
+                actualiza cuando Mercado Pago nos avisa que se canceló, no al
+                instante.
+              </p>
+            </div>
+          </details>
+        )}
       </div>
     </div>
   )
