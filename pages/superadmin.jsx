@@ -9,6 +9,7 @@ import { useSuperAdminData } from '../hooks/useSuperAdminData'
 import { cambiarEstadoSuscripcion, cambiarEstadoCuenta } from '../lib/services/suscripciones'
 import { responderContacto } from '../lib/services/contactos'
 import { actualizarUsuario, guardarConfigGlobal } from '../lib/services/superadmin'
+import { supabase } from '../lib/supabaseClient'
 import { crearAnuncio, actualizarAnuncio, cambiarActivoAnuncio, eliminarAnuncio } from '../lib/services/anuncios'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
@@ -41,6 +42,10 @@ export default function SuperAdmin() {
   // sesión — solo desincronizaba los dos valores)
   const [editandoUsuario, setEditandoUsuario] = useState(null)
   const [nuevoRol, setNuevoRol] = useState('')
+  const [editandoEmail, setEditandoEmail] = useState(null)   // id del usuario, o null
+  const [nuevoEmail, setNuevoEmail] = useState('')
+  const [confirmarEmail, setConfirmarEmail] = useState(null)  // { id, emailActual, emailNuevo } o null
+  const [guardandoEmail, setGuardandoEmail] = useState(false)
 
   // Locales — "suspender" acá cambia suscripciones.estado (lo mismo que la
   // pestaña Suscripciones): es el único mecanismo real de bloqueo. locales.activo
@@ -125,6 +130,32 @@ export default function SuperAdmin() {
       await recargar()
     } catch (err) {
       toast.error('Error: ' + err.message)
+    }
+  }
+
+  const confirmarCambioEmail = async () => {
+    if (!confirmarEmail) return
+    setGuardandoEmail(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/actualizar-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ userId: confirmarEmail.id, nuevoEmail: confirmarEmail.emailNuevo }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'No se pudo cambiar el email')
+      if (data?.warning) {
+        toast(data.warning, { icon: '⚠️' })
+      } else {
+        toast.success('Email actualizado — ya puede iniciar sesión con el nuevo')
+      }
+      setEditandoEmail(null); setNuevoEmail(''); setConfirmarEmail(null)
+      await recargar()
+    } catch (err) {
+      toast.error(err.message || 'Error al cambiar el email')
+    } finally {
+      setGuardandoEmail(false)
     }
   }
 
@@ -454,13 +485,48 @@ export default function SuperAdmin() {
                           </button>
                         </div>
                       </div>
+                    ) : editandoEmail === usuario.id ? (
+                      <div className="bg-slate-50 p-3 rounded-lg space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Nuevo email de acceso (también cambia con qué inicia sesión):
+                          </label>
+                          <input type="email" value={nuevoEmail} autoFocus
+                            onChange={(e) => setNuevoEmail(e.target.value)}
+                            placeholder={usuario.email}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            disabled={!/\S+@\S+\.\S+/.test(nuevoEmail) || nuevoEmail === usuario.email}
+                            onClick={() => setConfirmarEmail({ id: usuario.id, emailActual: usuario.email, emailNuevo: nuevoEmail })}
+                            className="px-4 py-2 bg-amber-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            💾 Guardar cambios
+                          </button>
+                          <button
+                            onClick={() => { setEditandoEmail(null); setNuevoEmail('') }}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-300"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
                     ) : (
-                      <button
-                        onClick={() => { setEditandoUsuario(usuario.id); setNuevoRol(usuario.rol_global) }}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600"
-                      >
-                        ✏️ Editar rol
-                      </button>
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => { setEditandoUsuario(usuario.id); setNuevoRol(usuario.rol_global) }}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600"
+                        >
+                          ✏️ Editar rol
+                        </button>
+                        <button
+                          onClick={() => { setEditandoEmail(usuario.id); setNuevoEmail(usuario.email || '') }}
+                          className="px-4 py-2 bg-amber-100 text-amber-700 rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
+                        >
+                          ✉️ Editar email
+                        </button>
+                      </div>
                     )}
                   </div>
                 )
@@ -882,6 +948,12 @@ export default function SuperAdmin() {
         title="Eliminar anuncio"
         message={`¿Confirmás eliminar "${aEliminarAnuncio?.titulo}"? No se puede deshacer.`}
         confirmLabel="Eliminar" />
+
+      <ConfirmDialog isOpen={!!confirmarEmail} onClose={() => setConfirmarEmail(null)} onConfirm={confirmarCambioEmail}
+        danger
+        title="Cambiar el email de acceso"
+        message={`Esta persona va a dejar de poder entrar con "${confirmarEmail?.emailActual}" y va a tener que usar "${confirmarEmail?.emailNuevo}" de ahora en más. ¿Confirmás?`}
+        confirmLabel={guardandoEmail ? 'Guardando…' : 'Sí, cambiar'} />
     </main>
   )
 }

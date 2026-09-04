@@ -10,6 +10,7 @@ import { formatCurrency } from '../lib/format'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
+import EmailPagoModal from '../components/EmailPagoModal'
 
 const SEGMENTOS = Object.values(SEGMENTO)
 
@@ -33,6 +34,7 @@ export default function Planes() {
   const [cargando, setCargando] = useState(true)
   const [pagando, setPagando] = useState(null) // segmento en proceso de pago, o null
   const [errorPago, setErrorPago] = useState('')
+  const [confirmarPago, setConfirmarPago] = useState(null) // segmento elegido, a la espera de confirmar el email, o null
 
   const vieneDePruebaVencida = router.query.motivo === 'prueba-vencida'
 
@@ -40,7 +42,8 @@ export default function Planes() {
     listarPlanes().then(setPrecios).finally(() => setCargando(false))
   }, [])
 
-  const elegirPlan = async (segmento) => {
+  const elegirPlan = async (payerEmail) => {
+    const segmento = confirmarPago
     setErrorPago('')
     setPagando(segmento)
     try {
@@ -51,7 +54,7 @@ export default function Planes() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ segmento, ciclo }),
+        body: JSON.stringify({ segmento, ciclo, payerEmail }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'No se pudo iniciar el pago')
@@ -59,6 +62,7 @@ export default function Planes() {
     } catch (err) {
       setErrorPago(err.message || 'No se pudo iniciar el pago. Probá de nuevo.')
       setPagando(null)
+      setConfirmarPago(null)
     }
   }
 
@@ -136,7 +140,7 @@ export default function Planes() {
                   ))}
                 </ul>
 
-                <button onClick={() => elegirPlan(segmento)} disabled={pagando !== null}
+                <button onClick={() => setConfirmarPago(segmento)} disabled={pagando !== null}
                   className="mt-3 w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
                   {pagando === segmento ? 'Redirigiendo…' : 'Elegir plan'}
                 </button>
@@ -153,6 +157,17 @@ export default function Planes() {
           </button>
         </p>
       </div>
+
+      <EmailPagoModal
+        isOpen={!!confirmarPago}
+        onClose={() => setConfirmarPago(null)}
+        segmento={confirmarPago}
+        precio={precioDe(confirmarPago)?.precio}
+        ciclo={ciclo}
+        emailSugerido={user?.email}
+        onConfirmar={elegirPlan}
+        procesando={pagando !== null}
+      />
 
       <BottomNav activeTab="planes" />
     </main>

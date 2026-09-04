@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
   if (authError || !user) return res.status(401).json({ error: 'No autenticado' })
 
-  const { segmento, ciclo } = req.body || {}
+  const { segmento, ciclo, payerEmail: payerEmailBody } = req.body || {}
   if (!Object.values(SEGMENTO).includes(segmento) || !Object.values(CICLO).includes(ciclo)) {
     return res.status(400).json({ error: 'Plan inválido' })
   }
@@ -27,8 +27,12 @@ export default async function handler(req, res) {
     .from('planes').select('precio').eq('segmento', segmento).eq('ciclo', ciclo).eq('activo', true).maybeSingle()
   if (planError || !plan) return res.status(400).json({ error: 'Ese plan no está disponible' })
 
+  // El email con el que se paga en Mercado Pago no tiene por qué ser el
+  // mismo con el que la cuenta se registró en GDT Suite — se pide en el
+  // checkout (ver EmailPagoModal). Si por algún motivo no llega, se cae al
+  // email de la cuenta como último recurso, para no romper el pago.
   const { data: perfil } = await supabaseAdmin.from('perfiles').select('email').eq('id', user.id).maybeSingle()
-  const payerEmail = perfil?.email || user.email
+  const payerEmail = (payerEmailBody && /\S+@\S+\.\S+/.test(payerEmailBody)) ? payerEmailBody : (perfil?.email || user.email)
   if (!payerEmail) return res.status(400).json({ error: 'No se encontró un email para esta cuenta' })
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
