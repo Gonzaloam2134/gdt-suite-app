@@ -2,18 +2,19 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 
 /**
  * Con 5 pestañas (Resumen, Miembros, Medios de pago, Suscripción,
- * Auditoría) no entran todas en la pantalla de un celular, y el scroll
- * horizontal no se nota si no hay nada que lo sugiera — alguien puede
- * usar la app meses sin enterarse de que "Suscripción" existe, ahí
- * nomás, un dedo más allá del borde. Los degradados de los costados
- * aparecen solo cuando de verdad hay más para desplazar hacia ese lado.
+ * Auditoría) no entran todas en la pantalla de un celular. Antes había
+ * solo un degradado sutil en el borde — en mobile pasaba desapercibido
+ * (mismo color que el fondo, muy angosto). Ahora son flechas de verdad,
+ * con su propio círculo blanco y sombra, que además de avisar que hay
+ * más para ver, sirven para tocarlas y desplazarse — mejor que arrastrar
+ * con el dedo en una tira angosta.
  */
 export default function Tabs({ tabs, activa, onChange }) {
   const scrollRef = useRef(null)
   const [puedeIzq, setPuedeIzq] = useState(false)
   const [puedeDer, setPuedeDer] = useState(false)
 
-  const actualizarSombras = useCallback(() => {
+  const actualizarFlechas = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
     setPuedeIzq(el.scrollLeft > 4)
@@ -21,14 +22,20 @@ export default function Tabs({ tabs, activa, onChange }) {
   }, [])
 
   useEffect(() => {
-    actualizarSombras()
-    window.addEventListener('resize', actualizarSombras)
-    return () => window.removeEventListener('resize', actualizarSombras)
-  }, [actualizarSombras, tabs])
+    actualizarFlechas()
+    // Un segundo chequeo un instante después del primer render: en algunos
+    // navegadores mobile el ancho real de las pestañas todavía no está
+    // asentado en el primer paint (emoji + fuentes del sistema).
+    const t = setTimeout(actualizarFlechas, 150)
+    window.addEventListener('resize', actualizarFlechas)
+    return () => { clearTimeout(t); window.removeEventListener('resize', actualizarFlechas) }
+  }, [actualizarFlechas, tabs])
+
+  const desplazar = (dir) => scrollRef.current?.scrollBy({ left: dir * 140, behavior: 'smooth' })
 
   return (
     <div className="relative mb-4">
-      <div ref={scrollRef} onScroll={actualizarSombras}
+      <div ref={scrollRef} onScroll={actualizarFlechas}
         className="flex gap-1 border-b border-gray-200 overflow-x-auto" role="tablist">
         {tabs.map(t => (
           <button key={t.id} role="tab" aria-selected={activa === t.id} onClick={() => onChange(t.id)}
@@ -40,10 +47,16 @@ export default function Tabs({ tabs, activa, onChange }) {
       </div>
 
       {puedeIzq && (
-        <div className="pointer-events-none absolute left-0 top-0 bottom-1 w-6 bg-gradient-to-r from-slate-100 to-transparent" />
+        <button type="button" aria-label="Ver pestañas anteriores" onClick={() => desplazar(-1)}
+          className="absolute left-0 top-0 bottom-1 flex items-center pl-0.5 pr-3 border-none cursor-pointer bg-gradient-to-r from-slate-100 via-slate-100 to-transparent">
+          <span className="w-6 h-6 rounded-full bg-white shadow border border-gray-300 flex items-center justify-center text-gray-600 text-sm leading-none">‹</span>
+        </button>
       )}
       {puedeDer && (
-        <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-6 bg-gradient-to-l from-slate-100 to-transparent" />
+        <button type="button" aria-label="Ver más pestañas" onClick={() => desplazar(1)}
+          className="absolute right-0 top-0 bottom-1 flex items-center pr-0.5 pl-3 border-none cursor-pointer bg-gradient-to-l from-slate-100 via-slate-100 to-transparent">
+          <span className="w-6 h-6 rounded-full bg-white shadow border border-gray-300 flex items-center justify-center text-gray-600 text-sm leading-none">›</span>
+        </button>
       )}
     </div>
   )

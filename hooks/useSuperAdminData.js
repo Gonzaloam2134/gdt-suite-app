@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { getStatsGlobales, listarUsuarios, listarLocalesConMiembros, getConfigGlobal } from '../lib/services/superadmin'
+import { getStatsGlobales, listarUsuarios, listarLocalesConMiembros, getConfigGlobal, listarPagosSuscripcion } from '../lib/services/superadmin'
 import { listarContactosConDetalle } from '../lib/services/contactos'
 import { listarSuscripcionesConOwner } from '../lib/services/suscripciones'
 import { listarAnuncios } from '../lib/services/anuncios'
+import { listarPlanes } from '../lib/services/planes'
 
 const CONFIG_DEFAULT = {
   max_locales_por_usuario: 10,
@@ -31,12 +32,14 @@ export function useSuperAdminData() {
   const [suscripciones, setSuscripciones] = useState([])
   const [config, setConfig] = useState(CONFIG_DEFAULT)
   const [anuncios, setAnuncios] = useState([])
+  const [planes, setPlanes] = useState([])
+  const [pagosSuscripcion, setPagosSuscripcion] = useState([])
   const [loading, setLoading] = useState(true)
 
   const cargar = useCallback(async () => {
     setLoading(true)
 
-    const [stats, contactosData, usuariosData, localesData, suscripcionesData, configData, anunciosData] =
+    const [stats, contactosData, usuariosData, localesData, suscripcionesData, configData, anunciosData, planesData, pagosData] =
       await Promise.allSettled([
         getStatsGlobales(),
         listarContactosConDetalle(),
@@ -45,6 +48,8 @@ export function useSuperAdminData() {
         listarSuscripcionesConOwner(),
         getConfigGlobal(),
         listarAnuncios({ soloActivos: false }),
+        listarPlanes(),
+        listarPagosSuscripcion(),
       ])
 
     if (stats.status === 'fulfilled') setGlobalStats(stats.value)
@@ -70,10 +75,16 @@ export function useSuperAdminData() {
     if (anunciosData.status === 'fulfilled') setAnuncios(anunciosData.value)
     else { console.error('[useSuperAdminData] anuncios', anunciosData.reason); toast.error('No se pudieron cargar los anuncios') }
 
+    if (planesData.status === 'fulfilled') setPlanes(planesData.value)
+    else { console.error('[useSuperAdminData] planes', planesData.reason); toast.error('No se pudieron cargar los precios de los planes') }
+
+    if (pagosData.status === 'fulfilled') setPagosSuscripcion(pagosData.value)
+    else { console.error('[useSuperAdminData] pagosSuscripcion', pagosData.reason); toast.error('No se pudo cargar el historial de pagos') }
+
     setLoading(false)
   }, [])
 
   useEffect(() => { cargar() }, [cargar])
 
-  return { globalStats, contactos, usuarios, todosLosLocales, suscripciones, config, setConfig, anuncios, loading, recargar: cargar }
+  return { globalStats, contactos, usuarios, todosLosLocales, suscripciones, config, setConfig, anuncios, planes, pagosSuscripcion, loading, recargar: cargar }
 }

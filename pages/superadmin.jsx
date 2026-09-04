@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { useAuthGuard } from '../hooks/useAuthGuard'
@@ -9,6 +9,10 @@ import { useSuperAdminData } from '../hooks/useSuperAdminData'
 import { cambiarEstadoSuscripcion, cambiarEstadoCuenta } from '../lib/services/suscripciones'
 import { responderContacto } from '../lib/services/contactos'
 import { actualizarUsuario, guardarConfigGlobal } from '../lib/services/superadmin'
+import { actualizarPrecioPlan } from '../lib/services/planes'
+import { formatCurrency, formatFecha } from '../lib/format'
+import { agruparPagosPorMes, proyectarCashflow, totalCobradoHistorico, mrrActual } from '../lib/domain/cashflow'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabaseClient'
 import { crearAnuncio, actualizarAnuncio, cambiarActivoAnuncio, eliminarAnuncio } from '../lib/services/anuncios'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
@@ -27,8 +31,33 @@ export default function SuperAdmin() {
   const signOut = useSignOut()
   const {
     globalStats, contactos, usuarios, todosLosLocales, suscripciones,
-    config, setConfig, anuncios, loading, recargar,
+    config, setConfig, anuncios, planes, pagosSuscripcion, loading, recargar,
   } = useSuperAdminData()
+
+  // Precios editables: se parte de lo que viene de la base, y se guarda
+  // por fila (no hay "guardar todo junto" — cada plan se ajusta por separado).
+  const [preciosEditando, setPreciosEditando] = useState({})   // { [id]: precioComoString }
+  const [guardandoPrecio, setGuardandoPrecio] = useState(null) // id en proceso, o null
+
+  // 7 pestañas no entran en un celular, y sin nada que lo sugiera el
+  // scroll horizontal pasa desapercibido (mismo problema que ya se
+  // encontró y arregló en components/admin/Tabs.jsx).
+  const tabsScrollRef = useRef(null)
+  const [tabsPuedeIzq, setTabsPuedeIzq] = useState(false)
+  const [tabsPuedeDer, setTabsPuedeDer] = useState(false)
+  const actualizarSombrasTabs = useCallback(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    setTabsPuedeIzq(el.scrollLeft > 4)
+    setTabsPuedeDer(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+  useEffect(() => {
+    actualizarSombrasTabs()
+    const t = setTimeout(actualizarSombrasTabs, 150)
+    window.addEventListener('resize', actualizarSombrasTabs)
+    return () => { clearTimeout(t); window.removeEventListener('resize', actualizarSombrasTabs) }
+  }, [actualizarSombrasTabs])
+  const desplazarTabs = (dir) => tabsScrollRef.current?.scrollBy({ left: dir * 140, behavior: 'smooth' })
 
   const [activeTab, setActiveTab] = useState('dashboard')
 
@@ -37,9 +66,8 @@ export default function SuperAdmin() {
   const [respondiendoId, setRespondiendoId] = useState(null)
   const [respuestaTexto, setRespuestaTexto] = useState('')
 
-  // Usuarios (solo se edita el rol global: el email de login vive en Supabase
-  // Auth, no en `perfiles`, y editarlo acá no cambiaba cómo esa persona inicia
-  // sesión — solo desincronizaba los dos valores)
+  // Usuarios: rol global, y el email de acceso real (auth.users + perfiles,
+  // vía pages/api/admin/actualizar-email.js con Service Role).
   const [editandoUsuario, setEditandoUsuario] = useState(null)
   const [nuevoRol, setNuevoRol] = useState('')
   const [editandoEmail, setEditandoEmail] = useState(null)   // id del usuario, o null
@@ -159,6 +187,22 @@ export default function SuperAdmin() {
     }
   }
 
+  const handleGuardarPrecio = async (plan) => {
+    const nuevoValor = preciosEditando[plan.id]
+    const precio = Number(nuevoValor)
+    if (!Number.isFinite(precio) || precio < 0) return toast.error('Ingresá un precio válido')
+    setGuardandoPrecio(plan.id)
+    try {
+      await actualizarPrecioPlan(plan.segmento, plan.ciclo, precio)
+      toast.success(`${LABEL_SEGMENTO[plan.segmento]} (${LABEL_CICLO[plan.ciclo]}) actualizado`)
+      await recargar()
+    } catch (err) {
+      toast.error(err.message || 'No se pudo guardar el precio')
+    } finally {
+      setGuardandoPrecio(null)
+    }
+  }
+
   const handleCrearAnuncio = async () => {
     if (!nuevoAnuncio.titulo.trim() || !nuevoAnuncio.mensaje.trim()) return toast.error('Completá título y mensaje')
     setPublicando(true)
@@ -236,7 +280,8 @@ export default function SuperAdmin() {
 
       <div className="max-w-6xl mx-auto p-4">
         {/* Tabs */}
-        <div className="flex gap-2 mb-4 border-b border-gray-200 overflow-x-auto">
+        <div className="relative mb-4">
+        <div ref={tabsScrollRef} onScroll={actualizarSombrasTabs} className="flex gap-2 border-b border-gray-200 overflow-x-auto">
           {[
             { id: 'dashboard', label: '📊 Dashboard Global' },
             { id: 'contactos', label: '📬 Consultas' },
@@ -244,7 +289,8 @@ export default function SuperAdmin() {
             { id: 'locales', label: '🏪 Locales' },
             { id: 'suscripciones', label: '💳 Suscripciones' },
             { id: 'config', label: '⚙️ Configuración' },
-            { id: 'anuncios', label: '📢 Anuncios' }
+            { id: 'anuncios', label: '📢 Anuncios' },
+            { id: 'cashflow', label: '💰 Cashflow' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -261,6 +307,19 @@ export default function SuperAdmin() {
               )}
             </button>
           ))}
+        </div>
+        {tabsPuedeIzq && (
+          <button type="button" aria-label="Ver pestañas anteriores" onClick={() => desplazarTabs(-1)}
+            className="absolute left-0 top-0 bottom-1 flex items-center pl-0.5 pr-3 border-none cursor-pointer bg-gradient-to-r from-slate-100 via-slate-100 to-transparent">
+            <span className="w-6 h-6 rounded-full bg-white shadow border border-gray-300 flex items-center justify-center text-gray-600 text-sm leading-none">‹</span>
+          </button>
+        )}
+        {tabsPuedeDer && (
+          <button type="button" aria-label="Ver más pestañas" onClick={() => desplazarTabs(1)}
+            className="absolute right-0 top-0 bottom-1 flex items-center pr-0.5 pl-3 border-none cursor-pointer bg-gradient-to-l from-slate-100 via-slate-100 to-transparent">
+            <span className="w-6 h-6 rounded-full bg-white shadow border border-gray-300 flex items-center justify-center text-gray-600 text-sm leading-none">›</span>
+          </button>
+        )}
         </div>
 
         {/* TAB: DASHBOARD GLOBAL */}
@@ -790,6 +849,43 @@ export default function SuperAdmin() {
                 💾 Guardar configuración
               </button>
             </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-base font-bold text-gray-900 mb-1">Precios de los planes</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Cada fila se guarda por separado. Un cambio acá solo afecta a las
+                suscripciones NUEVAS que se creen a partir de ahora — nunca a las
+                que ya están activas, esas quedan con el precio que pagaron.
+              </p>
+              <div className="space-y-2">
+                {planes.map(plan => {
+                  const valorEditando = preciosEditando[plan.id] ?? String(plan.precio)
+                  const cambio = Number(valorEditando) !== Number(plan.precio)
+                  return (
+                    <div key={plan.id} className="flex items-center gap-3 flex-wrap p-3 bg-slate-50 rounded-lg">
+                      <div className="min-w-[160px]">
+                        <div className="text-sm font-semibold text-gray-800">{LABEL_SEGMENTO[plan.segmento] || plan.segmento}</div>
+                        <div className="text-xs text-gray-500">{LABEL_CICLO[plan.ciclo] || plan.ciclo} · hoy: {formatCurrency(plan.precio)}</div>
+                      </div>
+                      <input type="number" min="0" step="100"
+                        value={valorEditando}
+                        onChange={(e) => setPreciosEditando({ ...preciosEditando, [plan.id]: e.target.value })}
+                        className="w-32 p-2 border border-gray-300 rounded-md text-sm" />
+                      <button
+                        onClick={() => handleGuardarPrecio(plan)}
+                        disabled={!cambio || guardandoPrecio === plan.id}
+                        className="px-3 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {guardandoPrecio === plan.id ? 'Guardando…' : '💾 Guardar'}
+                      </button>
+                    </div>
+                  )
+                })}
+                {planes.length === 0 && (
+                  <p className="text-sm text-gray-400 m-0">No se pudieron cargar los planes.</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -929,6 +1025,98 @@ export default function SuperAdmin() {
             </div>
           </div>
         )}
+
+        {/* TAB: CASHFLOW */}
+        {activeTab === 'cashflow' && (() => {
+          const MESES_ATRAS = 6
+          const MESES_ADELANTE = 6
+          const ahora = new Date()
+
+          const pagosPorMes = agruparPagosPorMes(pagosSuscripcion)
+          const historico = []
+          for (let i = MESES_ATRAS - 1; i >= 0; i--) {
+            const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1)
+            const clave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            historico.push({ mes: clave, real: pagosPorMes[clave] || 0, proyectado: null })
+          }
+
+          // La proyección arranca el mes que viene — el actual ya está
+          // representado como dato real de arriba, no hay que duplicarlo.
+          const proximoMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1)
+          const proximoMesISO = `${proximoMes.getFullYear()}-${String(proximoMes.getMonth() + 1).padStart(2, '0')}-01`
+          const proyeccion = proyectarCashflow(suscripciones, MESES_ADELANTE, proximoMesISO)
+          const futuro = Object.entries(proyeccion).map(([mes, monto]) => ({ mes, real: null, proyectado: monto }))
+
+          const datosGrafico = [...historico, ...futuro]
+          const total = totalCobradoHistorico(pagosSuscripcion)
+          const mrr = mrrActual(suscripciones)
+
+          const nombrePorOwner = (ownerId) => usuarios.find(u => u.id === ownerId)?.nombre || usuarios.find(u => u.id === ownerId)?.email || 'Desconocido'
+
+          return (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800 m-0">
+                  💰 Lo que ya cobraste, y una proyección de lo que deberías seguir cobrando si nadie
+                  cancela ni falla ningún pago — es optimista a propósito, no una garantía.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-lg border border-gray-200 p-5">
+                  <div className="text-xs text-gray-500 font-semibold uppercase">Cobrado hasta hoy</div>
+                  <div className="text-2xl font-extrabold text-green-700 mt-1">{formatCurrency(total)}</div>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-5">
+                  <div className="text-xs text-gray-500 font-semibold uppercase">Ingreso mensual recurrente (MRR)</div>
+                  <div className="text-2xl font-extrabold text-blue-700 mt-1">{formatCurrency(mrr)}</div>
+                  <div className="text-xs text-gray-400 mt-1">Suscripciones activas hoy — las anuales cuentan a 1/12</div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h3 className="text-base font-bold text-gray-900 mb-1">Real vs. proyectado, mes a mes</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Barras verdes: lo que ya entró. Barras celestes: lo que se espera si las
+                  suscripciones activas de hoy se renuevan sin cortes.
+                </p>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={datosGrafico}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(v) => v == null ? '—' : formatCurrency(v)} />
+                      <Legend />
+                      <Bar dataKey="real" name="Cobrado" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="proyectado" name="Proyectado" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h3 className="text-base font-bold text-gray-900 mb-3">Detalle de pagos ({pagosSuscripcion.length})</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {pagosSuscripcion.map(pago => (
+                    <div key={pago.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg text-sm">
+                      <div>
+                        <div className="font-semibold text-gray-800">{nombrePorOwner(pago.owner_id)}</div>
+                        <div className="text-xs text-gray-500">
+                          {LABEL_SEGMENTO[pago.segmento] || pago.segmento} · {LABEL_CICLO[pago.ciclo] || pago.ciclo} · {formatFecha(pago.procesado_en)}
+                        </div>
+                      </div>
+                      <div className="font-bold text-green-700">{formatCurrency(pago.monto)}</div>
+                    </div>
+                  ))}
+                  {pagosSuscripcion.length === 0 && (
+                    <p className="text-gray-500 text-sm m-0">Todavía no hay pagos registrados.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       <ConfirmDialog isOpen={!!confirmarLocal} onClose={() => setConfirmarLocal(null)} onConfirm={confirmarSuspenderLocal}

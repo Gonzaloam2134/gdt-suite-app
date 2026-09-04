@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin'
 import { obtenerPago, obtenerPreapproval } from '../../../lib/server/mercadopago'
 import { validarFirmaWebhook, parsearExternalReference, proximoVencimiento } from '../../../lib/domain/mercadopago'
-import { activarPlanPago, cambiarEstadoCuenta } from '../../../lib/server/suscripcionesAdmin'
+import { activarPlanPago, cambiarEstadoCuenta, registrarPagoSuscripcion } from '../../../lib/server/suscripcionesAdmin'
 
 /**
  * Mercado Pago reintenta agresivamente si no contestamos 200, así que una
@@ -68,10 +68,18 @@ async function procesarNotificacionDePago(paymentId) {
   if (pago.status === 'approved') {
     await activarPlanPago(ownerId, {
       segmento, ciclo,
+      monto: pago.transaction_amount ?? null,
       fechaVencimiento: proximoVencimiento(ciclo),
       mpPreapprovalId: pago.preapproval_id ?? null,
       mpPayerEmail: pago.payer?.email ?? null,
     })
+    if (pago.transaction_amount != null) {
+      await registrarPagoSuscripcion({
+        ownerId, segmento, ciclo,
+        monto: pago.transaction_amount,
+        mpPaymentId: String(pago.id),
+      }).catch((err) => console.error('No se pudo registrar el pago en el historial de cashflow (el plan sí se activó)', err))
+    }
   } else if (pago.status === 'rejected' || pago.status === 'cancelled') {
     await cambiarEstadoCuenta(ownerId, 'restricted')
   }
