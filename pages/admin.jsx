@@ -98,7 +98,7 @@ export default function AdminPanel() {
         {tab === 'medios-pago' && (
           <MediosPagoTab mediosPago={mediosPago} localId={activeLocalId} userId={userId} onCambio={recargar} />
         )}
-        {tab === 'suscripcion' && <SuscripcionTab suscripcion={suscripcion} />}
+        {tab === 'suscripcion' && <SuscripcionTab suscripcion={suscripcion} onCambio={recargar} />}
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>
 

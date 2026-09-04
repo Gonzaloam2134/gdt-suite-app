@@ -1,6 +1,10 @@
+import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { estadoEfectivo } from '../../lib/domain/suscripciones'
 import { LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO } from '../../lib/constants/planes'
 import { formatFecha } from '../../lib/format'
+import { supabase } from '../../lib/supabaseClient'
+import ConfirmDialog from '../ui/ConfirmDialog'
 
 const ESTILO_ESTADO = {
   active:     { texto: 'Activo',      color: 'bg-green-100 text-green-800 border-green-200' },
@@ -10,19 +14,40 @@ const ESTILO_ESTADO = {
 }
 
 /**
- * Estado de la suscripción del local, visible solo para el dueño. La
- * cancelación real de un plan pago se hace del lado de Mercado Pago —
- * ver el bloque "¿Cómo cancelo?" más abajo — porque son dos sistemas
- * separados: cancelar en MP no actualiza esta pantalla al instante,
- * depende de que llegue la notificación (webhook) correspondiente.
+ * Estado de la suscripción del local, visible solo para el dueño.
+ * "Cancelar suscripción" acá adentro llama de verdad a Mercado Pago
+ * (pages/api/suscripcion/cancelar.js) — no es un atajo local: si esa
+ * llamada falla, no se toca la base, para nunca mostrar "cancelado" sin
+ * que el cobro real se haya detenido.
  */
-export default function SuscripcionTab({ suscripcion }) {
-  // Este panel muestra la cuenta, no solo este local: si tenés más de un
-  // local, todos comparten la misma suscripción — pagás una vez.
+export default function SuscripcionTab({ suscripcion, onCambio }) {
+  const [confirmarCancelar, setConfirmarCancelar] = useState(false)
+  const [cancelando, setCancelando] = useState(false)
+
   const { estado, vencioPrueba, diasRestantes } = estadoEfectivo(suscripcion)
   const esPrueba = suscripcion?.plan === 'trial'
   const esPago = suscripcion?.plan === 'pago'
   const estilo = ESTILO_ESTADO[estado] || ESTILO_ESTADO.active
+
+  const cancelarSuscripcion = async () => {
+    setCancelando(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/suscripcion/cancelar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'No se pudo cancelar')
+      toast.success('Suscripción cancelada — Mercado Pago no va a volver a cobrar')
+      setConfirmarCancelar(false)
+      await onCambio?.()
+    } catch (err) {
+      toast.error(err.message || 'No se pudo cancelar. Probá desde Mercado Pago directamente.')
+    } finally {
+      setCancelando(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -86,14 +111,21 @@ export default function SuscripcionTab({ suscripcion }) {
           {esPago ? 'Cambiar de plan' : 'Ver planes'}
         </a>
 
+        {esPago && estado === 'active' && (
+          <button onClick={() => setConfirmarCancelar(true)}
+            className="mt-2 block w-full text-center p-2.5 bg-white text-red-600 border border-red-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-red-50">
+            Cancelar suscripción
+          </button>
+        )}
+
         {esPago && (
           <details className="mt-3 border border-gray-200 rounded-lg">
             <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">
-              ¿Cómo cancelo mi suscripción?
+              ¿Problemas para cancelar desde acá?
             </summary>
             <div className="p-3 pt-0 space-y-2">
               <p className="text-xs text-gray-600 m-0">
-                La cancelación se hace desde Mercado Pago, no desde acá:
+                También podés cancelarla directo desde Mercado Pago:
               </p>
               <ol className="text-xs text-gray-600 pl-4 m-0 space-y-1">
                 <li>Abrí la app de Mercado Pago (o entrá a mercadopago.com desde una compu).</li>
@@ -101,14 +133,19 @@ export default function SuscripcionTab({ suscripcion }) {
                 <li>Elegí la suscripción de GDT Suite y tocá <strong>"Cancelar suscripción"</strong>.</li>
               </ol>
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 m-0">
-                Puede tardar unos minutos en reflejarse acá — esta pantalla se
-                actualiza cuando Mercado Pago nos avisa que se canceló, no al
-                instante.
+                Si la cancelás por ese camino, esta pantalla puede tardar unos
+                minutos en reflejarlo — depende de que Mercado Pago nos avise.
               </p>
             </div>
           </details>
         )}
       </div>
+
+      <ConfirmDialog isOpen={confirmarCancelar} onClose={() => setConfirmarCancelar(false)} onConfirm={cancelarSuscripcion}
+        danger
+        title="Cancelar suscripción"
+        message="Mercado Pago va a dejar de cobrarte a partir de ahora. Vas a quedar con acceso solo a Reportes, igual que al vencer una prueba. ¿Confirmás?"
+        confirmLabel={cancelando ? 'Cancelando…' : 'Sí, cancelar'} />
     </div>
   )
 }
