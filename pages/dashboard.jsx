@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useActiveLocal } from '../hooks/useActiveLocal'
+import { useRouter } from 'next/router'
 import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
 import { useCaja } from '../hooks/useCaja'
 import { useTransaccionesDia } from '../hooks/useTransaccionesDia'
@@ -32,6 +33,7 @@ import BienvenidaModal from '../components/BienvenidaModal'
 import { marcarBienvenidaVista } from '../lib/services/auth'
 
 export default function Dashboard() {
+  const router = useRouter()
   const { user, checking } = useAuthGuard()
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
   const { esSuperUser, loading: cargandoRol, role, perfil, userId, recargar: recargarRol } = useUserRole()
@@ -67,6 +69,30 @@ export default function Dashboard() {
   const cerrarModal = () => setModal(null)
 
   if (checking || cargandoRol || cargandoLocal || suscripcion.checking || suscripcion.debeRedirigir) return <LoadingScreen mensaje="Cargando caja…" />
+
+  // useActiveLocal ya dispara un redirect solo a /locales cuando no hay
+  // ningún local activo — esto es la red de seguridad para cuando ese
+  // redirect tarda, se corta, o algo lo interrumpe (ej. viniendo de
+  // Reportes en modo "Todos los locales", donde nunca se llegó a fijar un
+  // local activo). Antes, en ese caso, la pantalla quedaba mostrando un
+  // "Cargando local…" genérico indefinidamente — sin decir por qué, ni
+  // ofrecer ninguna salida.
+  if (!localId) {
+    return (
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-sm text-center">
+          <div className="text-4xl mb-3">🏪</div>
+          <p className="text-sm font-semibold text-gray-900 m-0 mb-1">No hay ningún local seleccionado</p>
+          <p className="text-xs text-gray-500 mb-4">Elegí un local para ver su caja.</p>
+          <button onClick={() => router.replace('/locales')}
+            className="w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+            Ir a Mis locales
+          </button>
+        </div>
+      </main>
+    )
+  }
+
   if (!local) return <LoadingScreen mensaje="Cargando local…" icono="🏪" />
 
   const abrirHistorial = async () => { if (await caja.cargarHistorial()) setModal('historial') }
