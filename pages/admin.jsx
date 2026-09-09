@@ -113,7 +113,12 @@ export default function AdminPanel() {
         {tab === 'medios-pago' && (
           <MediosPagoTab mediosPago={mediosPago} localId={activeLocalId} userId={userId} onCambio={recargar} />
         )}
-        {tab === 'mercadopago' && <MercadoPagoClienteTab local={local} localId={activeLocalId} onCambio={recargar} />}
+        {tab === 'mercadopago' && (
+          <MercadoPagoClienteTab
+            local={local} localId={activeLocalId} onCambio={recargar}
+            ownerId={local?.creado_por} locales={locales}
+          />
+        )}
         {tab === 'suscripcion' && <SuscripcionTab suscripcion={suscripcion} onCambio={recargar} />}
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>

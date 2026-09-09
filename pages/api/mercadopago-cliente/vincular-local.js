@@ -1,6 +1,8 @@
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin'
-import { buscarStore, crearStore, buscarPos, crearPos, refrescarTokens } from '../../../lib/server/mercadopagoCliente'
-import { getConexionDeOwner, guardarConexion } from '../../../lib/services/conexionesMercadopago'
+import { buscarStore, crearStore, buscarPos, crearPos } from '../../../lib/server/mercadopagoCliente'
+import { tokenVigente } from '../../../lib/server/mercadopagoClienteAuth'
+import { sincronizarCuenta, DIAS_BACKFILL_INICIAL } from '../../../lib/server/mercadopagoClienteSync'
+import { getConexionDeOwner } from '../../../lib/services/conexionesMercadopago'
 import { guardarMapeo } from '../../../lib/services/mapeoLocalesMp'
 import { derivarExternalStoreId, derivarExternalPosId } from '../../../lib/domain/mercadopagoCliente'
 
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const accessToken = await tokenVigente(conexion)
+    const accessToken = await tokenVigente(supabaseAdmin, conexion)
     const externalStoreId = derivarExternalStoreId(localId)
     const externalPosId = derivarExternalPosId(localId, 1)
 
@@ -60,30 +62,20 @@ export default async function handler(req, res) {
       mpPosId: String(posId),
     })
 
+    // Backfill de los últimos días (Fase C): best-effort — si falla, el local
+    // queda igual vinculado, los cobros nuevos van a llegar por webhook y el
+    // cron periódico va a terminar de completar lo viejo.
+    const hasta = new Date()
+    const desde = new Date(hasta.getTime() - DIAS_BACKFILL_INICIAL * 24 * 60 * 60 * 1000)
+    sincronizarCuenta(supabaseAdmin, { ...conexion, access_token: accessToken }, {
+      desde: desde.toISOString(), hasta: hasta.toISOString(),
+    }).catch((err) => console.error('Backfill inicial de Mercado Pago falló (el local sigue vinculado igual)', err))
+
     return res.status(200).json(mapeo)
   } catch (err) {
     console.error('Error vinculando local con Mercado Pago', err)
     return res.status(502).json({ error: `Mercado Pago no confirmó la vinculación: ${err.message}` })
   }
-}
-
-/** Refresca el token si está vencido o a punto de vencer (margen de 1 día). */
-const MARGEN_RENOVACION_MS = 24 * 60 * 60 * 1000
-
-async function tokenVigente(conexion) {
-  const venceEn = new Date(conexion.vence_en).getTime()
-  if (venceEn - Date.now() > MARGEN_RENOVACION_MS) return conexion.access_token
-
-  const tokens = await refrescarTokens(conexion.refresh_token)
-  const nuevoVenceEn = new Date(Date.now() + (tokens.expires_in ? tokens.expires_in * 1000 : 180 * 24 * 60 * 60 * 1000)).toISOString()
-  await guardarConexion(supabaseAdmin, {
-    ownerId: conexion.owner_id,
-    mpUserId: conexion.mp_user_id,
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    venceEn: nuevoVenceEn,
-  })
-  return tokens.access_token
 }
 
 async function resolverStore({ mpUserId, accessToken, externalStoreId, nombreLocal, local }) {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useMercadoPagoCliente } from '../../hooks/useMercadoPagoCliente'
 import { setDireccionLocal } from '../../lib/services/locales'
+import PendientesMpSinAsignar from './PendientesMpSinAsignar'
 
 /**
  * Conectar la cuenta de Mercado Pago del DUEÑO (una cuenta cubre todos sus
@@ -12,7 +13,7 @@ import { setDireccionLocal } from '../../lib/services/locales'
  * dueño rechaza el permiso, se sigue igual con la dirección escrita a mano
  * y lat/long quedan sin completar — nunca bloquea la conexión.
  */
-export default function MercadoPagoClienteTab({ local, localId, onCambio }) {
+export default function MercadoPagoClienteTab({ local, localId, ownerId, locales, onCambio }) {
   const { conectado, mapeo, cargando, conectando, vinculando, conectar, vincular } = useMercadoPagoCliente(localId)
   const tieneDireccion = !!(local?.direccion && local?.ciudad && local?.provincia)
 
@@ -120,6 +121,8 @@ export default function MercadoPagoClienteTab({ local, localId, onCambio }) {
           </div>
         )}
       </div>
+
+      {conectado && <PendientesMpSinAsignar ownerId={ownerId} locales={locales} />}
     </div>
   )
 }

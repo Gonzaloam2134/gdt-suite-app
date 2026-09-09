@@ -116,3 +116,14 @@ alter table locales
 -- pide para no tener errores en los cálculos de impuestos, pero eso es una
 -- validación de producto al momento de crear la Store (Fase A), no una
 -- restricción de esta tabla.
+
+-- ============================================================================
+-- Sincronización manual ("Sincronizar" en el dashboard) — Vercel Hobby solo
+-- admite un cron diario, así que el dueño/cajero puede pedir una
+-- reconciliación al toque en vez de esperar al cron. Este timestamp es el
+-- cooldown server-side para que no se pueda golpear la API de Mercado Pago
+-- a repetición (ver pages/api/mercadopago-cliente/sincronizar.js).
+-- Bloque nuevo, aplicar aparte si el resto de este archivo ya se corrió.
+-- ============================================================================
+alter table conexiones_mercadopago
+  add column if not exists ultima_sincronizacion_manual timestamptz;

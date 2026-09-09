@@ -30,6 +30,7 @@ import ContactModal from '../components/ContactModal'
 import GuiaArqueoModal from '../components/caja/GuiaArqueoModal'
 import EditarMontoInicialModal from '../components/caja/EditarMontoInicialModal'
 import BienvenidaModal from '../components/BienvenidaModal'
+import PorConfirmarMp from '../components/dashboard/PorConfirmarMp'
 import { marcarBienvenidaVista } from '../lib/services/auth'
 
 export default function Dashboard() {
@@ -133,6 +134,7 @@ export default function Dashboard() {
           <p className="text-center text-sm text-gray-500 py-8">Actualizando movimientos…</p>
         ) : (
           <>
+            <PorConfirmarMp localId={localId} local={local} />
             <KpiCards
               totales={totales}
               cantidadCobros={cobros.filter(c => !c.anulada).length}

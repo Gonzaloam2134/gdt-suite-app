@@ -210,3 +210,17 @@ API, en su nombre, con su propio `access_token` (permiso `write`).
 - No mezclar las credenciales de esta integración con las de
   `MERCADOPAGO_ACCESS_TOKEN` (suscripciones) — son aplicaciones y tokens
   completamente separados.
+
+---
+
+## 5. Pendiente de verificar antes de producción
+
+- [ ] **`operation_type: "money_transfer"` para detectar transferencias**
+      (`lib/domain/mercadopagoCliente.js`, `esTransferencia`) está basado
+      en la documentación de Postman de Mercado Pago, no en
+      developers.mercadopago.com — no es la fuente oficial. Antes de
+      activar el cron para un comerciante real: hacer una transferencia
+      real chica a la cuenta conectada, correr la sincronización, y
+      confirmar en los logs (o en `movimientos_mp_pendientes`) que
+      aparece con `origen = 'transferencia'`. Recién ahí queda de verdad
+      confirmado — hasta entonces, tratarlo como no verificado.
