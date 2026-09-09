@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import toast from 'react-hot-toast'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
@@ -15,12 +16,14 @@ import ResumenTab from '../components/admin/ResumenTab'
 import MiembrosTab from '../components/admin/MiembrosTab'
 import MediosPagoTab from '../components/admin/MediosPagoTab'
 import SuscripcionTab from '../components/admin/SuscripcionTab'
+import MercadoPagoClienteTab from '../components/admin/MercadoPagoClienteTab'
 import ListaLogs from '../components/admin/ListaLogs'
 
 const TABS_OWNER = [
   { id: 'resumen', label: '📊 Resumen' },
   { id: 'miembros', label: '👥 Miembros' },
   { id: 'medios-pago', label: '💳 Medios de pago' },
+  { id: 'mercadopago', label: '🏪 Mercado Pago' },
   { id: 'suscripcion', label: '💎 Suscripción' },
   { id: 'logs', label: '📋 Auditoría' },
 ]
@@ -43,6 +46,18 @@ export default function AdminPanel() {
   const [tab, setTab] = useState(router.query.tab || 'resumen')
 
   useEffect(() => { if (router.query.tab) setTab(router.query.tab) }, [router.query.tab])
+
+  // Vuelta del callback de OAuth de Mercado Pago (pages/api/mercadopago-cliente/callback.js)
+  useEffect(() => {
+    const { mp_cliente } = router.query
+    if (!mp_cliente) return
+    if (mp_cliente === 'conectado') toast.success('Cuenta de Mercado Pago conectada')
+    else if (mp_cliente === 'cancelado') toast('Conexión con Mercado Pago cancelada')
+    else if (mp_cliente === 'error') toast.error('No se pudo conectar con Mercado Pago. Probá de nuevo.')
+    const { mp_cliente: _omit, ...resto } = router.query
+    router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.mp_cliente])
 
   // El panel global vive en /superadmin; acá se administra un local puntual.
   useEffect(() => {
@@ -98,6 +113,7 @@ export default function AdminPanel() {
         {tab === 'medios-pago' && (
           <MediosPagoTab mediosPago={mediosPago} localId={activeLocalId} userId={userId} onCambio={recargar} />
         )}
+        {tab === 'mercadopago' && <MercadoPagoClienteTab local={local} localId={activeLocalId} onCambio={recargar} />}
         {tab === 'suscripcion' && <SuscripcionTab suscripcion={suscripcion} onCambio={recargar} />}
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>
