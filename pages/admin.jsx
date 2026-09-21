@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
+import { useTerminosGuard } from '../hooks/useTerminosGuard'
 import { useAdminData } from '../hooks/useAdminData'
 import { ROLES } from '../lib/constants/roles'
 import { useMisLocales } from '../hooks/useMisLocales'
@@ -18,6 +19,7 @@ import MediosPagoTab from '../components/admin/MediosPagoTab'
 import SuscripcionTab from '../components/admin/SuscripcionTab'
 import MercadoPagoClienteTab from '../components/admin/MercadoPagoClienteTab'
 import ListaLogs from '../components/admin/ListaLogs'
+import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
 const TABS_OWNER = [
   { id: 'resumen', label: '📊 Resumen' },
@@ -32,6 +34,7 @@ export default function AdminPanel() {
   const router = useRouter()
   const { checking } = useAuthGuard()
   const { role, userId, activeLocalId, esSuperUser, loading: cargandoRol } = useUserRole()
+  const terminos = useTerminosGuard(userId)
   // El super admin no queda bloqueado por la suscripción: administra el local
   // desde acá y desde /superadmin, no tendría sentido que lo echen de los dos.
   // OJO: hay que esperar `cargandoRol` antes de decidir esto — `esSuperUser`
@@ -64,7 +67,9 @@ export default function AdminPanel() {
     if (!cargandoRol && esSuperUser && !activeLocalId) router.replace('/superadmin')
   }, [cargandoRol, esSuperUser, activeLocalId, router])
 
-  if (checking || cargandoRol || loading || guardSuscripcion.checking || guardSuscripcion.debeRedirigir) return <LoadingScreen mensaje="Cargando panel…" />
+  if (checking || cargandoRol || loading || guardSuscripcion.checking || guardSuscripcion.debeRedirigir || terminos.checking) return <LoadingScreen mensaje="Cargando panel…" />
+
+  if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
   if (!activeLocalId) {
     return (

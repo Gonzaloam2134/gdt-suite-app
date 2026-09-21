@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
+import { aceptarTerminos } from '../lib/services/auth'
+import { VERSION_TERMINOS_ACTUAL } from '../lib/constants/legal'
 
 export default function Registro() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nombre, setNombre] = useState('')
+  const [aceptaTerminos, setAceptaTerminos] = useState(false)
   const [loading, setLoading] = useState(false)
   const [pendienteConfirmacion, setPendienteConfirmacion] = useState(false)
   const router = useRouter()
@@ -17,6 +20,7 @@ export default function Registro() {
 
   const handleRegistro = async (e) => {
     e.preventDefault()
+    if (!aceptaTerminos) return toast.error('Tenés que aceptar los Términos y Condiciones')
     setLoading(true)
 
     try {
@@ -49,9 +53,18 @@ export default function Registro() {
         // El proyecto requiere confirmar el email antes de dar sesión.
         // Sin esto, el código anterior mostraba "Cuenta creada" y redirigía
         // como si ya hubiera sesión, y el usuario rebotaba sin entender por qué.
+        // La aceptación de términos no se puede guardar todavía (no hay sesión,
+        // RLS lo rechazaría en silencio) — el guard se la va a pedir de nuevo
+        // en el primer login real, que es cuando sí hay sesión.
         setPendienteConfirmacion(true)
         return
       }
+
+      // Mismo momento en que se crea la cuenta: se registra la aceptación con
+      // la versión vigente. Si esto falla, no se corta el registro — el
+      // guard de términos se la va a volver a pedir en el próximo login.
+      aceptarTerminos(authData.user.id, VERSION_TERMINOS_ACTUAL).catch((err) =>
+        console.error('[registro] no se pudo guardar la aceptación de términos:', err))
 
       toast.success('Cuenta creada')
 
@@ -163,9 +176,25 @@ export default function Registro() {
             />
           </div>
 
+          <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={aceptaTerminos}
+              onChange={(e) => setAceptaTerminos(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Acepto los{' '}
+              <a href="/terminos" target="_blank" rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 underline font-semibold">
+                Términos y Condiciones
+              </a>
+            </span>
+          </label>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !aceptaTerminos}
             className="w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Creando cuenta...' : 'Crear cuenta'}

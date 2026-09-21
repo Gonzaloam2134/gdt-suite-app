@@ -4,6 +4,7 @@ import { useUserRole } from '../lib/UserRoleContext'
 import { useActiveLocal } from '../hooks/useActiveLocal'
 import { useRouter } from 'next/router'
 import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
+import { useTerminosGuard } from '../hooks/useTerminosGuard'
 import { useCaja } from '../hooks/useCaja'
 import { useTransaccionesDia } from '../hooks/useTransaccionesDia'
 import { hoyISO, aFechaISO } from '../lib/dates'
@@ -30,12 +31,14 @@ import ContactModal from '../components/ContactModal'
 import GuiaArqueoModal from '../components/caja/GuiaArqueoModal'
 import EditarMontoInicialModal from '../components/caja/EditarMontoInicialModal'
 import BienvenidaModal from '../components/BienvenidaModal'
+import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 import PorConfirmarMp from '../components/dashboard/PorConfirmarMp'
 import { marcarBienvenidaVista } from '../lib/services/auth'
 
 export default function Dashboard() {
   const router = useRouter()
   const { user, checking } = useAuthGuard()
+  const terminos = useTerminosGuard(user?.id)
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
   const { esSuperUser, loading: cargandoRol, role, perfil, userId, recargar: recargarRol } = useUserRole()
   // El super admin no queda bloqueado por la suscripción de un local: la
@@ -69,7 +72,9 @@ export default function Dashboard() {
   const [aReversar, setAReversar] = useState(null)
   const cerrarModal = () => setModal(null)
 
-  if (checking || cargandoRol || cargandoLocal || suscripcion.checking || suscripcion.debeRedirigir) return <LoadingScreen mensaje="Cargando caja…" />
+  if (checking || cargandoRol || cargandoLocal || suscripcion.checking || suscripcion.debeRedirigir || terminos.checking) return <LoadingScreen mensaje="Cargando caja…" />
+
+  if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
   // useActiveLocal ya dispara un redirect solo a /locales cuando no hay
   // ningún local activo — esto es la red de seguridad para cuando ese

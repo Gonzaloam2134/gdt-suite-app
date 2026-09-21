@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
+import { useTerminosGuard } from '../hooks/useTerminosGuard'
 import { LABEL_SEGMENTO, LABEL_CICLO } from '../lib/constants/planes'
 import { useSignOut } from '../hooks/useSignOut'
 import { useSuperAdminData } from '../hooks/useSuperAdminData'
@@ -17,6 +18,7 @@ import { supabase } from '../lib/supabaseClient'
 import { crearAnuncio, actualizarAnuncio, cambiarActivoAnuncio, eliminarAnuncio } from '../lib/services/anuncios'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
+import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
 /**
  * Panel global de la plataforma. A diferencia del resto de la app, acá no hay
@@ -28,6 +30,7 @@ export default function SuperAdmin() {
   const router = useRouter()
   const { user, checking } = useAuthGuard()
   const { esSuperUser, loading: cargandoRol } = useUserRole()
+  const terminos = useTerminosGuard(user?.id)
   const signOut = useSignOut()
   const {
     globalStats, contactos, usuarios, todosLosLocales, suscripciones,
@@ -250,7 +253,10 @@ export default function SuperAdmin() {
     }
   }
 
-  if (checking || cargandoRol || !esSuperUser) return <LoadingScreen mensaje="Verificando acceso…" icono="👑" />
+  if (checking || cargandoRol || !esSuperUser || terminos.checking) return <LoadingScreen mensaje="Verificando acceso…" icono="👑" />
+
+  if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
+
   if (loading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando panel de super admin...</p></div>
 
   return (

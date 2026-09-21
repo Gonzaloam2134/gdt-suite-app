@@ -11,3 +11,6 @@ public/workbox-*.js
 public/worker-*.js
 public/sw.js.map
 public/workbox-*.js.map
+
+# Estado local del wizard mercadopago:mp-integrate — no es código del proyecto
+.mp-integrate-progress.md

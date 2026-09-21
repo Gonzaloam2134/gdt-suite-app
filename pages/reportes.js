@@ -5,6 +5,7 @@ import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useSignOut } from '../hooks/useSignOut'
 import { useReportes } from '../hooks/useReportes'
 import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
+import { useTerminosGuard } from '../hooks/useTerminosGuard'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
@@ -16,11 +17,13 @@ import ResumenEjecutivo from '../components/reportes/ResumenEjecutivo'
 import ResumenPorAlicuota from '../components/reportes/ResumenPorAlicuota'
 import MediosYConciliacion from '../components/reportes/MediosYConciliacion'
 import TablaLibro from '../components/reportes/TablaLibro'
+import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
 export default function Reportes() {
   const router = useRouter()
   const signOut = useSignOut()
   const { user, checking } = useAuthGuard()
+  const terminos = useTerminosGuard(user?.id)
   const r = useReportes(user?.id)
   // 'solo-reportes': nunca redirige, solo informa. Reportes tiene que quedar
   // siempre accesible aunque la prueba haya vencido o el pago esté al día
@@ -29,7 +32,9 @@ export default function Reportes() {
   const [ayuda, setAyuda] = useState(false)
   const [exportando, setExportando] = useState(null)
 
-  if (checking || r.loading) return <LoadingScreen mensaje="Generando reporte…" icono="📊" />
+  if (checking || r.loading || terminos.checking) return <LoadingScreen mensaje="Generando reporte…" icono="📊" />
+
+  if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
   /**
    * jsPDF y ExcelJS pesan bastante y solo hacen falta al exportar,
