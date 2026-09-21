@@ -29,6 +29,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Email inválido' })
   }
 
+  // Guardamos el email anterior ANTES de pisarlo — sin esto, el registro de
+  // auditoría diría solo "se cambió a X", sin poder mostrar nunca desde
+  // dónde. Best-effort: si esto falla, seguimos igual con el cambio real.
+  const { data: perfilAnterior } = await supabaseAdmin
+    .from('perfiles').select('email').eq('id', userId).maybeSingle()
+
   // 1. El cambio real: la credencial de login en auth.users.
   //    email_confirm:true lo marca como ya verificado — es un cambio hecho
   //    por un admin, no tiene sentido mandarle un mail de confirmación a
@@ -40,6 +46,17 @@ export default async function handler(req, res) {
   if (authUpdateError) {
     return res.status(400).json({ error: authUpdateError.message || 'No se pudo actualizar el email de acceso' })
   }
+
+  // Se registra ACÁ, apenas se confirma el cambio real — no al final, para
+  // que quede constancia aunque el paso 2 (sincronizar perfiles) falle.
+  await supabaseAdmin.from('logs_auditoria_global').insert({
+    actor_id: quienLlama.id,
+    accion: 'email_actualizado',
+    objetivo_id: userId,
+    detalles: { emailAnterior: perfilAnterior?.email ?? null, emailNuevo: nuevoEmail },
+  }).then(({ error }) => {
+    if (error) console.error('No se pudo registrar en la auditoría global (el cambio de email sí se aplicó)', error)
+  })
 
   // 2. Mantener perfiles.email sincronizado — es lo que se muestra en toda
   //    la app (listas de miembros, superadmin, etc.), y no se actualiza

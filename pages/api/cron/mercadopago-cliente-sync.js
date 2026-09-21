@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin'
 import { sincronizarCuenta } from '../../../lib/server/mercadopagoClienteSync'
+import { compararTiempoConstante } from '../../../lib/domain/mercadopago'
 
 // Ventana de re-consulta: con margen sobre el intervalo del cron (ver
 // vercel.json) para no perder nada si una corrida se retrasa o falla —
@@ -25,8 +26,14 @@ const VENTANA_HORAS = 26
  * disparar cualquiera pegándole a la URL.
  */
 export default async function handler(req, res) {
+  // Si CRON_SECRET no está configurada, el endpoint NIEGA el acceso — nunca
+  // lo deja pasar. Antes, `if (secret && ...)` hacía exactamente lo
+  // contrario: sin la variable cargada, el chequeo entero se saltaba y
+  // cualquiera en internet podía disparar la sincronización de todas las
+  // cuentas conectadas, sin ninguna contraseña. Fallar cerrado, no abierto.
   const secret = process.env.CRON_SECRET
-  if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+  const header = req.headers.authorization || ''
+  if (!secret || !compararTiempoConstante(header, `Bearer ${secret}`)) {
     return res.status(401).json({ error: 'No autorizado' })
   }
 

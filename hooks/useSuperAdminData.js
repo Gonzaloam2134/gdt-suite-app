@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { getStatsGlobales, listarUsuarios, listarLocalesConMiembros, getConfigGlobal, listarPagosSuscripcion } from '../lib/services/superadmin'
+import { getStatsGlobales, listarUsuarios, listarLocalesConMiembros, getConfigGlobal, listarPagosSuscripcion, listarAuditoriaGlobal } from '../lib/services/superadmin'
 import { listarContactosConDetalle } from '../lib/services/contactos'
 import { listarSuscripcionesConOwner } from '../lib/services/suscripciones'
 import { listarAnuncios } from '../lib/services/anuncios'
@@ -34,12 +34,13 @@ export function useSuperAdminData() {
   const [anuncios, setAnuncios] = useState([])
   const [planes, setPlanes] = useState([])
   const [pagosSuscripcion, setPagosSuscripcion] = useState([])
+  const [auditoriaGlobal, setAuditoriaGlobal] = useState([])
   const [loading, setLoading] = useState(true)
 
   const cargar = useCallback(async () => {
     setLoading(true)
 
-    const [stats, contactosData, usuariosData, localesData, suscripcionesData, configData, anunciosData, planesData, pagosData] =
+    const [stats, contactosData, usuariosData, localesData, suscripcionesData, configData, anunciosData, planesData, pagosData, auditoriaData] =
       await Promise.allSettled([
         getStatsGlobales(),
         listarContactosConDetalle(),
@@ -50,6 +51,7 @@ export function useSuperAdminData() {
         listarAnuncios({ soloActivos: false }),
         listarPlanes(),
         listarPagosSuscripcion(),
+        listarAuditoriaGlobal(),
       ])
 
     if (stats.status === 'fulfilled') setGlobalStats(stats.value)
@@ -81,10 +83,13 @@ export function useSuperAdminData() {
     if (pagosData.status === 'fulfilled') setPagosSuscripcion(pagosData.value)
     else { console.error('[useSuperAdminData] pagosSuscripcion', pagosData.reason); toast.error('No se pudo cargar el historial de pagos') }
 
+    if (auditoriaData.status === 'fulfilled') setAuditoriaGlobal(auditoriaData.value)
+    else console.error('[useSuperAdminData] auditoriaGlobal', auditoriaData.reason)
+
     setLoading(false)
   }, [])
 
   useEffect(() => { cargar() }, [cargar])
 
-  return { globalStats, contactos, usuarios, todosLosLocales, suscripciones, config, setConfig, anuncios, planes, pagosSuscripcion, loading, recargar: cargar }
+  return { globalStats, contactos, usuarios, todosLosLocales, suscripciones, config, setConfig, anuncios, planes, pagosSuscripcion, auditoriaGlobal, loading, recargar: cargar }
 }

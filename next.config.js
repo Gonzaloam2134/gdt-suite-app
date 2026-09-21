@@ -40,6 +40,34 @@ const withPWA = require('next-pwa')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // Headers de seguridad básicos, presentes en cualquier app tomada en
+  // serio. El Content-Security-Policy queda afuera a propósito: hay que
+  // armarlo con cuidado (Supabase, Mercado Pago, Google Fonts) y probarlo
+  // bien antes de activarlo en una app que ya mueve plata real — uno mal
+  // configurado puede romper el checkout o el login sin avisar.
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          // No embeber la app dentro de un iframe ajeno (clickjacking).
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // El navegador no debe "adivinar" el tipo de un archivo distinto
+          // al que el servidor declaró.
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // No filtrar la URL completa de origen al navegar hacia afuera
+          // (por ejemplo, al link de Mercado Pago en el checkout).
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Apaga cámara/micrófono/pago por API del navegador que la app no
+          // usa. La geolocalización queda permitida SOLO para el propio
+          // origen — la necesita el flujo de conectar Mercado Pago del
+          // cliente (pedir la ubicación del local).
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), payment=(), geolocation=(self)' },
+        ],
+      },
+    ]
+  },
 }
 
 module.exports = withPWA(nextConfig)

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import crypto from 'crypto'
 import {
   construirExternalReference, parsearExternalReference,
-  frequencyTypeDeCiclo, proximoVencimiento, validarFirmaWebhook,
+  frequencyTypeDeCiclo, proximoVencimiento, validarFirmaWebhook, compararTiempoConstante,
 } from '../lib/domain/mercadopago'
 
 describe('external_reference', () => {
@@ -40,7 +40,27 @@ describe('proximoVencimiento', () => {
   })
 })
 
+describe('compararTiempoConstante', () => {
+  it('dos strings iguales dan true', () => {
+    expect(compararTiempoConstante('abc123', 'abc123')).toBe(true)
+  })
+  it('dos strings distintos del mismo largo dan false', () => {
+    expect(compararTiempoConstante('abc123', 'abc124')).toBe(false)
+  })
+  it('largos distintos dan false sin tirar una excepción', () => {
+    expect(compararTiempoConstante('abc', 'abcdef')).toBe(false)
+  })
+  it('valores no-string nunca rompen, dan false', () => {
+    expect(compararTiempoConstante(null, 'algo')).toBe(false)
+    expect(compararTiempoConstante('algo', undefined)).toBe(false)
+    expect(compararTiempoConstante(123, '123')).toBe(false)
+  })
+})
+
 describe('validarFirmaWebhook', () => {
+  it('un v1 con largo distinto al hash real (firma corta/inválida) no rompe y da false', () => {
+    expect(validarFirmaWebhook('ts=1,v1=abc', 'req-1', '123', 'un-secreto')).toBe(false)
+  })
   const secret = 'mi-secreto'
   const firmar = (dataId, xRequestId, ts) => {
     const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`

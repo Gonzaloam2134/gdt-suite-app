@@ -34,7 +34,7 @@ export default function SuperAdmin() {
   const signOut = useSignOut()
   const {
     globalStats, contactos, usuarios, todosLosLocales, suscripciones,
-    config, setConfig, anuncios, planes, pagosSuscripcion, loading, recargar,
+    config, setConfig, anuncios, planes, pagosSuscripcion, auditoriaGlobal, loading, recargar,
   } = useSuperAdminData()
 
   // Precios editables: se parte de lo que viene de la base, y se guarda
@@ -892,6 +892,37 @@ export default function SuperAdmin() {
                 )}
               </div>
             </div>
+
+            <details className="bg-white rounded-lg border border-gray-200 p-6">
+              <summary className="text-base font-bold text-gray-900 cursor-pointer m-0">
+                🔒 Auditoría de acciones globales ({auditoriaGlobal.length})
+              </summary>
+              <p className="text-xs text-gray-500 mt-2 mb-4">
+                Registro de acciones sensibles de superadmin que no pertenecen a ningún
+                local en particular — hoy, únicamente cambios de email de acceso.
+              </p>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {auditoriaGlobal.map(log => (
+                  <div key={log.id} className="p-3 bg-slate-50 rounded-lg text-xs">
+                    <div className="font-semibold text-gray-800">
+                      {log.accion === 'email_actualizado' ? 'Email de acceso actualizado' : log.accion}
+                    </div>
+                    <div className="text-gray-600 mt-1">
+                      {log.actor?.nombre || log.actor?.email || 'Desconocido'} → {log.objetivo?.nombre || log.objetivo?.email || 'Desconocido'}
+                    </div>
+                    {log.detalles?.emailAnterior && (
+                      <div className="text-gray-400 mt-1">
+                        {log.detalles.emailAnterior} → {log.detalles.emailNuevo}
+                      </div>
+                    )}
+                    <div className="text-gray-400 mt-1">{new Date(log.creado_en).toLocaleString('es-AR')}</div>
+                  </div>
+                ))}
+                {auditoriaGlobal.length === 0 && (
+                  <p className="text-sm text-gray-400 m-0">Sin registros todavía.</p>
+                )}
+              </div>
+            </details>
           </div>
         )}
 
