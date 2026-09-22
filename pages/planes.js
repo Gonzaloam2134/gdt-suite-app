@@ -156,6 +156,13 @@ export default function Planes() {
             Ir a Reportes
           </button>
         </p>
+
+        <p className="text-center text-xs text-gray-400 mt-2">
+          Al pagar, aceptás nuestra{' '}
+          <a href="/reembolsos" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+            Política de Reembolsos
+          </a>.
+        </p>
       </div>
 
       <EmailPagoModal

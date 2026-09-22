@@ -189,6 +189,11 @@ export default function Registro() {
                 className="text-blue-600 hover:text-blue-700 underline font-semibold">
                 Términos y Condiciones
               </a>
+              {' '}y la{' '}
+              <a href="/privacidad" target="_blank" rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 underline font-semibold">
+                Política de Privacidad
+              </a>
             </span>
           </label>
 
