@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getCajaAbiertaLocal, abrirCaja, cerrarCaja, corregirMontoInicial, listarCierres } from '../lib/services/cierresCaja'
+import { listarTransaccionesDia } from '../lib/services/transacciones'
 import { registrarAccion } from '../lib/services/auditoria'
 import { ACCIONES } from '../lib/constants/auditoria'
-import { efectivoEsperado } from '../lib/domain/transacciones'
+import { efectivoEsperado, calcularTotalesDia } from '../lib/domain/transacciones'
 import { esCajaDeHoy } from '../lib/domain/cajas'
+import { aFechaISO } from '../lib/dates'
 import { mensajeError } from '../lib/errorMessage'
 import { formatFecha } from '../lib/format'
 
@@ -79,15 +81,32 @@ export function useCaja({ localId, userId, onCambio }) {
     } finally { if (montado.current) setProcesando(false) }
   }
 
-  const cerrar = async ({ efectivoFisico, observaciones, totales, cantidadTransacciones }) => {
+  /**
+   * Recalcula los totales DEL DÍA DE `fila` justo antes de cerrar, en vez de
+   * confiar en lo que haya quedado cacheado en la pantalla desde la última
+   * vez que se refrescó. Si alguien cargó un cobro desde otro dispositivo
+   * mientras el modal de cierre estaba abierto, el arqueo tiene que
+   * reflejarlo — es justo lo que el dueño compara contra su cuaderno, y
+   * CLAUDE.md lo marca como el bug más caro que puede haber acá.
+   */
+  const totalesFrescos = async (fila) => {
+    const diaISO = aFechaISO(new Date(fila.fecha_apertura))
+    const transacciones = await listarTransaccionesDia(localId, diaISO)
+    const { totales } = calcularTotalesDia(transacciones, diaISO)
+    return { totales, cantidadTransacciones: transacciones.length }
+  }
+
+  const cerrar = async ({ efectivoFisico, observaciones }) => {
     if (!cajaAbierta) { toast.error('No hay caja abierta'); return false }
     const fisico = efectivoFisico === '' ? null : parseFloat(efectivoFisico)
     if (fisico !== null && !Number.isFinite(fisico)) { toast.error('Ingresá un monto de efectivo válido'); return false }
-    const esperado = efectivoEsperado(cajaAbierta.monto_inicial_efectivo, totales)
-    const diferencia = fisico === null ? null : Math.round((fisico - esperado) * 100) / 100
 
     setProcesando(true)
     try {
+      const { totales, cantidadTransacciones } = await totalesFrescos(cajaAbierta)
+      const esperado = efectivoEsperado(cajaAbierta.monto_inicial_efectivo, totales)
+      const diferencia = fisico === null ? null : Math.round((fisico - esperado) * 100) / 100
+
       await cerrarCaja(cajaAbierta.id, {
         totalCobrado: totales.cobros, totalGastado: totales.gastos,
         cantidadTransacciones, efectivoFisico: fisico, diferencia, observaciones,
@@ -111,10 +130,11 @@ export function useCaja({ localId, userId, onCambio }) {
    * efectivo contado: nadie la contó ese día, así que queda `null` y la
    * conciliación la informa como "sin contar" en vez de fingir que cuadró.
    */
-  const cerrarHuerfana = async ({ totales, cantidadTransacciones, nota }) => {
+  const cerrarHuerfana = async ({ nota }) => {
     if (!huerfana) return false
     setProcesando(true)
     try {
+      const { totales, cantidadTransacciones } = await totalesFrescos(huerfana)
       const base = `Cerrada tarde: quedó abierta desde el ${formatFecha(huerfana.fecha_apertura)}. El efectivo de ese día no se contó.`
       const observaciones = nota?.trim() ? `${base} ${nota.trim()}` : base
       await cerrarCaja(huerfana.id, {

@@ -161,15 +161,13 @@ export default function Dashboard() {
       <CierreCajaModal
         isOpen={modal === 'cierre'} onClose={cerrarModal}
         cajaAbierta={caja.cajaAbierta} totales={totales} procesando={caja.procesando}
-        onConfirmar={({ efectivoFisico, observaciones }) =>
-          caja.cerrar({ efectivoFisico, observaciones, totales, cantidadTransacciones: transacciones.length })}
+        onConfirmar={({ efectivoFisico, observaciones }) => caja.cerrar({ efectivoFisico, observaciones })}
         onVerGuia={() => setModal('guia')}
       />
       <CierreCajaAnteriorModal
         isOpen={modal === 'cierre-huerfana'} onClose={cerrarModal}
         caja={caja.huerfana} totales={datosHuerfana.totales} loading={datosHuerfana.loading} procesando={caja.procesando}
-        onConfirmar={(nota) =>
-          caja.cerrarHuerfana({ totales: datosHuerfana.totales, cantidadTransacciones: datosHuerfana.transacciones.length, nota })}
+        onConfirmar={(nota) => caja.cerrarHuerfana({ nota })}
       />
       <HistorialCierresModal
         isOpen={modal === 'historial'} onClose={cerrarModal}
