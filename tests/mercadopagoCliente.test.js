@@ -138,6 +138,10 @@ describe('esTransferencia', () => {
     expect(esTransferencia({ operation_type: 'money_transfer', status: 'approved', collector_id: 'otra-cuenta', payer: { id: MI_CUENTA } }, MI_CUENTA)).toBe(false)
   })
 
+  it('operation_type account_fund (transferencia por red interoperable, ej. MODO) también es una transferencia entrante', () => {
+    expect(esTransferencia({ operation_type: 'account_fund', status: 'approved', collector_id: MI_CUENTA, payer: { id: MI_CUENTA } }, MI_CUENTA)).toBe(true)
+  })
+
   it('un cobro de QR/Point (pos_payment) no es una transferencia', () => {
     expect(esTransferencia({ operation_type: 'pos_payment', status: 'approved', collector_id: MI_CUENTA }, MI_CUENTA)).toBe(false)
   })
