@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin'
-import { crearPreapproval } from '../../../lib/server/mercadopago'
+import { crearPreapproval, buscarPreapprovalEquivalente } from '../../../lib/server/mercadopago'
 import { construirExternalReference, frequencyTypeDeCiclo } from '../../../lib/domain/mercadopago'
 import { SEGMENTO, CICLO } from '../../../lib/constants/planes'
 
@@ -38,10 +38,20 @@ export default async function handler(req, res) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
   if (!appUrl) return res.status(500).json({ error: 'Falta configurar NEXT_PUBLIC_APP_URL' })
 
+  const externalReference = construirExternalReference(user.id, segmento, ciclo)
+
   try {
+    // Doble click, retry del navegador, o timeout+reintento no deben crear
+    // una segunda suscripción recurrente — si ya hay una pendiente o
+    // autorizada para esta cuenta y este plan, se reutiliza.
+    const existente = await buscarPreapprovalEquivalente(externalReference)
+    if (existente) {
+      return res.status(200).json({ initPoint: existente.init_point })
+    }
+
     const preapproval = await crearPreapproval({
       reason: `GDT Suite — Plan ${segmento} (${ciclo})`,
-      externalReference: construirExternalReference(user.id, segmento, ciclo),
+      externalReference,
       payerEmail,
       backUrl: `${appUrl}/planes/confirmacion`,
       frequencyType: frequencyTypeDeCiclo(ciclo),
