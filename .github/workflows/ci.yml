@@ -1,0 +1,40 @@
+name: CI
+
+# CI real, independiente del workflow de aplicar-patch (main.yml, atado a
+# fase2.patch — ya no existe en el repo, ese workflow quedó inerte). Corre
+# en cada push y PR, para que un cambio que rompe tests o build no pueda
+# pasar silenciosamente.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Valores de relleno, NO secretos reales: next build falla al
+          # importar lib/supabaseClient.js si estas env vars faltan (tira
+          # una excepción a propósito), pero ninguna página estática
+          # necesita que apunten a un proyecto real para compilar — no se
+          # hace ninguna llamada de red durante el build.
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY: ci-placeholder
+          NEXT_PUBLIC_APP_URL: https://ci-placeholder.example.com
