@@ -21,6 +21,11 @@ const conToken = async (path, options = {}) => {
   return data
 }
 
+// Cada cuánto se sincroniza sola la pantalla mientras está abierta. Un poco
+// por encima del cooldown del servidor (60s, ver pages/api/mercadopago-
+// cliente/sincronizar.js) para no pisarlo nunca.
+const INTERVALO_AUTOSYNC_MS = 65_000
+
 /** Cola de "por confirmar" de ESTE local (dashboard) — QR/Point que ya se pudieron asignar solos, más transferencias que el dueño ya asignó a mano. */
 export function usePendientesDeLocal(localId) {
   const [pendientes, setPendientes] = useState([])
@@ -74,6 +79,24 @@ export function usePendientesDeLocal(localId) {
       setSincronizando(false)
     }
   }
+
+  // Autosync: mientras esta pantalla está abierta, pedimos solos lo nuevo cada
+  // un rato — así el cajero no tiene que acordarse de tocar "Sincronizar" ni
+  // refrescar la página para que aparezca una transferencia. Silencioso: si
+  // pega contra el cooldown del servidor (alguien ya sincronizó hace poco,
+  // a mano o desde otra pestaña) simplemente no hace nada, no es un error
+  // real que el cajero necesite ver.
+  useEffect(() => {
+    if (!localId) return
+    const id = setInterval(() => {
+      conToken('/api/mercadopago-cliente/sincronizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ localId }),
+      }).then(cargar).catch(() => {})
+    }, INTERVALO_AUTOSYNC_MS)
+    return () => clearInterval(id)
+  }, [localId, cargar])
 
   return { pendientes, loading, confirmar, descartar, sincronizar, sincronizando, recargar: cargar }
 }
