@@ -97,15 +97,18 @@ async function resolverStore({ mpUserId, accessToken, externalStoreId, nombreLoc
   const existente = encontrada?.results?.[0]
   if (existente) return existente.id
 
+  const location = {
+    street_name: local.direccion,
+    city_name: local.ciudad,
+    state_name: local.provincia,
+    ...(local.latitud != null && local.longitud != null ? { latitude: local.latitud, longitude: local.longitud } : {}),
+  }
+  console.log('Creando Store en Mercado Pago con location:', JSON.stringify(location))
+
   const creada = await crearStore(mpUserId, accessToken, {
     name: nombreLocal,
     externalId: externalStoreId,
-    location: {
-      street_name: local.direccion,
-      city_name: local.ciudad,
-      state_name: local.provincia,
-      ...(local.latitud != null && local.longitud != null ? { latitude: local.latitud, longitude: local.longitud } : {}),
-    },
+    location,
   })
   return creada.id
 }
