@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin'
 import { validarFirmaWebhook } from '../../../lib/domain/mercadopagoCliente'
 import { procesarOrderDeWebhook } from '../../../lib/server/mercadopagoClienteSync'
+import { logEvento } from '../../../lib/server/logger'
 
 /**
  * Webhook de la app de Mercado Pago del CLIENTE (ruta separada de
@@ -27,8 +28,11 @@ export default async function handler(req, res) {
   const xRequestId = req.headers['x-request-id']
   const secret = process.env.MERCADOPAGO_MARKETPLACE_WEBHOOK_SECRET
 
+  const inicio = Date.now()
+  logEvento({ operacion: 'webhook_mp_cliente', resultado: 'recibido', detalles: { type, dataId, mpUserId } })
+
   if (!validarFirmaWebhook(xSignature, xRequestId, dataId, secret)) {
-    console.error('Webhook de Mercado Pago (cliente) con firma inválida', { dataId, type })
+    logEvento({ operacion: 'webhook_mp_cliente', resultado: 'rechazado', detalles: { type, dataId, motivo: 'firma inválida' } })
     return res.status(401).json({ error: 'Firma inválida' })
   }
 
@@ -39,8 +43,9 @@ export default async function handler(req, res) {
   try {
     if (type === 'order') await procesarNotificacionDeOrder(dataId, mpUserId)
     await marcarResultado(notificationId, true)
+    logEvento({ operacion: 'webhook_mp_cliente', resultado: 'procesado', duracionMs: Date.now() - inicio, detalles: { type, dataId } })
   } catch (err) {
-    console.error('Error procesando webhook de Mercado Pago (cliente)', { type, dataId }, err)
+    logEvento({ operacion: 'webhook_mp_cliente', resultado: 'fallido', duracionMs: Date.now() - inicio, error: err, detalles: { type, dataId } })
     await marcarResultado(notificationId, false, err.message)
   }
 
