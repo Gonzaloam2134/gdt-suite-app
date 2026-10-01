@@ -63,7 +63,18 @@ export function useCaja({ localId, userId, onCambio }) {
       await onCambio?.()
       return true
     } catch (err) {
-      toast.error(`No se pudo abrir la caja: ${mensajeError(err)}`)
+      // La revalidación de arriba reduce la ventana de carrera, pero no la
+      // cierra del todo (dos personas pueden pasarla casi al mismo tiempo).
+      // La garantía real es el índice único que ya existe en la base
+      // (cierres_caja_una_abierta_por_local — ver scripts/test-concurrencia-caja.mjs);
+      // si la violación llega hasta acá, avisamos lo que realmente pasó en
+      // vez del genérico "ya existe un registro con esos datos".
+      if (err?.code === '23505' && err?.message?.includes('cierres_caja_una_abierta_por_local')) {
+        toast.error('Ya hay una caja abierta para este local — la abrió otra persona en este instante.')
+        await verificar()
+      } else {
+        toast.error(`No se pudo abrir la caja: ${mensajeError(err)}`)
+      }
       return false
     } finally { if (montado.current) setProcesando(false) }
   }
