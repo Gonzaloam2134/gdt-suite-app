@@ -14,3 +14,7 @@ public/workbox-*.js.map
 
 # Estado local del wizard mercadopago:mp-integrate — no es código del proyecto
 .mp-integrate-progress.md
+
+# Caché local de `supabase link` (project-ref, versiones, URL del pooler) —
+# se regenera en cada máquina, no es config del proyecto
+supabase/.temp/
