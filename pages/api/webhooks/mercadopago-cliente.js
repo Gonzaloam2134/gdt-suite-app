@@ -33,28 +33,44 @@ export default async function handler(req, res) {
   }
 
   const notificationId = `mp-cliente:${type}:${req.body?.id ?? dataId}`
-  const yaProcesada = await marcarComoRecibida(notificationId)
-  if (yaProcesada) return res.status(200).json({ ok: true, duplicado: true })
+  const debeProcesar = await debeProcesarse(notificationId)
+  if (!debeProcesar) return res.status(200).json({ ok: true, duplicado: true })
 
   try {
     if (type === 'order') await procesarNotificacionDeOrder(dataId, mpUserId)
+    await marcarResultado(notificationId, true)
   } catch (err) {
     console.error('Error procesando webhook de Mercado Pago (cliente)', { type, dataId }, err)
+    await marcarResultado(notificationId, false, err.message)
   }
 
   return res.status(200).json({ ok: true })
 }
 
-async function marcarComoRecibida(notificationId) {
+/**
+ * true si hay que procesar esta notificación: es nueva, o ya se había
+ * recibido pero el procesamiento anterior falló (nunca se marcó completada).
+ * false solo si ya se completó con éxito antes — un duplicado real.
+ */
+async function debeProcesarse(notificationId) {
   try {
-    const { error } = await supabaseAdmin.from('mp_notificaciones_procesadas').insert({ id: notificationId })
-    if (!error) return false
-    if (error.code === '23505') return true
-    console.error('No se pudo registrar la notificación de MP-cliente (se procesa igual)', error)
-    return false
+    const { data, error } = await supabaseAdmin.rpc('registrar_intento_webhook_mp', { p_id: notificationId })
+    if (error) {
+      console.error('No se pudo registrar el intento de webhook de MP-cliente (se procesa igual)', error)
+      return true
+    }
+    return data === true
   } catch (err) {
     console.error('Error de idempotencia del webhook de MP-cliente (se procesa igual)', err)
-    return false
+    return true
+  }
+}
+
+async function marcarResultado(notificationId, exito, error = null) {
+  try {
+    await supabaseAdmin.rpc('marcar_webhook_mp_resultado', { p_id: notificationId, p_exito: exito, p_error: error })
+  } catch (err) {
+    console.error('No se pudo actualizar el estado del webhook de MP-cliente', err)
   }
 }
 
