@@ -127,7 +127,7 @@ async function resolverStore({ mpUserId, accessToken, externalStoreId, nombreLoc
   }
 }
 
-async function resolverPos({ accessToken, externalPosId, externalStoreId, storeId }) {
+async function resolverPos({ accessToken, externalPosId, storeId }) {
   const encontrado = await buscarPos(accessToken, externalPosId)
   const existente = encontrado?.results?.[0]
   if (existente) return existente.id
@@ -135,7 +135,6 @@ async function resolverPos({ accessToken, externalPosId, externalStoreId, storeI
   const creado = await crearPos(accessToken, {
     name: 'Caja 1',
     storeId,
-    externalStoreId,
     externalId: externalPosId,
   })
   return creado.id
