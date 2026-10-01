@@ -5,7 +5,7 @@ import { tokenVigente } from '../../../lib/server/mercadopagoClienteAuth'
 import { sincronizarCuenta, DIAS_BACKFILL_INICIAL } from '../../../lib/server/mercadopagoClienteSync'
 import { getConexionDeOwner } from '../../../lib/services/conexionesMercadopago'
 import { guardarMapeo } from '../../../lib/services/mapeoLocalesMp'
-import { derivarExternalStoreId, derivarExternalPosId } from '../../../lib/domain/mercadopagoCliente'
+import { derivarExternalStoreId, derivarExternalPosId, extraerValorValidoDelError } from '../../../lib/domain/mercadopagoCliente'
 
 /**
  * Después de conectar la cuenta, crea (o reutiliza) la Store y el POS de
@@ -103,14 +103,28 @@ async function resolverStore({ mpUserId, accessToken, externalStoreId, nombreLoc
     state_name: local.provincia,
     ...(local.latitud != null && local.longitud != null ? { latitude: local.latitud, longitude: local.longitud } : {}),
   }
-  console.log('Creando Store en Mercado Pago con location:', JSON.stringify(location))
 
-  const creada = await crearStore(mpUserId, accessToken, {
-    name: nombreLocal,
-    externalId: externalStoreId,
-    location,
-  })
-  return creada.id
+  try {
+    const creada = await crearStore(mpUserId, accessToken, { name: nombreLocal, externalId: externalStoreId, location })
+    return creada.id
+  } catch (err) {
+    // MP valida city_name/state_name contra un catálogo propio y rechaza por
+    // diferencias de mayúsculas/minúsculas (ej. "Tres de Febrero" vs la forma
+    // que ellos esperan, "Tres de febrero"). El error trae la lista completa
+    // de valores válidos — si el nuestro está ahí con otro casing, lo
+    // corregimos y reintentamos una sola vez en vez de fallar por eso.
+    const descripcion = err.causes?.[0]?.description
+    const ciudadCorregida = extraerValorValidoDelError(descripcion, location.city_name)
+    if (!ciudadCorregida || ciudadCorregida === location.city_name) throw err
+
+    console.log(`Reintentando Store con city_name corregido: "${location.city_name}" -> "${ciudadCorregida}"`)
+    const creada = await crearStore(mpUserId, accessToken, {
+      name: nombreLocal,
+      externalId: externalStoreId,
+      location: { ...location, city_name: ciudadCorregida },
+    })
+    return creada.id
+  }
 }
 
 async function resolverPos({ accessToken, externalPosId, externalStoreId, storeId }) {

@@ -3,6 +3,7 @@ import {
   generarPkce, derivarExternalStoreId, derivarExternalPosId,
   extraerDatosOrder, resolverLocalId, esTransferencia, extraerDatosTransferencia,
   segundosParaProximaSincronizacionManual, COOLDOWN_SINCRONIZACION_MANUAL_SEGUNDOS,
+  extraerValorValidoDelError,
 } from '../lib/domain/mercadopagoCliente'
 
 describe('derivarExternalStoreId', () => {
@@ -211,5 +212,24 @@ describe('generarPkce', () => {
     const segundo = generarPkce()
     expect(primero.codeVerifier).not.toBe(segundo.codeVerifier)
     expect(primero.codeChallenge).not.toBe(segundo.codeChallenge)
+  })
+})
+
+describe('extraerValorValidoDelError', () => {
+  const descripcion = 'location.city_name was invalid. Valid values are: Avellaneda, La Plata, Tres de febrero, Vicente López'
+
+  it('encuentra el valor correcto sin importar mayúsculas/minúsculas', () => {
+    expect(extraerValorValidoDelError(descripcion, 'Tres de Febrero')).toBe('Tres de febrero')
+    expect(extraerValorValidoDelError(descripcion, 'LA PLATA')).toBe('La Plata')
+  })
+
+  it('devuelve null si el candidato no está en la lista', () => {
+    expect(extraerValorValidoDelError(descripcion, 'Rosario')).toBeNull()
+  })
+
+  it('devuelve null si la descripción no tiene el formato esperado', () => {
+    expect(extraerValorValidoDelError('otro error cualquiera', 'La Plata')).toBeNull()
+    expect(extraerValorValidoDelError(null, 'La Plata')).toBeNull()
+    expect(extraerValorValidoDelError(descripcion, null)).toBeNull()
   })
 })
