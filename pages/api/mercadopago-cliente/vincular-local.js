@@ -42,21 +42,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Este local todavía no tiene dirección cargada' })
   }
 
-  // Mercado Pago exige lat/long para crear la Sucursal. El navegador es best-effort
-  // (puede no haber dado permiso), así que si faltan las completamos acá geocodificando
-  // la dirección en texto — el dueño no tiene que hacer nada distinto.
-  let { latitud, longitud } = local
-  if (latitud == null || longitud == null) {
-    const ubicacion = await geocodificarDireccion(local)
-    if (!ubicacion) {
-      return res.status(400).json({
-        error: 'No pudimos ubicar esa dirección automáticamente. Revisá que esté bien escrita (con número y ciudad) e intentá de nuevo.',
-      })
-    }
-    latitud = ubicacion.latitud
-    longitud = ubicacion.longitud
-    await supabaseAdmin.from('locales').update({ latitud, longitud }).eq('id', localId)
+  // Mercado Pago exige lat/long para crear la Sucursal, y valida city_name/state_name
+  // contra un catálogo geográfico real (un typo del dueño hace que MP rechace la
+  // Sucursal). Por eso siempre geocodificamos la dirección y usamos el nombre oficial
+  // que devuelve, en vez de confiar en lo que se tipeó a mano.
+  const ubicacion = await geocodificarDireccion(local)
+  if (!ubicacion) {
+    return res.status(400).json({
+      error: 'No pudimos ubicar esa dirección automáticamente. Revisá que esté bien escrita (con número, ciudad y provincia) e intentá de nuevo.',
+    })
   }
+  const { latitud, longitud, ciudad, provincia } = ubicacion
+  await supabaseAdmin.from('locales').update({ latitud, longitud, ciudad, provincia }).eq('id', localId)
 
   try {
     const accessToken = await tokenVigente(supabaseAdmin, conexion)
@@ -68,7 +65,7 @@ export default async function handler(req, res) {
       accessToken,
       externalStoreId,
       nombreLocal: local.nombre,
-      local: { ...local, latitud, longitud },
+      local: { ...local, latitud, longitud, ciudad, provincia },
     })
 
     const posId = await resolverPos({ accessToken, externalPosId, externalStoreId, storeId })
