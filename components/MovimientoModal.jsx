@@ -69,7 +69,7 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
     setGuardando(true)
     try {
       const tx = await cfg.servicio({
-        localId, medio, monto: montoNum, descripcion,
+        localId, medioPagoId: medio.id, monto: montoNum, descripcion,
         alicuota: conIva ? alicuota : 0,
         tipoComprobante: comprobante,
       })

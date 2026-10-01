@@ -49,7 +49,7 @@ export function usePendientesDeLocal(localId) {
   /** Confirmar = crear la transacción real (nunca se carga sola) y recién ahí cerrar el pendiente. */
   const confirmar = async (pendiente, { medio, alicuota, tipoComprobante }) => {
     const tx = await registrarCobro({
-      localId, medio,
+      localId, medioPagoId: medio.id,
       monto: Number(pendiente.monto),
       descripcion: pendiente.descripcion || `Mercado Pago (${pendiente.origen})`,
       alicuota, tipoComprobante,
