@@ -128,20 +128,26 @@ describe('resolverLocalId', () => {
 })
 
 describe('esTransferencia', () => {
-  it('operation_type money_transfer aprobado es una transferencia', () => {
-    expect(esTransferencia({ operation_type: 'money_transfer', status: 'approved' })).toBe(true)
+  const MI_CUENTA = '12345'
+
+  it('operation_type money_transfer aprobado y la cuenta conectada es quien recibe', () => {
+    expect(esTransferencia({ operation_type: 'money_transfer', status: 'approved', collector_id: MI_CUENTA }, MI_CUENTA)).toBe(true)
+  })
+
+  it('una transferencia SALIENTE (la cuenta conectada es quien manda, no quien recibe) no cuenta como cobro', () => {
+    expect(esTransferencia({ operation_type: 'money_transfer', status: 'approved', collector_id: 'otra-cuenta', payer: { id: MI_CUENTA } }, MI_CUENTA)).toBe(false)
   })
 
   it('un cobro de QR/Point (pos_payment) no es una transferencia', () => {
-    expect(esTransferencia({ operation_type: 'pos_payment', status: 'approved' })).toBe(false)
+    expect(esTransferencia({ operation_type: 'pos_payment', status: 'approved', collector_id: MI_CUENTA }, MI_CUENTA)).toBe(false)
   })
 
   it('una transferencia todavía no aprobada no cuenta', () => {
-    expect(esTransferencia({ operation_type: 'money_transfer', status: 'pending' })).toBe(false)
+    expect(esTransferencia({ operation_type: 'money_transfer', status: 'pending', collector_id: MI_CUENTA }, MI_CUENTA)).toBe(false)
   })
 
   it('sin payment no rompe', () => {
-    expect(esTransferencia(null)).toBe(false)
+    expect(esTransferencia(null, MI_CUENTA)).toBe(false)
   })
 })
 
