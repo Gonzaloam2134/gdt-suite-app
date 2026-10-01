@@ -21,8 +21,10 @@ export default function ReversaModal({ isOpen, onClose, transaccion, userId, onR
     try {
       // Revalida justo antes de escribir: si alguien más ya la canceló mientras
       // este modal estaba abierto, evita una segunda reversa duplicada. No elimina
-      // la ventana de carrera del todo (para eso hace falta un constraint en la
-      // base), pero la reduce a lo mínimo.
+      // la ventana de carrera del todo — la garantía real es el índice único
+      // en la base (tx_una_reversa_por_original, ver
+      // MIGRACION_HARDENING_P0_3_REVERSA.sql / scripts/test-reversa-race.mjs),
+      // esto solo la reduce a lo mínimo y evita un viaje de más al servidor.
       const actual = await getTransaccion(transaccion.id)
       if (actual?.revertida) {
         toast.error('Esta transacción ya fue cancelada por otra persona')
@@ -40,7 +42,13 @@ export default function ReversaModal({ isOpen, onClose, transaccion, userId, onR
       onReversaExitosa?.()
       cerrar()
     } catch (err) {
-      toast.error(`No se pudo cancelar: ${mensajeError(err)}`)
+      if (err?.code === '23505' && err?.message?.includes('tx_una_reversa_por_original')) {
+        toast.error('Esta transacción ya fue cancelada por otra persona')
+        onReversaExitosa?.()
+        cerrar()
+      } else {
+        toast.error(`No se pudo cancelar: ${mensajeError(err)}`)
+      }
     } finally { setGuardando(false) }
   }
 
