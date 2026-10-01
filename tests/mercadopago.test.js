@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import {
   construirExternalReference, parsearExternalReference,
   frequencyTypeDeCiclo, proximoVencimiento, validarFirmaWebhook, compararTiempoConstante,
+  decidirAccionDePago, decidirAccionDePreapproval,
 } from '../lib/domain/mercadopago'
 
 describe('external_reference', () => {
@@ -87,5 +88,67 @@ describe('validarFirmaWebhook', () => {
     expect(validarFirmaWebhook(null, 'req-1', '123', secret)).toBe(false)
     expect(validarFirmaWebhook('ts=1,v1=abc', 'req-1', null, secret)).toBe(false)
     expect(validarFirmaWebhook('ts=1,v1=abc', 'req-1', '123', null)).toBe(false)
+  })
+})
+
+// Hardening P1 ítem 10: decisión pura de qué hacer con un webhook de pago/
+// preapproval, separada de la ejecución (DB/red) en pages/api/webhooks/
+// mercadopago.js — así se puede probar cada status sin pegarle a Mercado
+// Pago ni a Supabase.
+describe('decidirAccionDePago', () => {
+  const ref = construirExternalReference('owner-123', 'negocio', 'mensual')
+
+  it('pago aprobado → activar_plan, con los datos para activar y para el historial', () => {
+    const decision = decidirAccionDePago({
+      id: 999, status: 'approved', external_reference: ref,
+      transaction_amount: 15000, preapproval_id: 'pa-1', payer: { email: 'pagador@test.com' },
+    })
+    expect(decision.accion).toBe('activar_plan')
+    expect(decision.ownerId).toBe('owner-123')
+    expect(decision.segmento).toBe('negocio')
+    expect(decision.ciclo).toBe('mensual')
+    expect(decision.monto).toBe(15000)
+    expect(decision.mpPreapprovalId).toBe('pa-1')
+    expect(decision.mpPayerEmail).toBe('pagador@test.com')
+    expect(decision.mpPaymentId).toBe('999')
+  })
+
+  it('pago rechazado → restringir', () => {
+    expect(decidirAccionDePago({ status: 'rejected', external_reference: ref })).toEqual({ accion: 'restringir', ownerId: 'owner-123' })
+  })
+
+  it('pago cancelado → restringir', () => {
+    expect(decidirAccionDePago({ status: 'cancelled', external_reference: ref })).toEqual({ accion: 'restringir', ownerId: 'owner-123' })
+  })
+
+  it('status intermedio (pending, in_process, authorized) → ignorar, no es un error', () => {
+    for (const status of ['pending', 'in_process', 'authorized', 'refunded']) {
+      expect(decidirAccionDePago({ status, external_reference: ref })).toEqual({ accion: 'ignorar' })
+    }
+  })
+
+  it('evento desconocido / sin external_reference reconocible → sin_referencia', () => {
+    expect(decidirAccionDePago({ status: 'approved', external_reference: null })).toEqual({ accion: 'sin_referencia' })
+    expect(decidirAccionDePago({ status: 'approved', external_reference: 'formato-raro' })).toEqual({ accion: 'sin_referencia' })
+  })
+})
+
+describe('decidirAccionDePreapproval', () => {
+  const ref = construirExternalReference('owner-456', 'basico', 'anual')
+
+  it('cancelado → restringir', () => {
+    expect(decidirAccionDePreapproval({ status: 'cancelled', external_reference: ref })).toEqual({ accion: 'restringir', ownerId: 'owner-456' })
+  })
+
+  it('pausado → restringir', () => {
+    expect(decidirAccionDePreapproval({ status: 'paused', external_reference: ref })).toEqual({ accion: 'restringir', ownerId: 'owner-456' })
+  })
+
+  it('autorizado (renovación al día) → ignorar', () => {
+    expect(decidirAccionDePreapproval({ status: 'authorized', external_reference: ref })).toEqual({ accion: 'ignorar' })
+  })
+
+  it('sin external_reference reconocible → sin_referencia', () => {
+    expect(decidirAccionDePreapproval({ status: 'cancelled', external_reference: null })).toEqual({ accion: 'sin_referencia' })
   })
 })

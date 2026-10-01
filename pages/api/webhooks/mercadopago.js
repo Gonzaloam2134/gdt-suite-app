@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin'
 import { obtenerPago, obtenerPreapproval } from '../../../lib/server/mercadopago'
-import { validarFirmaWebhook, parsearExternalReference, proximoVencimiento } from '../../../lib/domain/mercadopago'
+import { validarFirmaWebhook, decidirAccionDePago, decidirAccionDePreapproval } from '../../../lib/domain/mercadopago'
 import { activarPlanPago, cambiarEstadoCuenta, registrarPagoSuscripcion } from '../../../lib/server/suscripcionesAdmin'
 
 /**
@@ -75,42 +75,35 @@ async function marcarResultado(notificationId, exito, error = null) {
 
 async function procesarNotificacionDePago(paymentId) {
   const pago = await obtenerPago(paymentId)
-  const ref = parsearExternalReference(pago.external_reference)
-  if (!ref) {
-    console.error('Pago de Mercado Pago sin external_reference reconocible', pago.id)
-    return
-  }
-  const { ownerId, segmento, ciclo } = ref
+  const decision = decidirAccionDePago(pago)
 
-  if (pago.status === 'approved') {
-    await activarPlanPago(ownerId, {
-      segmento, ciclo,
-      monto: pago.transaction_amount ?? null,
-      fechaVencimiento: proximoVencimiento(ciclo),
-      mpPreapprovalId: pago.preapproval_id ?? null,
-      mpPayerEmail: pago.payer?.email ?? null,
+  if (decision.accion === 'sin_referencia') {
+    console.error('Pago de Mercado Pago sin external_reference reconocible', pago.id)
+  } else if (decision.accion === 'activar_plan') {
+    await activarPlanPago(decision.ownerId, {
+      segmento: decision.segmento, ciclo: decision.ciclo, monto: decision.monto,
+      fechaVencimiento: decision.fechaVencimiento,
+      mpPreapprovalId: decision.mpPreapprovalId, mpPayerEmail: decision.mpPayerEmail,
     })
-    if (pago.transaction_amount != null) {
+    if (decision.monto != null) {
       await registrarPagoSuscripcion({
-        ownerId, segmento, ciclo,
-        monto: pago.transaction_amount,
-        mpPaymentId: String(pago.id),
+        ownerId: decision.ownerId, segmento: decision.segmento, ciclo: decision.ciclo,
+        monto: decision.monto, mpPaymentId: decision.mpPaymentId,
       }).catch((err) => console.error('No se pudo registrar el pago en el historial de cashflow (el plan sí se activó)', err))
     }
-  } else if (pago.status === 'rejected' || pago.status === 'cancelled') {
-    await cambiarEstadoCuenta(ownerId, 'restricted')
+  } else if (decision.accion === 'restringir') {
+    await cambiarEstadoCuenta(decision.ownerId, 'restricted')
   }
+  // 'ignorar': status intermedio (pending, in_process, authorized, etc.) — no es un error.
 }
 
 async function procesarNotificacionDePreapproval(preapprovalId) {
   const preapproval = await obtenerPreapproval(preapprovalId)
-  const ref = parsearExternalReference(preapproval.external_reference)
-  if (!ref) {
-    console.error('Preapproval de Mercado Pago sin external_reference reconocible', preapproval.id)
-    return
-  }
+  const decision = decidirAccionDePreapproval(preapproval)
 
-  if (preapproval.status === 'cancelled' || preapproval.status === 'paused') {
-    await cambiarEstadoCuenta(ref.ownerId, 'restricted')
+  if (decision.accion === 'sin_referencia') {
+    console.error('Preapproval de Mercado Pago sin external_reference reconocible', preapproval.id)
+  } else if (decision.accion === 'restringir') {
+    await cambiarEstadoCuenta(decision.ownerId, 'restricted')
   }
 }
