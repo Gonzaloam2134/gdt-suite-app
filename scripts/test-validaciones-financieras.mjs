@@ -72,9 +72,19 @@ async function main() {
     .insert([{ local_id: local.id, tipo: 'COBRO_RECIBIDO', monto: 500, es_reversa: true, reversa_de: '00000000-0000-0000-0000-000000000000' }])
   check('reversa con monto positivo: rechazada', !!reversaPositiva.error, reversaPositiva.error?.message)
 
+  // Esto NO prueba el CHECK de signo (transacciones_componentes_mismo_signo_check):
+  // el trigger calcular_financieros_transaccion() recalcula comision_monto para
+  // CUALQUIER COBRO_RECIBIDO antes de que el constraint llegue a evaluarse — sin
+  // medio_pago_id, lo fuerza a 0 (ver MIGRACION_HARDENING_P1_5_COBRO_SERVIDOR.sql).
+  // El CHECK queda como defensa en profundidad para si el trigger alguna vez se
+  // cae, no es alcanzable hoy por este camino — lo que SÍ hay que confirmar es
+  // que el valor forjado nunca llega a guardarse tal cual.
   const comisionSignoInvertido = await cliente.from('transacciones')
     .insert([{ local_id: local.id, tipo: 'COBRO_RECIBIDO', monto: 1000, comision_monto: -50 }])
-  check('cobro positivo con comisión negativa: rechazado', !!comisionSignoInvertido.error, comisionSignoInvertido.error?.message)
+    .select().single()
+  check('cobro con comisión forjada negativa: el trigger la pisa a 0, nunca se guarda negativa',
+    !comisionSignoInvertido.error && comisionSignoInvertido.data?.comision_monto === 0,
+    comisionSignoInvertido.error?.message ?? `comision_monto guardado: ${comisionSignoInvertido.data?.comision_monto}`)
 
   const esReversaInconsistente = await cliente.from('transacciones')
     .insert([{ local_id: local.id, tipo: 'COBRO_RECIBIDO', monto: -500, es_reversa: true, reversa_de: null }])
