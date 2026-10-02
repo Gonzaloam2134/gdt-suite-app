@@ -7,6 +7,7 @@ import { ACCIONES } from '../../lib/constants/auditoria'
 import { ROLES, ROLES_INVITABLES, LABEL_ROL } from '../../lib/constants/roles'
 import { LABEL_SEGMENTO } from '../../lib/constants/planes'
 import { superaLimiteEquipo, equipoIlimitado } from '../../lib/domain/planes'
+import { invitacionVigente } from '../../lib/domain/invitaciones'
 import { mensajeError } from '../../lib/errorMessage'
 import { formatFecha } from '../../lib/format'
 import EditarMiembroModal from './EditarMiembroModal'
@@ -33,7 +34,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
   // Durante la prueba gratuita no hay segmento todavía: no se limita nada.
   // El límite solo aplica una vez que el local está en un plan pago.
   const segmento = suscripcion?.plan === 'pago' ? suscripcion.segmento : null
-  const personasActivas = miembros.length + (invitaciones.filter(i => i.estado === 'pendiente').length)
+  const personasActivas = miembros.length + invitaciones.filter(invitacionVigente).length
   const sinCupo = segmento && superaLimiteEquipo(segmento, personasActivas)
 
   /**
@@ -56,16 +57,14 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
     if (sinCupo) return toast.error(`Tu plan ${LABEL_SEGMENTO[segmento]} permite solo al dueño operando. Actualizá a Negocio para sumar gente.`)
     setInvitando(true)
     try {
-      const inv = await crearInvitacion({ localId, email, nombre, rol, invitadoPor: userId })
+      const inv = await crearInvitacion({ localId, email, nombre, rol })
       await registrarAccion({ localId, userId, accion: ACCIONES.USUARIO_INVITADO, detalles: { email, rol } })
       setRecienCreada(inv)
       setEmail('')
       setNombre('')
       onCambio()
     } catch (err) {
-      toast.error(err.message?.includes('duplicate') || err.message?.includes('unica')
-        ? 'Ya hay una invitación pendiente para ese email en este local'
-        : mensajeError(err))
+      toast.error(mensajeError(err))
     } finally { setInvitando(false) }
   }
 
@@ -221,7 +220,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
         footer={<button onClick={() => setRecienCreada(null)}
           className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">Listo</button>}>
         <p className="text-sm text-gray-600 m-0">
-          Le enviamos un mail, pero si no lo usa mandale este link directo. Vence en 7 días.
+          Mandale este link para que pueda crear su cuenta. Vence en 7 días.
         </p>
         <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 break-all font-mono">
           {recienCreada && linkInvitacion(recienCreada.token)}
