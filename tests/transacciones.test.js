@@ -183,6 +183,42 @@ describe('calcularResumenPeriodo', () => {
     expect(resumen.totalFacturado).toBe(0)
     expect(resumen.cantidadVentas).toBe(0)
   })
+
+  it('lista la anulada y su reversa en libroVentas, con montos reales, sin que entren a los totales', () => {
+    const { resumen, libroVentas } = calcularResumenPeriodo([
+      tx({ id: 'o', monto: 30000, revertida: true, tipo_comprobante: 'B', monto_neto: 24793.39, monto_iva: 5206.61 }),
+      tx({ id: 'r', monto: -30000, es_reversa: true, reversa_de: 'o', monto_neto: -24793.39, monto_iva: -5206.61 }),
+      tx({ id: 'v', monto: 1000 }), // una venta válida real, para confirmar que convive bien
+    ])
+    expect(libroVentas).toHaveLength(3)
+
+    const anulada = libroVentas.find(v => v.id === 'o')
+    expect(anulada.estado).toBe('anulada')
+    expect(anulada.total).toBe(30000)      // monto real, no en cero: tiene que poder rastrearse
+
+    const reversa = libroVentas.find(v => v.id === 'r')
+    expect(reversa.estado).toBe('reversa')
+    expect(reversa.total).toBe(-30000)
+
+    const valida = libroVentas.find(v => v.id === 'v')
+    expect(valida.estado).toBe('valida')
+
+    // Ninguna de las dos entró a los totales: solo la venta válida de $1000.
+    expect(resumen.totalFacturado).toBe(1000)
+    expect(resumen.cantidadVentas).toBe(1)
+  })
+
+  it('misma garantía para gastos anulados en libroCompras', () => {
+    const { resumen, libroCompras } = calcularResumenPeriodo([
+      tx({ id: 'go', tipo: 'GASTO_REGISTRADO', monto: 5000, revertida: true }),
+      tx({ id: 'gr', tipo: 'GASTO_REGISTRADO', monto: -5000, es_reversa: true, reversa_de: 'go' }),
+    ])
+    expect(libroCompras).toHaveLength(2)
+    expect(libroCompras.find(c => c.id === 'go').estado).toBe('anulada')
+    expect(libroCompras.find(c => c.id === 'gr').estado).toBe('reversa')
+    expect(resumen.gastosOperativos).toBe(0)
+    expect(resumen.cantidadGastos).toBe(0)
+  })
 })
 
 /**

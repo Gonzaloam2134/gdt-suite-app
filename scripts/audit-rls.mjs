@@ -78,6 +78,7 @@ async function limpiar() {
     await admin.from('transacciones').delete().in('local_id', limpieza.localIds)
     await admin.from('cierres_caja').delete().in('local_id', limpieza.localIds)
     await admin.from('medios_pago').delete().in('local_id', limpieza.localIds)
+    await admin.from('invitaciones').delete().in('local_id', limpieza.localIds)
     await admin.from('miembros_locales').delete().in('local_id', limpieza.localIds)
     await admin.from('suscripciones').delete().in('local_id', limpieza.localIds)
     await admin.from('locales').delete().in('id', limpieza.localIds)
@@ -169,6 +170,38 @@ async function main() {
 
   const rpcInvitacion = await anon.rpc('aceptar_invitacion', { p_token: 'token-inexistente' })
   check('anon no puede llamar a aceptar_invitacion', !!rpcInvitacion.error, rpcInvitacion.error?.message ?? `se ejecutó sin error, resultado: ${JSON.stringify(rpcInvitacion.data)}`)
+
+  console.log('\n--- crear_invitacion: ownership del local (hardening P0-15) ---')
+
+  const emailInvitadoC = `rls-audit-c-${sufijo}@gdt-audit.local`
+  const invParaA1 = await A.cliente.rpc('crear_invitacion', {
+    p_local_id: locA1, p_email: emailInvitadoC, p_nombre: null, p_rol: 'cajero',
+  })
+  check('A (owner de A1) puede crear una invitación en A1', !invParaA1.error, invParaA1.error?.message ?? '')
+
+  const invSinPermiso = await B.cliente.rpc('crear_invitacion', {
+    p_local_id: locA1, p_email: 'x@gdt-audit.local', p_nombre: null, p_rol: 'cajero',
+  })
+  check('B no puede crear una invitación en A1 (no es owner)', !!invSinPermiso.error, invSinPermiso.error?.message ?? 'se ejecutó sin error')
+
+  console.log('\n--- crear_invitacion: dedup de invitaciones pendientes (hardening P0-15) ---')
+
+  const invRepetida = await A.cliente.rpc('crear_invitacion', {
+    p_local_id: locA1, p_email: emailInvitadoC, p_nombre: null, p_rol: 'cajero',
+  })
+  check('Invitar dos veces al mismo email reutiliza la misma fila (mismo token)',
+    !invRepetida.error && invRepetida.data?.token === invParaA1.data?.token,
+    `token1=${invParaA1.data?.token} token2=${invRepetida.data?.token}`)
+
+  console.log('\n--- aceptar_invitacion: no debe poder secuestrarse con otra identidad (hardening P0-14) ---')
+
+  const secuestro = await B.cliente.rpc('aceptar_invitacion', { p_token: invParaA1.data?.token })
+  check('B no puede aceptar una invitación dirigida a otro email',
+    secuestro.data?.ok === false, secuestro.error?.message ?? JSON.stringify(secuestro.data))
+
+  const miembroSecuestrado = await admin.from('miembros_locales')
+    .select('id').eq('local_id', locA1).eq('user_id', B.id).eq('activo', true)
+  check('B no quedó como miembro de A1 tras el intento de secuestro', (miembroSecuestrado.data?.length ?? 0) === 0, `filas: ${miembroSecuestrado.data?.length}`)
 
   console.log('\n--- Control: ni siquiera A puede borrar sus propias transacciones (nada se borra) ---')
   const delPropia = await A.cliente.from('transacciones').delete().eq('id', txA1.id).select()
