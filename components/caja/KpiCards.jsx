@@ -53,8 +53,10 @@ export default function KpiCards({ totales, cantidadCobros, cantidadGastos, caja
 
   return (
     <div className="space-y-3">
-      <Grupo titulo="Cómo viene el día" abierto={abiertos.resultado} onAlternar={() => alternar('resultado')} tarjetas={resultado} />
+      {/* "Dónde está la plata" primero: disponible/pendiente es la pregunta
+          que el dueño necesita responder apenas entra, antes que el resultado del día. */}
       <Grupo titulo="Dónde está la plata" abierto={abiertos.plata} onAlternar={() => alternar('plata')} tarjetas={plata} />
+      <Grupo titulo="Cómo viene el día" abierto={abiertos.resultado} onAlternar={() => alternar('resultado')} tarjetas={resultado} />
     </div>
   )
 }

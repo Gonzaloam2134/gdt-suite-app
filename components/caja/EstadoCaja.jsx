@@ -1,6 +1,7 @@
 import { formatHora, formatCurrency } from '../../lib/format'
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES_OPERAN_CAJA } from '../../lib/constants/roles'
+import StatusBadge from '../ui/StatusBadge'
 
 /** Franja que dice de un vistazo si la caja está abierta y desde cuándo. */
 export default function EstadoCaja({ cajaAbierta, onAyuda, onEditarInicial }) {
@@ -13,8 +14,7 @@ export default function EstadoCaja({ cajaAbierta, onAyuda, onEditarInicial }) {
         <p className={`text-xs font-semibold m-0 flex items-center gap-2 flex-wrap ${cajaAbierta ? 'text-green-800' : 'text-amber-800'}`}>
           {cajaAbierta ? (
             <>
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              Caja abierta desde las {formatHora(cajaAbierta.fecha_apertura)}
+              <StatusBadge tone="success" dot label={`Caja abierta desde las ${formatHora(cajaAbierta.fecha_apertura)}`} />
               <span className="text-green-700 font-normal">
                 · Inicial {formatCurrency(cajaAbierta.monto_inicial_efectivo)}
               </span>
@@ -26,7 +26,7 @@ export default function EstadoCaja({ cajaAbierta, onAyuda, onEditarInicial }) {
               )}
             </>
           ) : (
-            <>Caja cerrada · abrila para empezar a registrar movimientos</>
+            <StatusBadge tone="warning" label="Caja cerrada · abrila para empezar a registrar movimientos" />
           )}
         </p>
         <button onClick={onAyuda}

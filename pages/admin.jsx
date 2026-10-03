@@ -23,7 +23,7 @@ import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
 const TABS_OWNER = [
   { id: 'resumen', label: '📊 Resumen' },
-  { id: 'miembros', label: '👥 Miembros' },
+  { id: 'miembros', label: '👥 Equipo' },
   { id: 'medios-pago', label: '💳 Medios de pago' },
   { id: 'mercadopago', label: '🏪 Mercado Pago' },
   { id: 'suscripcion', label: '💎 Suscripción' },

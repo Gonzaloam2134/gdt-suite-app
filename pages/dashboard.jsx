@@ -57,6 +57,13 @@ export default function Dashboard() {
   const { totales, cobros, gastos, acreditacionesHoy, desgloseMedios, transacciones, loading, recargar } =
     useTransaccionesDia(localId, fechaISO)
 
+  // Una sola tira cronológica con cobros, gastos y sus reversas — en vez de
+  // dos listas separadas por tipo. Cada fila ya trae su tipoMovimiento.
+  const movimientos = [
+    ...cobros.map(c => ({ ...c, tipoMovimiento: 'cobro' })),
+    ...gastos.map(g => ({ ...g, tipoMovimiento: 'gasto' })),
+  ].sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
+
   const caja = useCaja({ localId, userId: user?.id, onCambio: recargar })
 
   // Totales del día de la caja huérfana (si hay una), para poder cerrarla con
@@ -142,12 +149,11 @@ export default function Dashboard() {
             <PorConfirmarMp localId={localId} local={local} />
             <KpiCards
               totales={totales}
-              cantidadCobros={cobros.filter(c => !c.anulada).length}
-              cantidadGastos={gastos.filter(g => !g.anulada).length}
+              cantidadCobros={cobros.filter(c => !c.anulada && !c.reversa).length}
+              cantidadGastos={gastos.filter(g => !g.anulada && !g.reversa).length}
               cajaAbierta={caja.cajaAbierta}
             />
-            <ListaTransacciones tipo="cobro" items={cobros} onReversar={setAReversar} />
-            <ListaTransacciones tipo="gasto" items={gastos} onReversar={setAReversar} />
+            <ListaTransacciones items={movimientos} onReversar={setAReversar} />
             <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />
             <DesgloseMedios medios={desgloseMedios} />
           </>

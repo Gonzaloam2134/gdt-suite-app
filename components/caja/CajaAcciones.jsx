@@ -1,5 +1,6 @@
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES_OPERAN_CAJA, ROLES_REGISTRAN_COBRO } from '../../lib/constants/roles'
+import Button from '../ui/Button'
 
 /**
  * Barra de acciones del día.
@@ -18,22 +19,21 @@ export default function CajaAcciones({ cajaAbierta, huerfana, onAbrir, onCerrar,
       <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           {puedeOperar && (cajaAbierta
-            ? <button onClick={onCerrar} className="px-3 py-2 bg-orange-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-orange-600 shadow-sm">🔒 Cerrar caja</button>
-            : <button onClick={onAbrir} disabled={!!huerfana} title={huerfana ? 'Cerrá la caja anterior antes de abrir la de hoy' : ''}
-                className="px-3 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-emerald-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">🔓 Abrir caja</button>)}
-          <button onClick={onHistorial} title="Historial de cierres"
-            className="px-3 py-2 bg-indigo-100 text-indigo-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-indigo-200">
+            ? <Button variant="danger" size="sm" onClick={onCerrar}>🔒 Cerrar caja</Button>
+            : <Button variant="success" size="sm" onClick={onAbrir} disabled={!!huerfana}
+                title={huerfana ? 'Cerrá la caja anterior antes de abrir la de hoy' : ''}>🔓 Abrir caja</Button>)}
+          <Button variant="ghost" size="sm" onClick={onHistorial} title="Historial de cierres">
             📋 <span className="hidden md:inline">Historial</span>
-          </button>
+          </Button>
         </div>
 
         {puedeCobrar ? (
           <div className="flex items-center gap-2">
-            <button onClick={onCobro} disabled={!cajaAbierta} title={cajaAbierta ? '' : 'Falta que abran la caja para registrar cobros'}
-              className="px-4 py-2 bg-green-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-green-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">+ Cobro</button>
+            <Button variant="success" onClick={onCobro} disabled={!cajaAbierta}
+              title={cajaAbierta ? '' : 'Falta que abran la caja para registrar cobros'}>+ Cobro</Button>
             {puedeOperar && (
-              <button onClick={onGasto} disabled={!cajaAbierta} title={cajaAbierta ? '' : 'Abrí la caja para registrar gastos'}
-                className="px-4 py-2 bg-red-500 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-red-600 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">+ Gasto</button>
+              <Button variant="danger" onClick={onGasto} disabled={!cajaAbierta}
+                title={cajaAbierta ? '' : 'Abrí la caja para registrar gastos'}>+ Gasto</Button>
             )}
           </div>
         ) : !loading && (
