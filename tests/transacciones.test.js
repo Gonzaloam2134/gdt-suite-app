@@ -77,21 +77,24 @@ describe('calcularTotalesDia', () => {
     expect(r.gastos).toHaveLength(1)
   })
 
-  it('una transacción cancelada NO suma pero SÍ se lista, marcada', () => {
+  it('una transacción cancelada NO suma pero SÍ se lista, marcada — junto con su reversa', () => {
     const original = tx({ id: 'orig', monto: 10000, revertida: true, motivo_reversa: 'se cargó dos veces' })
     const reversa = tx({ monto: -10000, es_reversa: true, reversa_de: 'orig' })
     const r = calcularTotalesDia([original, reversa], DIA)
     expect(r.totales.cobros).toBe(0)
     expect(r.totales.efectivoCobrado).toBe(0)
-    expect(r.cobros).toHaveLength(1)              // el dueño la ve en la caja
-    expect(r.cobros[0].anulada).toBe(true)
-    expect(r.cobros[0].motivo_reversa).toBe('se cargó dos veces')
+    expect(r.cobros).toHaveLength(2)              // el dueño ve las dos: la original y su reversa
+    const fOriginal = r.cobros.find(c => c.anulada)
+    const fReversa = r.cobros.find(c => c.reversa)
+    expect(fOriginal.motivo_reversa).toBe('se cargó dos veces')
+    expect(fReversa).toBeTruthy()
   })
 
-  it('el asiento inverso no se lista como movimiento propio', () => {
+  it('el asiento inverso se lista marcado (reversa: true), sin sumar a los totales', () => {
     const r = calcularTotalesDia([tx({ monto: -500, es_reversa: true, reversa_de: 'x' })], DIA)
-    expect(r.cobros).toHaveLength(0)
-    expect(r.gastos).toHaveLength(0)
+    expect(r.cobros).toHaveLength(1)
+    expect(r.cobros[0].reversa).toBe(true)
+    expect(r.totales.cobros).toBe(0)
   })
 
   it('un gasto cancelado tampoco suma y se lista marcado', () => {
