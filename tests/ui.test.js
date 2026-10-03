@@ -2,21 +2,23 @@ import { describe, it, expect } from 'vitest'
 import { claseBoton, claseBadge, claseDot } from '../lib/ui/estilos'
 
 describe('claseBoton', () => {
+  // Los tonos base están en 600/700, no 500: con texto blanco, bg-primary-500/
+  // bg-success-500/bg-danger-500 no llegan a WCAG AA (ver lib/ui/estilos.js).
   it('primary por defecto', () => {
-    expect(claseBoton()).toContain('bg-primary-500')
+    expect(claseBoton()).toContain('bg-primary-600')
   })
   it('success', () => {
-    expect(claseBoton({ variant: 'success' })).toContain('bg-success-500')
+    expect(claseBoton({ variant: 'success' })).toContain('bg-success-700')
   })
   it('danger', () => {
-    expect(claseBoton({ variant: 'danger' })).toContain('bg-danger-500')
+    expect(claseBoton({ variant: 'danger' })).toContain('bg-danger-600')
   })
   it('secondary y ghost no usan los tokens semánticos (son neutros)', () => {
     expect(claseBoton({ variant: 'secondary' })).toContain('bg-gray-100')
     expect(claseBoton({ variant: 'ghost' })).toContain('bg-transparent')
   })
   it('variant desconocida cae a primary, no rompe', () => {
-    expect(claseBoton({ variant: 'inexistente' })).toContain('bg-primary-500')
+    expect(claseBoton({ variant: 'inexistente' })).toContain('bg-primary-600')
   })
   it('tamaño sm vs md', () => {
     expect(claseBoton({ size: 'sm' })).toContain('text-xs')
