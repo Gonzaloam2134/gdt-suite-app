@@ -11,9 +11,16 @@ export default function Login() {
 
   // Si ya hay sesión (por ejemplo, después de cambiar la contraseña desde el
   // flujo de recuperación), no tiene sentido mostrar el formulario de login.
+  // Si además ya hay un local activo de una sesión anterior, vamos directo a
+  // la caja — es la pantalla que se usa todos los días, /locales es solo
+  // para elegir/cambiar de local. dashboard.jsx ya corre su propio guard de
+  // suscripción (local suspendido/restringido), así que saltear /locales acá
+  // no pierde esa validación.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) router.replace('/locales')
+      if (!session?.user) return
+      const localId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
+      router.replace(localId ? '/dashboard' : '/locales')
     })
   }, [router])
 

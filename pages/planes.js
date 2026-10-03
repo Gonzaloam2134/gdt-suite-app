@@ -3,14 +3,43 @@ import { useRouter } from 'next/router'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useMisLocales } from '../hooks/useMisLocales'
+import { useUsoCuenta } from '../hooks/useUsoCuenta'
 import { listarPlanes } from '../lib/services/planes'
 import { supabase } from '../lib/supabaseClient'
-import { SEGMENTO, CICLO, LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO, CARACTERISTICAS_SEGMENTO } from '../lib/constants/planes'
+import { SEGMENTO, CICLO, LABEL_SEGMENTO, LABEL_CICLO, DESCRIPCION_SEGMENTO, CARACTERISTICAS_SEGMENTO, LIMITE_LOCALES, LIMITE_EQUIPO } from '../lib/constants/planes'
+import { planMinimoRequerido, excedeSegmento } from '../lib/domain/planes'
 import { formatCurrency } from '../lib/format'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
 import EmailPagoModal from '../components/EmailPagoModal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
+
+/**
+ * Qué permite un segmento, en una frase — para el aviso de "este plan no te
+ * alcanza". Solo menciona la dimensión que ese segmento realmente limita
+ * (Negocio no tiene límite de equipo, por ejemplo no se menciona).
+ */
+const descripcionLimite = (segmento) => {
+  const limiteLocales = LIMITE_LOCALES[segmento]
+  const limiteEquipo = LIMITE_EQUIPO[segmento]
+  const partes = []
+  if (limiteLocales !== null) partes.push(limiteLocales === 1 ? '1 solo local' : `${limiteLocales} locales`)
+  if (limiteEquipo !== null) partes.push(limiteEquipo === 1 ? 'vos como único operador' : `${limiteEquipo} personas operando`)
+  return partes.join(' y ')
+}
+
+const mensajeBajarPlan = (segmento, localesPropios, personasActivas) => {
+  const supera = []
+  if (LIMITE_LOCALES[segmento] !== null && localesPropios > LIMITE_LOCALES[segmento]) {
+    supera.push(`${localesPropios} local${localesPropios === 1 ? '' : 'es'}`)
+  }
+  if (LIMITE_EQUIPO[segmento] !== null && personasActivas > LIMITE_EQUIPO[segmento]) {
+    supera.push(`${personasActivas} persona${personasActivas === 1 ? '' : 's'} activa${personasActivas === 1 ? '' : 's'}`)
+  }
+  return `Con ${LABEL_SEGMENTO[segmento]} vas a poder tener ${descripcionLimite(segmento)} — hoy tenés ${supera.join(' y ')}. `
+    + 'Vas a tener que dar de baja lo que sobre antes de poder usar este plan.'
+}
 
 const SEGMENTOS = Object.values(SEGMENTO)
 
@@ -29,12 +58,27 @@ export default function Planes() {
   const { user, checking } = useAuthGuard()
   const { activeLocalId } = useUserRole()
   const { locales } = useMisLocales(user?.id)
+  const uso = useUsoCuenta(locales)
   const [ciclo, setCiclo] = useState(CICLO.MENSUAL)
   const [precios, setPrecios] = useState([])
   const [cargando, setCargando] = useState(true)
   const [pagando, setPagando] = useState(null) // segmento en proceso de pago, o null
   const [errorPago, setErrorPago] = useState('')
   const [confirmarPago, setConfirmarPago] = useState(null) // segmento elegido, a la espera de confirmar el email, o null
+  const [avisoBajarPlan, setAvisoBajarPlan] = useState(null) // segmento elegido que no le alcanza según su uso real, o null
+
+  // Solo recomendamos activamente cuando el uso real ya pide algo más que el
+  // plan más barato — no tiene sentido destacar Básico, es el default.
+  const recomendado = uso.cargado ? planMinimoRequerido(uso.localesPropios, uso.personasActivas) : null
+  const destacarRecomendado = recomendado && recomendado !== SEGMENTO.BASICO
+
+  const elegirOAvisar = (segmento) => {
+    if (uso.cargado && excedeSegmento(segmento, uso.localesPropios, uso.personasActivas)) {
+      setAvisoBajarPlan(segmento)
+    } else {
+      setConfirmarPago(segmento)
+    }
+  }
 
   const vieneDePruebaVencida = router.query.motivo === 'prueba-vencida'
 
@@ -118,8 +162,14 @@ export default function Planes() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
           {orden.map(segmento => {
             const precio = precioDe(segmento)
+            const esRecomendado = destacarRecomendado && recomendado === segmento
             return (
-              <div key={segmento} className="bg-white rounded-xl border-2 border-gray-200 p-5 flex flex-col">
+              <div key={segmento} className={`bg-white rounded-xl border-2 p-5 flex flex-col ${esRecomendado ? 'border-blue-400' : 'border-gray-200'}`}>
+                {esRecomendado && (
+                  <span className="self-start -mt-8 mb-2 px-2.5 py-1 bg-blue-500 text-white rounded-full text-[11px] font-bold">
+                    Te recomendamos este plan
+                  </span>
+                )}
                 <h2 className="text-lg font-bold text-gray-900 m-0">{LABEL_SEGMENTO[segmento]}</h2>
                 <p className="text-xs text-gray-500 mt-1 mb-3">{DESCRIPCION_SEGMENTO[segmento]}</p>
 
@@ -140,7 +190,7 @@ export default function Planes() {
                   ))}
                 </ul>
 
-                <button onClick={() => setConfirmarPago(segmento)} disabled={pagando !== null}
+                <button onClick={() => elegirOAvisar(segmento)} disabled={pagando !== null}
                   className="mt-3 w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
                   {pagando === segmento ? 'Redirigiendo…' : 'Elegir plan'}
                 </button>
@@ -174,6 +224,15 @@ export default function Planes() {
         emailSugerido={user?.email}
         onConfirmar={elegirPlan}
         procesando={pagando !== null}
+      />
+
+      <ConfirmDialog
+        isOpen={!!avisoBajarPlan}
+        onClose={() => setAvisoBajarPlan(null)}
+        onConfirm={() => { const s = avisoBajarPlan; setAvisoBajarPlan(null); setConfirmarPago(s) }}
+        title="Este plan no te alcanza hoy"
+        message={avisoBajarPlan ? mensajeBajarPlan(avisoBajarPlan, uso.localesPropios, uso.personasActivas) : ''}
+        confirmLabel="Elegir igual"
       />
 
       <BottomNav activeTab="planes" />
