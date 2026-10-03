@@ -53,6 +53,7 @@ export default function AppHeader({ titulo, subtitulo, locales = [], localId, on
               <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-50">
                 <ItemMenu onClick={() => { setMenu(false); setGuiaInstalacion(true) }}>📲 Instalar app</ItemMenu>
                 <ItemMenu onClick={() => ir('/anuncios')}>Novedades</ItemMenu>
+                {hasRole([ROLES.OWNER]) && <ItemMenu onClick={() => ir('/mi-cuenta')}>💎 Mi cuenta</ItemMenu>}
                 {esSuperUser && <ItemMenu onClick={() => ir('/superadmin')}>Panel global</ItemMenu>}
                 <hr className="my-1 border-gray-200" />
                 <ItemMenu onClick={signOut} peligro>Cerrar sesión</ItemMenu>

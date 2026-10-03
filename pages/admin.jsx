@@ -16,7 +16,6 @@ import Tabs from '../components/admin/Tabs'
 import ResumenTab from '../components/admin/ResumenTab'
 import MiembrosTab from '../components/admin/MiembrosTab'
 import MediosPagoTab from '../components/admin/MediosPagoTab'
-import SuscripcionTab from '../components/admin/SuscripcionTab'
 import MercadoPagoClienteTab from '../components/admin/MercadoPagoClienteTab'
 import ListaLogs from '../components/admin/ListaLogs'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
@@ -26,7 +25,6 @@ const TABS_OWNER = [
   { id: 'miembros', label: '👥 Equipo' },
   { id: 'medios-pago', label: '💳 Medios de pago' },
   { id: 'mercadopago', label: '🏪 Mercado Pago' },
-  { id: 'suscripcion', label: '💎 Suscripción' },
   { id: 'logs', label: '📋 Auditoría' },
 ]
 
@@ -124,7 +122,6 @@ export default function AdminPanel() {
             ownerId={local?.creado_por} locales={locales}
           />
         )}
-        {tab === 'suscripcion' && <SuscripcionTab suscripcion={suscripcion} onCambio={recargar} />}
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>
 
