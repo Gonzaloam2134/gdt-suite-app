@@ -95,7 +95,7 @@ export default function Planes() {
         ) : (
           <div className="text-center">
             <h1 className="text-xl font-bold text-gray-900 m-0">Elegí tu plan</h1>
-            <p className="text-sm text-gray-500 mt-1 m-0">Pagás una vez por tu cuenta — Básico y Negocio cubren un local, Multi-local no tiene límite.</p>
+            <p className="text-sm text-gray-500 mt-1 m-0">Pagás una vez por tu cuenta — Básico y Local cubren un local, Multi-local no tiene límite.</p>
           </div>
         )}
 

@@ -37,7 +37,7 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
   const invitar = async (e) => {
     e.preventDefault()
     if (!datos.email.trim()) return toast.error('Ingresá el email de la persona')
-    if (sinCupo) return toast.error(`Tu plan ${LABEL_SEGMENTO[segmento]} permite solo al dueño operando. Actualizá a Negocio para sumar gente.`)
+    if (sinCupo) return toast.error(`Tu plan ${LABEL_SEGMENTO[segmento]} permite solo al dueño operando. Actualizá a Local para sumar gente.`)
     setInvitando(true)
     try {
       const inv = await crearInvitacion({ localId, email: datos.email, nombre: datos.nombre, rol: datos.rol })
