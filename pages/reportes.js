@@ -10,12 +10,14 @@ import { useTerminosGuard } from '../hooks/useTerminosGuard'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
+import SeccionColapsable from '../components/ui/SeccionColapsable'
 import ReportGuide from '../components/ReportGuide'
 import FiltrosReporte from '../components/reportes/FiltrosReporte'
 import AvisosCalidad from '../components/reportes/AvisosCalidad'
 import ResumenEjecutivo from '../components/reportes/ResumenEjecutivo'
 import ResumenPorAlicuota from '../components/reportes/ResumenPorAlicuota'
-import MediosYConciliacion from '../components/reportes/MediosYConciliacion'
+import ResumenMedios from '../components/reportes/ResumenMedios'
+import ConciliacionCaja from '../components/reportes/ConciliacionCaja'
 import TablaLibro from '../components/reportes/TablaLibro'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
@@ -120,15 +122,26 @@ export default function Reportes() {
 
         <ResumenEjecutivo resumen={r.resumen} discriminaIva={r.discriminaIva} />
 
-        {r.discriminaIva && <ResumenPorAlicuota ventas={r.porAlicuotaVentas} compras={r.porAlicuotaCompras} />}
+        {r.discriminaIva && (
+          <SeccionColapsable titulo="Resumen por alícuota" abiertaPorDefecto={false}>
+            <ResumenPorAlicuota ventas={r.porAlicuotaVentas} compras={r.porAlicuotaCompras} />
+          </SeccionColapsable>
+        )}
 
-        <MediosYConciliacion
-          porMedio={r.porMedio} conciliacion={r.conciliacion}
-          cierres={r.cierres} totalFacturado={r.resumen.totalFacturado}
-        />
+        <SeccionColapsable titulo="Medios de pago" abiertaPorDefecto={false}>
+          <ResumenMedios porMedio={r.porMedio} totalFacturado={r.resumen.totalFacturado} />
+        </SeccionColapsable>
 
-        <TablaLibro tipo="ventas" filas={r.libroVentas} totales={totalesVentas} discriminaIva={r.discriminaIva} />
-        <TablaLibro tipo="compras" filas={r.libroCompras} totales={totalesCompras} discriminaIva={r.discriminaIva} />
+        <SeccionColapsable titulo="Conciliación de caja" abiertaPorDefecto={false}>
+          <ConciliacionCaja conciliacion={r.conciliacion} cierres={r.cierres} />
+        </SeccionColapsable>
+
+        <SeccionColapsable titulo="Libro IVA Ventas" badge={r.libroVentas.length} abiertaPorDefecto={false}>
+          <TablaLibro tipo="ventas" filas={r.libroVentas} totales={totalesVentas} discriminaIva={r.discriminaIva} />
+        </SeccionColapsable>
+        <SeccionColapsable titulo="Libro IVA Compras" badge={r.libroCompras.length} abiertaPorDefecto={false}>
+          <TablaLibro tipo="compras" filas={r.libroCompras} totales={totalesCompras} discriminaIva={r.discriminaIva} />
+        </SeccionColapsable>
 
         <p className="text-xs text-gray-400 text-center m-0">
           Generado a partir de los movimientos cargados en el sistema. No reemplaza la liquidación de un profesional.

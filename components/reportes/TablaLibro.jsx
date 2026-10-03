@@ -5,19 +5,18 @@ import EmptyState from '../ui/EmptyState'
 const TIPO_LABEL = { A: 'Factura A', B: 'Factura B', C: 'Factura C', M: 'Factura M', TICKET: 'Ticket', SIN_COMPROBANTE: 'Sin comprobante' }
 const LIMITE = 25
 
-/** Libro IVA (ventas o compras). Muestra los primeros 25 y ofrece el resto en el Excel. */
+/**
+ * Libro IVA (ventas o compras). Muestra los primeros 25 y ofrece el resto en
+ * el Excel. Sin card/header propios — vive dentro de un SeccionColapsable
+ * (pages/reportes.js), que ya da el título y el badge de cantidad.
+ */
 export default function TablaLibro({ tipo, filas, totales, discriminaIva }) {
   const [verTodo, setVerTodo] = useState(false)
   const esVentas = tipo === 'ventas'
   const visibles = verTodo ? filas : filas.slice(0, LIMITE)
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <header className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
-        <h2 className="font-bold text-gray-900 m-0 text-base">{esVentas ? 'Libro IVA Ventas' : 'Libro IVA Compras'}</h2>
-        <span className="text-xs text-gray-500">{filas.length} registros</span>
-      </header>
-
+    <>
       {filas.length === 0 ? (
         <EmptyState icono="📄" titulo={`Sin ${esVentas ? 'ventas' : 'compras'} en el período`} />
       ) : (
@@ -72,6 +71,6 @@ export default function TablaLibro({ tipo, filas, totales, discriminaIva }) {
           )}
         </>
       )}
-    </section>
+    </>
   )
 }
