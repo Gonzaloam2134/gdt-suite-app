@@ -25,6 +25,7 @@ const CONFIG = {
 export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId, local, onSuccess }) {
   const cfg = CONFIG[tipo]
   const [medios, setMedios] = useState([])
+  const [cargandoMedios, setCargandoMedios] = useState(true)
   const [medioId, setMedioId] = useState('')
   const [monto, setMonto] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -36,12 +37,14 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
 
   useEffect(() => {
     if (!isOpen || !localId) return
+    setCargandoMedios(true)
     listarMediosPago(localId, { soloHabilitados: true })
       .then((data) => {
         setMedios(data)
         if (data.length) setMedioId(data[0].id)
       })
       .catch(() => toast.error('No se pudieron cargar los medios de pago'))
+      .finally(() => setCargandoMedios(false))
     setComprobante(COMPROBANTE_POR_CONDICION[local?.condicion_fiscal] || 'SIN_COMPROBANTE')
     setAlicuota(conIva ? 21 : 0)
   }, [isOpen, localId, local?.condicion_fiscal, conIva])
@@ -95,13 +98,8 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
         </button>
       </>}>
       <form onSubmit={guardar} className="space-y-4">
-        <div>
-          <label htmlFor="mov-monto" className="block text-sm font-semibold text-gray-700 mb-2">Monto</label>
-          <input id="mov-monto" type="number" step="0.01" min="0" inputMode="decimal" value={monto} autoFocus required
-            onChange={(e) => setMonto(e.target.value)} placeholder="0,00"
-            className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 outline-none" />
-        </div>
-
+        {/* Medio de pago primero: el teclado numérico que abre el monto (autoFocus,
+            más abajo) tapa lo que esté debajo — así queda visible arriba. */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">{cfg.etiquetaMedio}</label>
           <div className="grid grid-cols-2 gap-2">
@@ -114,7 +112,14 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
               </button>
             ))}
           </div>
-          {medios.length === 0 && <p className="text-xs text-gray-500 m-0">No hay medios de pago configurados para este local.</p>}
+          {!cargandoMedios && medios.length === 0 && <p className="text-xs text-gray-500 m-0">No hay medios de pago configurados para este local.</p>}
+        </div>
+
+        <div>
+          <label htmlFor="mov-monto" className="block text-sm font-semibold text-gray-700 mb-2">Monto</label>
+          <input id="mov-monto" type="number" step="0.01" min="0" inputMode="decimal" value={monto} autoFocus required
+            onChange={(e) => setMonto(e.target.value)} placeholder="0,00"
+            className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 outline-none" />
         </div>
 
         <div>
