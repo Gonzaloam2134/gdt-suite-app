@@ -72,7 +72,7 @@ export default function AdminPanel() {
   if (!activeLocalId) {
     return (
       <main className="min-h-screen bg-fondo md:pl-56">
-        <AppHeader ocultarNavDesktop titulo="Administración" locales={locales} localId={activeLocalId} />
+        <AppHeader ocultarNavDesktop titulo="Configuración" locales={locales} localId={activeLocalId} />
         <div className="max-w-6xl mx-auto p-4">
           <p className="text-sm text-gray-600">Elegí un local para administrarlo.</p>
         </div>
@@ -101,7 +101,7 @@ export default function AdminPanel() {
 
   return (
     <main className="min-h-screen bg-fondo pb-20 md:pl-56">
-      <AppHeader ocultarNavDesktop titulo="Administración" locales={locales} localId={activeLocalId} />
+      <AppHeader ocultarNavDesktop titulo="Configuración" locales={locales} localId={activeLocalId} />
 
       <div className="max-w-6xl mx-auto p-4">
         <Tabs tabs={TABS_OWNER} activa={tab} onChange={setTab} />
