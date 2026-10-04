@@ -66,7 +66,7 @@ export default function Reportes() {
   }
 
   const totalesVentas = { neto: r.resumen.netoGravado, iva: r.resumen.ivaDebitoFiscal, total: r.resumen.totalFacturado }
-  const totalesCompras = { neto: r.resumen.gastosOperativos - r.resumen.ivaCreditoFiscal, iva: r.resumen.ivaCreditoFiscal, total: r.resumen.gastosOperativos }
+  const totalesCompras = { neto: r.resumen.gastosOperativos - r.resumen.ivaCreditoGastos, iva: r.resumen.ivaCreditoGastos, total: r.resumen.gastosOperativos }
 
   return (
     <main className="min-h-screen bg-fondo pb-20 md:pb-8 md:pl-56">

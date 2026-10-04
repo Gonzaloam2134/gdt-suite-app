@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularComision, calcularIva, comisionDe, calcularTotalesDia, calcularAcreditacionesDia, calcularResumenPeriodo, efectivoEsperado } from '../lib/domain/transacciones'
+import { calcularComision, calcularIva, comisionDe, comisionIvaDe, calcularTotalesDia, calcularAcreditacionesDia, calcularResumenPeriodo, efectivoEsperado } from '../lib/domain/transacciones'
 
 const efectivo = { nombre: 'Efectivo', tipo: 'efectivo', comision_porcentaje: 0, plazo_acreditacion_dias: 0 }
 const credito  = { nombre: 'Crédito',  tipo: 'credito',  comision_porcentaje: 3.5, plazo_acreditacion_dias: 30 }
@@ -16,6 +16,20 @@ describe('cálculos unitarios', () => {
   it('IVA 21% desde bruto', () => expect(calcularIva(1210, 21)).toEqual({ neto: 1000, iva: 210 }))
   it('IVA 10.5%', () => expect(calcularIva(1105, 10.5)).toEqual({ neto: 1000, iva: 105 }))
   it('IVA 0%', () => expect(calcularIva(1000, 0)).toEqual({ neto: 1000, iva: 0 }))
+})
+
+describe('comisionIvaDe', () => {
+  it('descompone la comisión guardada (bruta) en neto + IVA 21%', () => {
+    // 42,35 bruto = 35 neto + 7,35 IVA
+    expect(comisionIvaDe({ monto: 1210, comision_monto: 42.35 })).toEqual({ neto: 35, iva: 7.35 })
+  })
+  it('comisión 0 guardada: sin IVA', () => {
+    expect(comisionIvaDe({ monto: 1000, comision_monto: 0, medios_pago: { comision_porcentaje: 5 } })).toEqual({ neto: 0, iva: 0 })
+  })
+  it('fila vieja sin comision_monto: deriva la comisión del medio y la descompone', () => {
+    // 1000 * 3,5% = 35 → neto 28,93 + IVA 6,07
+    expect(comisionIvaDe({ monto: 1000, medios_pago: { comision_porcentaje: 3.5 } })).toEqual({ neto: 28.93, iva: 6.07 })
+  })
 })
 
 describe('comisionDe', () => {
@@ -162,10 +176,27 @@ describe('calcularResumenPeriodo', () => {
     expect(resumen.comisiones).toBe(42.35)
     expect(resumen.ingresoNetoReal).toBe(1167.65)
     expect(resumen.gastosOperativos).toBe(605)
-    expect(resumen.ivaCreditoFiscal).toBe(105)
-    expect(resumen.ivaAPagar).toBe(105)
-    expect(resumen.resultadoEjercicio).toBe(562.65)
+    // El IVA crédito suma el de la factura de compra (105) + el estimado sobre la comisión (42,35 → 7,35)
+    expect(resumen.comisionesIvaEstimado).toBe(7.35)
+    expect(resumen.ivaCreditoGastos).toBe(105)
+    expect(resumen.ivaCreditoFiscal).toBe(112.35)
+    expect(resumen.ivaAPagar).toBe(97.65)
+    expect(resumen.resultadoEjercicio).toBe(562.65)   // la comisión bruta ya estaba descontada: el IVA no cambia el resultado
     expect(libroVentas[0].tipo).toBe('B')
+  })
+
+  it('monotributo: la comisión no genera IVA crédito', () => {
+    const { resumen } = calcularResumenPeriodo([tx({ monto: 1210, medios_pago: credito, comision_monto: 42.35 })], { discriminaIva: false })
+    expect(resumen.comisionesIvaEstimado).toBe(0)
+    expect(resumen.ivaCreditoFiscal).toBe(0)
+  })
+
+  it('comisiones de cobros anulados/reversas no suman IVA crédito', () => {
+    const { resumen } = calcularResumenPeriodo([
+      tx({ id: 'o', monto: 1210, medios_pago: credito, comision_monto: 42.35, revertida: true }),
+      tx({ monto: -1210, medios_pago: credito, comision_monto: -42.35, es_reversa: true, reversa_de: 'o' }),
+    ])
+    expect(resumen.comisionesIvaEstimado).toBe(0)
   })
 
   it('monotributo: no discrimina IVA', () => {
