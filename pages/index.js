@@ -58,7 +58,7 @@ export default function Login() {
       <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8">
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">💼</div>
+          <img src="/logo-mark.svg" width="64" height="64" alt="GDT Suite" className="mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-gray-900 m-0">GDT Suite</h1>
           <p className="text-sm text-gray-500 mt-1">Gestión contable para tu negocio</p>
         </div>

@@ -5,10 +5,11 @@ export default function Document() {
     <Html lang="es-AR">
       <Head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#1e3a5f" />
+        <meta name="theme-color" content="#019C62" />
 
         {/* Ícono estándar y favicon */}
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
 
         {/* iOS: Safari no lee manifest.json para instalar, necesita esto aparte */}

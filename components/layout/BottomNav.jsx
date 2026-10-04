@@ -48,7 +48,10 @@ export default function BottomNav({ activeTab, lateral = false }) {
 
       {lateral && (
         <nav className="hidden md:flex fixed top-0 bottom-0 left-0 w-56 z-30 flex-col gap-1 p-3 pt-5 bg-white border-r border-black/5" aria-label="Navegación principal">
-          <p className="m-0 mb-3 px-3 text-base font-extrabold text-primary-700 tracking-tight">GDT Suite</p>
+          <div className="mb-3 px-3 flex items-center gap-2">
+            <img src="/logo-mark.svg" width="22" height="22" alt="" />
+            <span className="text-base font-extrabold text-primary-700 tracking-tight">GDT Suite</span>
+          </div>
           {tabs.map(tab => {
             const activa = activeTab === tab.id
             return (
