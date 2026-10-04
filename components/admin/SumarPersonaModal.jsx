@@ -57,7 +57,7 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
         <p className="text-sm text-gray-600 m-0">
           Mandale este link para que pueda crear su cuenta. Vence en 7 días.
         </p>
-        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 break-all font-mono">
+        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-[14px] text-xs text-gray-700 break-all font-mono">
           {linkInvitacion(creada.token)}
         </div>
         <div className="mt-3 flex gap-2 flex-wrap">
@@ -88,7 +88,7 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
       </>}>
       <form onSubmit={invitar} className="space-y-3">
         {sinCupo && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-[14px]">
             <p className="text-sm font-semibold text-amber-900 m-0">
               Tu plan {LABEL_SEGMENTO[segmento]} llegó al límite de personas operando.
             </p>
@@ -102,7 +102,7 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
           <label htmlFor="sp-nombre" className="block text-sm font-semibold text-gray-700 mb-1">Nombre (opcional)</label>
           <input id="sp-nombre" type="text" value={datos.nombre} onChange={(e) => setDatos(d => ({ ...d, nombre: e.target.value }))}
             placeholder="María"
-            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            className="w-full p-2.5 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-600 outline-none" />
         </div>
 
         <div>
@@ -111,20 +111,20 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
             onChange={(e) => setDatos(d => ({ ...d, email: e.target.value }))}
             onBlur={(e) => revisarRolExistente(e.target.value)}
             placeholder="maria@gmail.com"
-            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            className="w-full p-2.5 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-600 outline-none" />
         </div>
 
         <div>
           <label htmlFor="sp-rol" className="block text-sm font-semibold text-gray-700 mb-1">¿Qué va a poder hacer?</label>
           <select id="sp-rol" value={datos.rol} onChange={(e) => setDatos(d => ({ ...d, rol: e.target.value }))}
             disabled={!!datos.rolYaAsignado}
-            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500">
+            className="w-full p-2.5 border border-gray-300 rounded-[14px] text-sm disabled:bg-gray-100 disabled:text-gray-500">
             {ROLES_INVITABLES.map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
           </select>
         </div>
 
         {datos.rolYaAsignado && (
-          <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-2 m-0">
+          <p className="text-xs text-primary-700 bg-primary-50 border border-primary-500/30 rounded-[14px] p-2 m-0">
             Esta persona ya trabaja en otro de tus locales como <strong>{LABEL_ROL[datos.rolYaAsignado]}</strong>.
             Cada persona tiene el mismo rol en todos los locales, así que entra con ese.
           </p>

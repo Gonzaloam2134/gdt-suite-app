@@ -13,14 +13,14 @@ export default function FiltrosReporte({ periodo, onPreset, onFechas }) {
   const [hasta, setHasta] = useState(periodo.hasta)
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+    <div className="bg-white rounded-[20px] border border-black/5 shadow-suave p-4 space-y-4">
       <div>
         <span className="block text-sm font-semibold text-gray-700 mb-2">Período</span>
         <div className="flex gap-2 flex-wrap mb-3">
           {PRESETS.map(p => (
             <button key={p.id} onClick={() => onPreset(p.id)}
-              className={`px-3 py-1.5 border-none rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-                periodo.preset === p.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+              className={`px-3 py-1.5 border-none rounded-[12px] text-xs font-semibold cursor-pointer transition-colors ${
+                periodo.preset === p.id ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
               {p.label}
             </button>
           ))}
@@ -29,15 +29,15 @@ export default function FiltrosReporte({ periodo, onPreset, onFechas }) {
           <div>
             <label htmlFor="r-desde" className="block text-xs text-gray-500 mb-1">Desde</label>
             <input id="r-desde" type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
-              className="p-2 border border-gray-300 rounded-md text-sm" />
+              className="p-2 border border-gray-300 rounded-[12px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
           </div>
           <div>
             <label htmlFor="r-hasta" className="block text-xs text-gray-500 mb-1">Hasta</label>
             <input id="r-hasta" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)}
-              className="p-2 border border-gray-300 rounded-md text-sm" />
+              className="p-2 border border-gray-300 rounded-[12px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
           </div>
           <button onClick={() => onFechas(desde, hasta)}
-            className="px-4 py-2 bg-blue-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600">
+            className="px-4 py-2 press bg-primary-600 text-white border-none rounded-[12px] text-xs font-semibold cursor-pointer hover:bg-primary-700">
             Aplicar
           </button>
         </div>

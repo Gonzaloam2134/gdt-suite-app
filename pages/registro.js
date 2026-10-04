@@ -95,8 +95,8 @@ export default function Registro() {
 
   if (pendienteConfirmacion) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+      <div className="min-h-screen bg-fondo flex items-center justify-center p-4">
+        <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8 text-center">
           <div className="text-6xl mb-4">📬</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Confirmá tu email</h1>
           <p className="text-sm text-gray-600">
@@ -106,7 +106,7 @@ export default function Registro() {
           </p>
           <button
             onClick={() => router.push('/')}
-            className="mt-6 w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+            className="mt-6 w-full py-3 press bg-primary-600 text-white font-semibold rounded-[14px] cursor-pointer hover:bg-primary-700 transition-colors"
           >
             Ya confirmé, ir a iniciar sesión
           </button>
@@ -116,11 +116,11 @@ export default function Registro() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-fondo flex items-center justify-center p-4">
+      <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8">
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3"></div>
+          <img src="/logo-mark.svg" width="64" height="64" alt="GDT Suite" className="mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-gray-900 m-0">Crear Cuenta</h1>
           <p className="text-sm text-gray-500 mt-1">Comenzá a gestionar tu negocio</p>
         </div>
@@ -137,7 +137,7 @@ export default function Registro() {
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="Juan Pérez"
               autoComplete="name"
             />
@@ -153,7 +153,7 @@ export default function Registro() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="tu@email.com"
               autoComplete="email"
             />
@@ -170,7 +170,7 @@ export default function Registro() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="Mínimo 6 caracteres"
               autoComplete="new-password"
             />
@@ -181,17 +181,17 @@ export default function Registro() {
               type="checkbox"
               checked={aceptaTerminos}
               onChange={(e) => setAceptaTerminos(e.target.checked)}
-              className="mt-0.5"
+              className="mt-0.5 accent-primary-600"
             />
             <span>
               Acepto los{' '}
               <a href="/terminos" target="_blank" rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 underline font-semibold">
+                className="text-primary-700 hover:text-primary-700 underline font-semibold">
                 Términos y Condiciones
               </a>
               {' '}y la{' '}
               <a href="/privacidad" target="_blank" rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 underline font-semibold">
+                className="text-primary-700 hover:text-primary-700 underline font-semibold">
                 Política de Privacidad
               </a>
             </span>
@@ -200,7 +200,7 @@ export default function Registro() {
           <button
             type="submit"
             disabled={loading || !aceptaTerminos}
-            className="w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 press bg-primary-600 text-white font-semibold rounded-[14px] cursor-pointer hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
@@ -212,7 +212,7 @@ export default function Registro() {
             ¿Ya tenés cuenta?{' '}
             <button
               onClick={() => router.push('/')}
-              className="text-blue-600 hover:text-blue-700 cursor-pointer bg-none border-none underline font-semibold"
+              className="text-primary-700 hover:text-primary-700 cursor-pointer bg-none border-none underline font-semibold"
             >
               Ingresá
             </button>

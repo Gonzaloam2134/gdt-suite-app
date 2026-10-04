@@ -8,7 +8,7 @@ import { useState } from 'react'
 export default function SeccionColapsable({ titulo, badge, children, paginacion, abiertaPorDefecto = true, acciones }) {
   const [abierta, setAbierta] = useState(abiertaPorDefecto)
   return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <section className="bg-white rounded-[20px] border border-black/5 shadow-suave overflow-hidden">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <button onClick={() => setAbierta(a => !a)} className="flex items-center gap-2 bg-transparent border-none cursor-pointer text-left" aria-expanded={abierta}>
           <span className="text-gray-400 text-xs">{abierta ? '▼' : '▶'}</span>

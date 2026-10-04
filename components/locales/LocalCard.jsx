@@ -8,8 +8,8 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
     && diasRestantesPrueba !== null && diasRestantesPrueba !== undefined && diasRestantesPrueba <= 7
 
   return (
-    <div className={`bg-white rounded-xl border-2 overflow-hidden transition-colors ${
-      deshabilitado ? 'border-gray-200 opacity-70' : 'border-gray-200 hover:border-blue-300'}`}>
+    <div className={`bg-white rounded-[20px] border border-black/5 shadow-suave overflow-hidden transition-colors ${
+      deshabilitado ? 'border-black/5 opacity-70' : 'border-black/5 hover:border-primary-500/40'}`}>
       <button onClick={deshabilitado ? undefined : onEntrar} disabled={deshabilitado}
         className="w-full text-left p-4 bg-transparent border-none cursor-pointer disabled:cursor-not-allowed">
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -26,15 +26,15 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-2 bg-green-50 rounded-lg">
+          <div className="p-2 bg-green-50 rounded-[14px]">
             <div className="text-[10px] text-green-800 font-semibold uppercase">Cobros hoy</div>
             <div className="text-sm font-bold text-green-700 truncate">{formatCurrency(r.ventas)}</div>
           </div>
-          <div className="p-2 bg-red-50 rounded-lg">
+          <div className="p-2 bg-red-50 rounded-[14px]">
             <div className="text-[10px] text-red-800 font-semibold uppercase">Gastos</div>
             <div className="text-sm font-bold text-red-700 truncate">{formatCurrency(r.gastos)}</div>
           </div>
-          <div className="p-2 bg-gray-50 rounded-lg">
+          <div className="p-2 bg-gray-50 rounded-[14px]">
             <div className="text-[10px] text-gray-600 font-semibold uppercase">Movim.</div>
             <div className="text-sm font-bold text-gray-800">{r.movimientos}</div>
           </div>
@@ -51,7 +51,7 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
           </p>
         )}
         {!deshabilitado && pruebaVencida && (
-          <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded p-2 mt-3 m-0">
+          <p className="text-xs text-primary-700 bg-primary-50 border border-primary-500/30 rounded p-2 mt-3 m-0">
             Tu prueba terminó. Podés entrar a ver y descargar tus reportes.
           </p>
         )}
@@ -60,7 +60,7 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
       {!deshabilitado && pruebaVencida && (
         <div className="px-4 pb-3 -mt-1">
           <a href="/planes"
-            className="block text-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1.5 hover:bg-blue-100">
+            className="block text-center text-xs font-bold text-primary-700 bg-primary-50 border border-primary-500/30 rounded px-2 py-1.5 hover:bg-primary-500/10">
             Ver planes →
           </a>
         </div>
@@ -69,7 +69,7 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
       {!deshabilitado && (
         <div className="flex border-t border-gray-100">
           <button onClick={onEntrar}
-            className="flex-1 py-2.5 text-xs font-bold text-blue-700 bg-transparent border-none cursor-pointer hover:bg-blue-50">
+            className="flex-1 py-2.5 text-xs font-bold text-primary-700 bg-transparent border-none cursor-pointer hover:bg-primary-50">
             Ir a la caja
           </button>
           {onAdmin && (

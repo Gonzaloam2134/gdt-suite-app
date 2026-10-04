@@ -14,8 +14,8 @@ const Fila = ({ label, valor, negativo, destacada, ayuda }) => (
 
 export default function ResumenEjecutivo({ resumen, discriminaIva }) {
   return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <header className="bg-slate-800 px-4 py-3">
+    <section className="bg-white rounded-[20px] border border-black/5 shadow-suave overflow-hidden">
+      <header className="bg-primary-700 px-4 py-3">
         <h2 className="text-white font-bold m-0 text-base">Resultado del período</h2>
       </header>
       <div className="p-4">
@@ -25,11 +25,15 @@ export default function ResumenEjecutivo({ resumen, discriminaIva }) {
         <Fila label="(-) Comisiones de medios de pago" ayuda="Lo que se quedan las tarjetas y billeteras" valor={resumen.comisiones} negativo />
         <Fila label="Ingreso neto real" ayuda="Lo que efectivamente entró" valor={resumen.ingresoNetoReal} />
         <Fila label="(-) Gastos operativos" valor={resumen.gastosOperativos} negativo />
-        {discriminaIva && <Fila label="(+) IVA crédito fiscal" valor={resumen.ivaCreditoFiscal} />}
-        <Fila label="Resultado" valor={resumen.resultadoEjercicio} destacada negativo={resumen.resultadoEjercicio < 0} />
+        {discriminaIva && <Fila label="(+) IVA crédito fiscal" valor={resumen.ivaCreditoFiscal}
+          ayuda={resumen.comisionesIvaEstimado > 0
+            ? `Incluye ${formatCurrency(resumen.comisionesIvaEstimado)} estimado sobre comisiones (21%) — no hay comprobante del medio de pago cargado, verificalo contra su factura real antes de presentar.`
+            : undefined} />}
+        <Fila label="Resultado" valor={resumen.resultadoEjercicio} destacada negativo={resumen.resultadoEjercicio < 0}
+          ayuda={resumen.ivaAPagar > 0 ? 'Incluye el IVA que todavía hay que girarle a AFIP — no es ganancia disponible.' : undefined} />
 
         {discriminaIva && (
-          <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="mt-4 p-3 bg-fondo rounded-[14px] border border-black/5">
             <div className="flex justify-between items-baseline">
               <span className="text-sm font-semibold text-gray-700">
                 Posición IVA

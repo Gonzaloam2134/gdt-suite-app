@@ -101,7 +101,7 @@ export default function ReportGuide({ isOpen, onClose }) {
               </div>
 
               <div className="border-2 border-gray-200 rounded-lg p-3 bg-gray-50">
-                <div className="font-bold text-gray-900 text-sm mb-1">⬜ Exento u otro régimen</div>
+                <div className="font-bold text-gray-900 text-sm mb-1">⬜ No inscripto u otro régimen</div>
                 <p className="text-xs text-gray-800 mb-2">
                   No cobrás IVA por tu actividad. El reporte funciona igual, pero las filas de IVA serán $0.
                 </p>

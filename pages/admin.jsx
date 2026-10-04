@@ -21,11 +21,11 @@ import ListaLogs from '../components/admin/ListaLogs'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
 const TABS_OWNER = [
-  { id: 'resumen', label: '📊 Resumen' },
-  { id: 'miembros', label: '👥 Equipo' },
-  { id: 'medios-pago', label: '💳 Medios de pago' },
-  { id: 'mercadopago', label: '🏪 Mercado Pago' },
-  { id: 'logs', label: '📋 Auditoría' },
+  { id: 'resumen', label: 'Resumen', icono: 'reportes' },
+  { id: 'miembros', label: 'Equipo', icono: 'equipo' },
+  { id: 'medios-pago', label: 'Medios de pago', icono: 'tarjeta' },
+  { id: 'mercadopago', label: 'Mercado Pago', icono: 'inicio' },
+  { id: 'logs', label: 'Auditoría', icono: 'historial' },
 ]
 
 export default function AdminPanel() {
@@ -71,12 +71,12 @@ export default function AdminPanel() {
 
   if (!activeLocalId) {
     return (
-      <main className="min-h-screen bg-slate-100">
-        <AppHeader titulo="Administración" locales={locales} localId={activeLocalId} />
+      <main className="min-h-screen bg-fondo md:pl-56">
+        <AppHeader ocultarNavDesktop titulo="Configuración" locales={locales} localId={activeLocalId} />
         <div className="max-w-6xl mx-auto p-4">
           <p className="text-sm text-gray-600">Elegí un local para administrarlo.</p>
         </div>
-        <BottomNav activeTab="admin" />
+        <BottomNav activeTab="admin" lateral />
       </main>
     )
   }
@@ -86,22 +86,22 @@ export default function AdminPanel() {
   // Cajero y empleado: solo su propia actividad
   if (!esOwner) {
     return (
-      <main className="min-h-screen bg-slate-100 pb-20">
-        <AppHeader titulo="Mi actividad" locales={locales} localId={activeLocalId} />
+      <main className="min-h-screen bg-fondo pb-20 md:pl-56">
+        <AppHeader ocultarNavDesktop titulo="Mi actividad" locales={locales} localId={activeLocalId} />
         <div className="max-w-4xl mx-auto p-4 space-y-4">
-          <p className="text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3 m-0">
+          <p className="text-sm text-primary-700 bg-primary-50 border border-primary-500/30 rounded-[14px] p-3 m-0">
             Acá ves el registro de lo que fuiste cargando. Solo el dueño del local ve la actividad de todo el equipo.
           </p>
           <ListaLogs logs={logs} titulo="Mis acciones" />
         </div>
-        <BottomNav activeTab="admin" />
+        <BottomNav activeTab="admin" lateral />
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20">
-      <AppHeader titulo="Administración" locales={locales} localId={activeLocalId} />
+    <main className="min-h-screen bg-fondo pb-20 md:pl-56">
+      <AppHeader ocultarNavDesktop titulo="Configuración" locales={locales} localId={activeLocalId} />
 
       <div className="max-w-6xl mx-auto p-4">
         <Tabs tabs={TABS_OWNER} activa={tab} onChange={setTab} />
@@ -125,7 +125,7 @@ export default function AdminPanel() {
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>
 
-      <BottomNav activeTab="admin" />
+      <BottomNav activeTab="admin" lateral />
     </main>
   )
 }

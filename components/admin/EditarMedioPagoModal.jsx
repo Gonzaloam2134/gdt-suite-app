@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
+import Button from '../ui/Button'
 import { TIPOS_MEDIO, LABEL_TIPO_MEDIO, iconoMedio } from '../../lib/constants/mediosPago'
 
 const COMISION_MAXIMA = 100
@@ -11,7 +12,7 @@ const PLAZO_MAXIMO = 365
  * cada transacción guarda la comisión con la que se hizo. Los reportes viejos
  * siguen siendo correctos y el cambio rige de acá en adelante.
  */
-export default function EditarMedioPagoModal({ isOpen, onClose, medio, onGuardar, procesando }) {
+export default function EditarMedioPagoModal({ isOpen, onClose, medio, onGuardar, procesando, onEliminar }) {
   const [form, setForm] = useState({ nombre: '', tipo: '', comision: '', plazo: '' })
 
   useEffect(() => {
@@ -56,23 +57,23 @@ export default function EditarMedioPagoModal({ isOpen, onClose, medio, onGuardar
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Editar medio de pago" subtitle={medio.nombre}
       footer={<>
-        <button onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>
-        <button onClick={guardar} disabled={procesando || !formValido}
-          className="px-4 py-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 disabled:opacity-50">
+        {onEliminar && <Button variant="ghost" onClick={onEliminar} className="!text-danger-700 hover:!bg-danger-50 !rounded-[14px] mr-auto">Eliminar</Button>}
+        <Button variant="secondary" onClick={onClose} className="!rounded-[14px]">Cancelar</Button>
+        <Button onClick={guardar} disabled={procesando || !formValido} className="!rounded-[14px]">
           {procesando ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        </Button>
       </>}>
       <div className="space-y-4">
         <div>
           <label htmlFor="mp-nombre" className="block text-sm font-semibold text-gray-700 mb-2">Nombre</label>
           <input id="mp-nombre" type="text" value={form.nombre} onChange={set('nombre')}
-            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            className="w-full p-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
 
         <div>
           <label htmlFor="mp-tipo" className="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
           <select id="mp-tipo" value={form.tipo} onChange={set('tipo')}
-            className="w-full p-3 border border-gray-300 rounded-lg text-sm">
+            className="w-full p-3 border border-gray-300 rounded-[14px] text-sm">
             {Object.values(TIPOS_MEDIO).map(t => (
               <option key={t} value={t}>{iconoMedio(t)} {LABEL_TIPO_MEDIO[t]}</option>
             ))}
@@ -85,14 +86,14 @@ export default function EditarMedioPagoModal({ isOpen, onClose, medio, onGuardar
             <label htmlFor="mp-comision" className="block text-sm font-semibold text-gray-700 mb-2">Comisión %</label>
             <input id="mp-comision" type="number" step="0.01" min="0" max={COMISION_MAXIMA} value={form.comision} onChange={set('comision')}
               aria-invalid={!comisionValida}
-              className={`w-full p-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${comisionValida ? 'border-gray-300' : 'border-red-400'}`} />
+              className={`w-full p-3 border rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 outline-none ${comisionValida ? 'border-gray-300' : 'border-red-400'}`} />
             {!comisionValida && <p className="text-xs text-red-600 mt-1 m-0">Ingresá un número entre 0 y {COMISION_MAXIMA}.</p>}
           </div>
           <div>
             <label htmlFor="mp-plazo" className="block text-sm font-semibold text-gray-700 mb-2">Días de acreditación</label>
             <input id="mp-plazo" type="number" min="0" max={PLAZO_MAXIMO} step="1" value={form.plazo} onChange={set('plazo')}
               aria-invalid={!plazoValido}
-              className={`w-full p-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${plazoValido ? 'border-gray-300' : 'border-red-400'}`} />
+              className={`w-full p-3 border rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 outline-none ${plazoValido ? 'border-gray-300' : 'border-red-400'}`} />
             {!plazoValido && <p className="text-xs text-red-600 mt-1 m-0">Ingresá un número entero entre 0 y {PLAZO_MAXIMO}.</p>}
           </div>
         </div>

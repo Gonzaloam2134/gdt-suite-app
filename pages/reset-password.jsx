@@ -75,7 +75,7 @@ export default function ResetPassword() {
 
   if (estado === 'verificando') {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl text-center">
           <div className="text-5xl mb-3">🔐</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Verificando tu link…</h1>
@@ -87,14 +87,14 @@ export default function ResetPassword() {
 
   if (estado === 'invalido') {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl text-center">
           <div className="text-5xl mb-3">⚠️</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Link inválido o vencido</h1>
           <p className="text-sm text-gray-600 mb-4">Pedí uno nuevo para poder cambiar tu contraseña.</p>
           <button
             onClick={() => router.push('/recuperar-password')}
-            className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600"
+            className="px-6 py-3 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700"
           >
             Pedir un nuevo link
           </button>
@@ -104,7 +104,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl">
         <div className="text-center mb-6">
           <div className="text-5xl mb-2">🔐</div>
@@ -127,7 +127,7 @@ export default function ResetPassword() {
               required
               minLength={6}
               autoFocus
-              className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
+              className="w-full p-3 text-base border-2 border-gray-200 rounded-[14px] box-border"
             />
           </div>
 
@@ -142,14 +142,14 @@ export default function ResetPassword() {
               placeholder="Repetí la contraseña"
               required
               minLength={6}
-              className="w-full p-3 text-base border-2 border-gray-200 rounded-lg box-border"
+              className="w-full p-3 text-base border-2 border-gray-200 rounded-[14px] box-border"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full p-4 bg-blue-500 text-white border-none rounded-lg text-base font-bold cursor-pointer disabled:opacity-50 hover:bg-blue-600 transition-colors"
+            className="w-full p-4 press bg-primary-600 text-white border-none rounded-[14px] text-base font-bold cursor-pointer disabled:opacity-50 hover:bg-primary-700 transition-colors"
           >
             {loading ? 'Actualizando...' : 'Actualizar contraseña'}
           </button>

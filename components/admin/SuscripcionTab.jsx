@@ -51,7 +51,7 @@ export default function SuscripcionTab({ suscripcion, onCambio }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-[20px] border border-black/5 shadow-suave p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <h2 className="text-base font-bold text-gray-900 m-0">
             {esPago ? `Plan ${LABEL_SEGMENTO[suscripcion.segmento] || suscripcion.segmento}` : 'Prueba gratuita'}
@@ -95,7 +95,7 @@ export default function SuscripcionTab({ suscripcion, onCambio }) {
         )}
 
         {estado === 'restricted' && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-[14px]">
             <p className="text-sm text-amber-900 m-0 font-semibold">Acceso restringido a solo Reportes</p>
             <p className="text-xs text-amber-800 mt-1 m-0">
               {vencioPrueba
@@ -107,19 +107,19 @@ export default function SuscripcionTab({ suscripcion, onCambio }) {
         )}
 
         <a href="/planes"
-          className="mt-4 block w-full text-center p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold hover:bg-blue-600">
+          className="mt-4 block w-full text-center p-2.5 bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold hover:bg-primary-700">
           {esPago ? 'Cambiar de plan' : 'Ver planes'}
         </a>
 
         {esPago && estado === 'active' && (
           <button onClick={() => setConfirmarCancelar(true)}
-            className="mt-2 block w-full text-center p-2.5 bg-white text-red-600 border border-red-200 rounded-lg text-sm font-semibold cursor-pointer hover:bg-red-50">
+            className="mt-2 block w-full text-center p-2.5 bg-white text-red-600 border border-red-200 rounded-[14px] text-sm font-semibold cursor-pointer hover:bg-red-50">
             Cancelar suscripción
           </button>
         )}
 
         {esPago && (
-          <details className="mt-3 border border-gray-200 rounded-lg">
+          <details className="mt-3 border border-gray-200 rounded-[14px]">
             <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">
               ¿Problemas para cancelar desde acá?
             </summary>

@@ -14,7 +14,7 @@ export default function Button({ variant = 'primary', size = 'md', disabled, typ
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${claseBoton({ variant, size })}${className ? ` ${className}` : ''}`}
+      className={`press ${claseBoton({ variant, size })}${className ? ` ${className}` : ''}`}
       {...props}
     >
       {children}

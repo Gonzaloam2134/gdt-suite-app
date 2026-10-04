@@ -9,7 +9,7 @@ const ctx = {
   discriminaIva: true,
   resumen: {
     totalFacturado: 118900, ivaDebitoFiscal: 18900, netoGravado: 100000, comisiones: 2559,
-    ingresoNetoReal: 116341, gastosOperativos: 24200, ivaCreditoFiscal: 4200,
+    ingresoNetoReal: 116341, gastosOperativos: 24200, ivaCreditoFiscal: 4200, ivaCreditoGastos: 4200, comisionesIvaEstimado: 0,
     resultadoEjercicio: 92141, ivaAPagar: 14700, cantidadVentas: 3, cantidadGastos: 1,
   },
   libroVentas: [
@@ -44,6 +44,9 @@ const ctx = {
     avisos: [{ nivel: 'medio', texto: '1 de 4 movimientos (25%) no tienen comprobante asociado.' }],
   },
 }
+
+// 2.559 de comisiones → 444,50 de IVA estimado (21%) que se suma al crédito fiscal
+const conEstimado = { ...ctx, resumen: { ...ctx.resumen, comisionesIvaEstimado: 444.5, ivaCreditoFiscal: 4644.5, ivaAPagar: 14255.5 } }
 
 const sinIva = { ...ctx, discriminaIva: false, local: { nombre: 'Kiosco', condicion_fiscal: 'Monotributo' } }
 
@@ -117,7 +120,39 @@ describe('Excel', () => {
   })
 })
 
+describe('IVA estimado sobre comisiones en el Excel', () => {
+  const celdas = (wb) => {
+    const out = []
+    wb.eachSheet(ws => ws.eachRow(row => row.eachCell(c => out.push({ hoja: ws.name, valor: c.value }))))
+    return out
+  }
+
+  it('lo informa como ESTIMADO, con su importe, cuando hay comisiones', () => {
+    const fila = celdas(construirLibro(conEstimado)).find(c => typeof c.valor === 'string' && c.valor.includes('ESTIMADO'))
+    expect(fila).toBeTruthy()
+    expect(fila.valor).toMatch(/no hay comprobante/i)
+    expect(celdas(construirLibro(conEstimado)).some(c => c.valor === -444.5)).toBe(true)
+  })
+
+  it('sin comisiones estimadas no agrega la fila', () => {
+    expect(celdas(construirLibro(ctx)).some(c => typeof c.valor === 'string' && c.valor.includes('ESTIMADO'))).toBe(false)
+  })
+
+  it('el total del Libro IVA Compras sigue siendo solo el IVA de las facturas de compra', () => {
+    const ws = construirLibro(conEstimado).getWorksheet('IVA Compras')
+    let totales = null
+    ws.eachRow(row => { if (String(row.getCell(1).value).startsWith('TOTALES')) totales = row })
+    const valores = []; totales.eachCell(c => valores.push(c.value))
+    expect(valores).toContain(4200)        // IVA de compras, sin el estimado de comisiones
+    expect(valores).not.toContain(4644.5)
+  })
+})
+
 describe('PDF', () => {
+  it('con IVA estimado sobre comisiones genera el documento sin fallar', () => {
+    expect(() => construirPDF(conEstimado)).not.toThrow()
+  })
+
   it('genera un documento con varias páginas', () => {
     const doc = construirPDF(ctx)
     expect(doc.internal.getNumberOfPages()).toBeGreaterThan(3)
@@ -127,7 +162,7 @@ describe('PDF', () => {
     const vacio = {
       ...ctx,
       resumen: { totalFacturado: 0, ivaDebitoFiscal: 0, netoGravado: 0, comisiones: 0, ingresoNetoReal: 0,
-                 gastosOperativos: 0, ivaCreditoFiscal: 0, resultadoEjercicio: 0, ivaAPagar: 0,
+                 gastosOperativos: 0, ivaCreditoFiscal: 0, ivaCreditoGastos: 0, comisionesIvaEstimado: 0, resultadoEjercicio: 0, ivaAPagar: 0,
                  cantidadVentas: 0, cantidadGastos: 0 },
       libroVentas: [], libroCompras: [], porAlicuotaVentas: [], porAlicuotaCompras: [],
       porMedio: [], porDia: [], cierres: [],

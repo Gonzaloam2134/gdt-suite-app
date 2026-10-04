@@ -5,5 +5,53 @@
 /* Estilos base */
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background-color: #f1f5f9;
+  background-color: #FAF9F6;
+  /* Evita el "rebote" que arrastra toda la página en iOS/Android */
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Sin delay de doble-toque ni zoom accidental al tocar botones */
+button, a, [role='button'] {
+  touch-action: manipulation;
+}
+
+/* iOS hace zoom al enfocar un input con fuente < 16px */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+@layer components {
+  /* Respuesta inmediata al pointer-down: escala 0.97 al presionar,
+     vuelve con ease-out fuerte. */
+  .press {
+    transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms, opacity 120ms;
+  }
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Acción de fila ("Anular"): con mouse aparece al pasar por la fila; en
+     pantallas táctiles (tablet incluida) no hay hover, así que queda visible. */
+  .accion-fila {
+    opacity: 1;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .accion-fila {
+      opacity: 0;
+    }
+    .fila-hover:hover .accion-fila,
+    .accion-fila:focus-visible {
+      opacity: 1;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press, .animate-sheet-in, .animate-pop-in, .animate-fade-in {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }

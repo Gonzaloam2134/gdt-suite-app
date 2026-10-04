@@ -9,31 +9,25 @@ import { useCaja } from '../hooks/useCaja'
 import { useTransaccionesDia } from '../hooks/useTransaccionesDia'
 import { hoyISO, aFechaISO } from '../lib/dates'
 import { useMisLocales } from '../hooks/useMisLocales'
-import { formatFechaLarga } from '../lib/format'
+import { marcarBienvenidaVista } from '../lib/services/auth'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
 import BottomNav from '../components/layout/BottomNav'
 import AppHeader from '../components/layout/AppHeader'
+import FechaNav from '../components/caja/FechaNav'
 import EstadoCaja from '../components/caja/EstadoCaja'
 import AvisoCajaHuerfana from '../components/caja/AvisoCajaHuerfana'
 import CajaAcciones from '../components/caja/CajaAcciones'
 import KpiCards from '../components/caja/KpiCards'
+import ResumenDiaPasado from '../components/caja/ResumenDiaPasado'
 import ListaTransacciones from '../components/caja/ListaTransacciones'
 import AcreditacionesDelDia from '../components/caja/AcreditacionesDelDia'
 import DesgloseMedios from '../components/caja/DesgloseMedios'
-import AperturaCajaModal from '../components/caja/AperturaCajaModal'
-import CierreCajaModal from '../components/caja/CierreCajaModal'
-import CierreCajaAnteriorModal from '../components/caja/CierreCajaAnteriorModal'
-import HistorialCierresModal from '../components/caja/HistorialCierresModal'
-import MovimientoModal from '../components/MovimientoModal'
-import ReversaModal from '../components/ReversaModal'
-import ContactModal from '../components/ContactModal'
-import GuiaArqueoModal from '../components/caja/GuiaArqueoModal'
-import EditarMontoInicialModal from '../components/caja/EditarMontoInicialModal'
+import ModalesCaja from '../components/caja/ModalesCaja'
+import SinLocalSeleccionado from '../components/caja/SinLocalSeleccionado'
 import BienvenidaModal from '../components/BienvenidaModal'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 import PorConfirmarMp from '../components/dashboard/PorConfirmarMp'
-import { marcarBienvenidaVista } from '../lib/services/auth'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -42,23 +36,19 @@ export default function Dashboard() {
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
   const { esSuperUser, loading: cargandoRol, role, perfil, userId, recargar: recargarRol } = useUserRole()
   // El super admin no queda bloqueado por la suscripción de un local: la
-  // administra desde /superadmin, no tiene sentido que lo eche del panel que
-  // usa para revisarlo. OJO: hay que esperar a que el rol termine de cargar
-  // antes de decidir esto — `esSuperUser` arranca en `false` mientras
-  // `UserRoleContext` todavía no resolvió la sesión, así que mirarlo solo a él
-  // dejaba pasar una carrera: si `getSuscripcion` respondía antes que el rol
-  // (es una sola consulta contra las tres del contexto), un super admin real
-  // podía ser echado del local que estaba revisando antes de que la app se
-  // enterara de que era super admin.
+  // administra desde /superadmin. OJO: hay que esperar a que el rol termine de
+  // cargar antes de decidir esto — `esSuperUser` arranca en `false` mientras
+  // `UserRoleContext` no resolvió la sesión, y mirarlo solo a él dejaba pasar
+  // una carrera que podía echar a un super admin real del local que revisaba.
   const suscripcion = useSuscripcionGuard(cargandoRol ? null : (esSuperUser ? null : localId), 'total')
   const { locales } = useMisLocales(user?.id)
-  const [fechaISO] = useState(hoyISO())
+  const [fechaISO, setFechaISO] = useState(hoyISO())
+  const esHoyVista = fechaISO === hoyISO()
 
-  const { totales, cobros, gastos, acreditacionesHoy, desgloseMedios, transacciones, loading, recargar } =
+  const { totales, cobros, gastos, acreditacionesHoy, desgloseMedios, loading, recargar } =
     useTransaccionesDia(localId, fechaISO)
 
-  // Una sola tira cronológica con cobros, gastos y sus reversas — en vez de
-  // dos listas separadas por tipo. Cada fila ya trae su tipoMovimiento.
+  // Una sola tira cronológica con cobros, gastos y sus reversas.
   const movimientos = [
     ...cobros.map(c => ({ ...c, tipoMovimiento: 'cobro' })),
     ...gastos.map(g => ({ ...g, tipoMovimiento: 'gasto' })),
@@ -66,12 +56,12 @@ export default function Dashboard() {
 
   const caja = useCaja({ localId, userId: user?.id, onCambio: recargar })
 
-  // Totales del día de la caja huérfana (si hay una), para poder cerrarla con
-  // los números de SU día y no con los de hoy.
+  // Totales del día de la caja huérfana (si hay una), para cerrarla con los
+  // números de SU día y no con los de hoy.
   const diaHuerfanaISO = caja.huerfana ? aFechaISO(new Date(caja.huerfana.fecha_apertura)) : null
   const datosHuerfana = useTransaccionesDia(caja.huerfana ? localId : null, diaHuerfanaISO || fechaISO)
 
-  const [modal, setModal] = useState(null)   // apertura | cierre | cierre-huerfana | historial | cobro | gasto | ayuda | guia | editar-inicial | bienvenida
+  const [modal, setModal] = useState(null)   // apertura | cierre | cierre-huerfana | historial | cobro | gasto | ayuda | guia | editar-inicial
   // Primera vez que esta persona llega a la caja: se marca en la cuenta, no
   // en el dispositivo, para que no vuelva a aparecer al entrar desde otro celular.
   const [bienvenidaCerrada, setBienvenidaCerrada] = useState(false)
@@ -80,116 +70,60 @@ export default function Dashboard() {
   const cerrarModal = () => setModal(null)
 
   if (checking || cargandoRol || cargandoLocal || suscripcion.checking || suscripcion.debeRedirigir || terminos.checking) return <LoadingScreen mensaje="Cargando caja…" />
-
   if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
-  // useActiveLocal ya dispara un redirect solo a /locales cuando no hay
-  // ningún local activo — esto es la red de seguridad para cuando ese
-  // redirect tarda, se corta, o algo lo interrumpe (ej. viniendo de
-  // Reportes en modo "Todos los locales", donde nunca se llegó a fijar un
-  // local activo). Antes, en ese caso, la pantalla quedaba mostrando un
-  // "Cargando local…" genérico indefinidamente — sin decir por qué, ni
-  // ofrecer ninguna salida.
-  if (!localId) {
-    return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-sm text-center">
-          <div className="text-4xl mb-3">🏪</div>
-          <p className="text-sm font-semibold text-gray-900 m-0 mb-1">No hay ningún local seleccionado</p>
-          <p className="text-xs text-gray-500 mb-4">Elegí un local para ver su caja.</p>
-          <button onClick={() => router.replace('/locales')}
-            className="w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
-            Ir a Mis locales
-          </button>
-        </div>
-      </main>
-    )
-  }
-
-  if (!local) return <LoadingScreen mensaje="Cargando local…" icono="🏪" />
+  // useActiveLocal ya redirige a /locales cuando no hay local activo; esto es
+  // la red de seguridad para cuando ese redirect tarda o se interrumpe.
+  if (!localId) return <SinLocalSeleccionado onIr={() => router.replace('/locales')} />
+  if (!local) return <LoadingScreen mensaje="Cargando local…" icono="inicio" />
 
   const abrirHistorial = async () => { if (await caja.cargarHistorial()) setModal('historial') }
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
+    <main className="min-h-screen bg-fondo pb-24 md:pb-8 md:pl-56">
       <AppHeader
-        titulo="Caja del día"
-        subtitulo={formatFechaLarga(fechaISO + 'T12:00:00')}
-        locales={locales}
-        localId={localId}
+        titulo="Caja" locales={locales} localId={localId} ocultarNavDesktop
         acciones={
-          <button onClick={recargar} title="Actualizar"
-            className="px-2.5 py-2 bg-blue-50 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-100">
-            ↻
-          </button>
+          <button onClick={recargar} title="Actualizar" aria-label="Actualizar"
+            className="press w-10 h-10 bg-primary-50 text-primary-700 border-none rounded-full text-base cursor-pointer hover:bg-primary-50/70">↻</button>
         }
       />
 
-      {caja.huerfana && (
-        <AvisoCajaHuerfana fechaApertura={caja.huerfana.fecha_apertura} onResolver={() => setModal('cierre-huerfana')} />
-      )}
+      <div className="max-w-3xl mx-auto p-3 md:p-6 space-y-4">
+        <FechaNav fechaISO={fechaISO} onCambiar={setFechaISO} />
 
-      <EstadoCaja cajaAbierta={caja.cajaAbierta} onAyuda={() => setModal('guia')} onEditarInicial={() => setModal('editar-inicial')} />
+        {esHoyVista && caja.huerfana && (
+          <AvisoCajaHuerfana fechaApertura={caja.huerfana.fecha_apertura} onResolver={() => setModal('cierre-huerfana')} />
+        )}
 
-      <CajaAcciones
-        cajaAbierta={caja.cajaAbierta}
-        huerfana={caja.huerfana}
-        onAbrir={() => setModal('apertura')}
-        onCerrar={() => setModal('cierre')}
-        onHistorial={abrirHistorial}
-        onCobro={() => setModal('cobro')}
-        onGasto={() => setModal('gasto')}
-      />
+        {esHoyVista && (
+          <EstadoCaja
+            cajaAbierta={caja.cajaAbierta} huerfana={caja.huerfana}
+            onAbrir={() => setModal('apertura')} onCerrar={() => setModal('cierre')}
+            onHistorial={abrirHistorial} onAyuda={() => setModal('guia')} onEditarInicial={() => setModal('editar-inicial')}
+          />
+        )}
 
-      <div className="max-w-6xl mx-auto p-3 md:p-4 space-y-4 md:space-y-6">
         {loading ? (
           <p className="text-center text-sm text-gray-500 py-8">Actualizando movimientos…</p>
         ) : (
           <>
-            <PorConfirmarMp localId={localId} local={local} />
-            <KpiCards
-              totales={totales}
-              cantidadCobros={cobros.filter(c => !c.anulada && !c.reversa).length}
-              cantidadGastos={gastos.filter(g => !g.anulada && !g.reversa).length}
-              cajaAbierta={caja.cajaAbierta}
-            />
-            <ListaTransacciones items={movimientos} onReversar={setAReversar} />
+            {esHoyVista ? <KpiCards totales={totales} cajaAbierta={caja.cajaAbierta} /> : <ResumenDiaPasado totales={totales} />}
+            {esHoyVista && caja.cajaAbierta && <CajaAcciones onCobro={() => setModal('cobro')} onGasto={() => setModal('gasto')} />}
+            {esHoyVista && <PorConfirmarMp localId={localId} local={local} />}
+            <ListaTransacciones items={movimientos} onReversar={setAReversar} soloLectura={!esHoyVista}
+              titulo={esHoyVista ? 'Movimientos de hoy' : 'Movimientos del día'} />
             <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />
             <DesgloseMedios medios={desgloseMedios} />
           </>
         )}
       </div>
 
-      <AperturaCajaModal
-        isOpen={modal === 'apertura'} onClose={cerrarModal}
-        onConfirmar={caja.abrir} procesando={caja.procesando}
+      <ModalesCaja
+        modal={modal} cerrar={cerrarModal} setModal={setModal} caja={caja} totales={totales}
+        datosHuerfana={datosHuerfana} local={local} localId={localId} user={user} recargar={recargar}
+        aReversar={aReversar} setAReversar={setAReversar}
       />
-      <CierreCajaModal
-        isOpen={modal === 'cierre'} onClose={cerrarModal}
-        cajaAbierta={caja.cajaAbierta} totales={totales} procesando={caja.procesando}
-        onConfirmar={({ efectivoFisico, observaciones }) => caja.cerrar({ efectivoFisico, observaciones })}
-        onVerGuia={() => setModal('guia')}
-      />
-      <CierreCajaAnteriorModal
-        isOpen={modal === 'cierre-huerfana'} onClose={cerrarModal}
-        caja={caja.huerfana} totales={datosHuerfana.totales} loading={datosHuerfana.loading} procesando={caja.procesando}
-        onConfirmar={(nota) => caja.cerrarHuerfana({ nota })}
-      />
-      <HistorialCierresModal
-        isOpen={modal === 'historial'} onClose={cerrarModal}
-        cierres={caja.historial} nombreLocal={local.nombre}
-      />
-
-      <MovimientoModal tipo="cobro" isOpen={modal === 'cobro'} onClose={cerrarModal} localId={localId} userId={user?.id} local={local} onSuccess={recargar} />
-      <MovimientoModal tipo="gasto" isOpen={modal === 'gasto'} onClose={cerrarModal} localId={localId} userId={user?.id} local={local} onSuccess={recargar} />
-      <ReversaModal isOpen={!!aReversar} onClose={() => setAReversar(null)} transaccion={aReversar} userId={user?.id} onReversaExitosa={recargar} />
-      <GuiaArqueoModal isOpen={modal === 'guia'} onClose={cerrarModal} onContactar={() => setModal('ayuda')} />
-      <EditarMontoInicialModal
-        isOpen={modal === 'editar-inicial'} onClose={cerrarModal}
-        montoActual={caja.cajaAbierta?.monto_inicial_efectivo}
-        onGuardar={caja.corregirInicial} procesando={caja.procesando}
-      />
-      <ContactModal isOpen={modal === 'ayuda'} onClose={cerrarModal} user={user} localId={localId} paginaOrigen="dashboard" />
 
       <BienvenidaModal
         isOpen={!!mostrarBienvenida}
@@ -200,7 +134,7 @@ export default function Dashboard() {
         }}
       />
 
-      <BottomNav activeTab="caja" />
+      <BottomNav activeTab="caja" lateral />
     </main>
   )
 }

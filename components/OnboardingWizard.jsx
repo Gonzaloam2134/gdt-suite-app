@@ -37,7 +37,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
   const [formData, setFormData] = useState(preloadedData || {
     businessName: '',
     rubro: 'Gastronomía',
-    condicionFiscal: 'Consumidor Final',
+    condicionFiscal: 'No inscripto',
     escala: '1', // 1, 2-5, 5+
     mediosPago: MEDIOS_PRESET,
     invites: []
@@ -186,7 +186,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   onChange={(e) => updateField('condicionFiscal', e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                 >
-                  <option value="Consumidor Final">Consumidor Final</option>
+                  <option value="No inscripto">No inscripto</option>
                   <option value="Monotributo">Monotributo</option>
                   <option value="Responsable Inscripto">Responsable Inscripto</option>
                 </select>

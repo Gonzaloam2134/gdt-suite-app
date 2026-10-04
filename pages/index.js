@@ -54,11 +54,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-fondo flex items-center justify-center p-4">
+      <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8">
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">💼</div>
+          <img src="/logo-mark.svg" width="64" height="64" alt="GDT Suite" className="mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-gray-900 m-0">GDT Suite</h1>
           <p className="text-sm text-gray-500 mt-1">Gestión contable para tu negocio</p>
         </div>
@@ -75,7 +75,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="tu@email.com"
               autoComplete="email"
             />
@@ -91,7 +91,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="••••••••"
               autoComplete="current-password"
             />
@@ -100,7 +100,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 press bg-primary-600 text-white font-semibold rounded-[14px] cursor-pointer hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
@@ -110,7 +110,7 @@ export default function Login() {
         <div className="mt-6 text-center space-y-2">
           <button
             onClick={() => router.push('/recuperar-password')}
-            className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer bg-none border-none underline"
+            className="text-sm text-primary-700 hover:text-primary-700 cursor-pointer bg-none border-none underline"
           >
             ¿Olvidaste tu contraseña?
           </button>
@@ -118,7 +118,7 @@ export default function Login() {
             ¿No tenés cuenta?{' '}
             <button
               onClick={handleSignUp}
-              className="text-blue-600 hover:text-blue-700 cursor-pointer bg-none border-none underline font-semibold"
+              className="text-primary-700 hover:text-primary-700 cursor-pointer bg-none border-none underline font-semibold"
             >
               Creá una
             </button>

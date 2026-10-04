@@ -15,6 +15,7 @@ import ReportGuide from '../components/ReportGuide'
 import FiltrosReporte from '../components/reportes/FiltrosReporte'
 import AvisosCalidad from '../components/reportes/AvisosCalidad'
 import ResumenEjecutivo from '../components/reportes/ResumenEjecutivo'
+import TarjetaNegocio from '../components/reportes/TarjetaNegocio'
 import ResumenPorAlicuota from '../components/reportes/ResumenPorAlicuota'
 import ResumenMedios from '../components/reportes/ResumenMedios'
 import ConciliacionCaja from '../components/reportes/ConciliacionCaja'
@@ -34,7 +35,7 @@ export default function Reportes() {
   const [ayuda, setAyuda] = useState(false)
   const [exportando, setExportando] = useState(null)
 
-  if (checking || r.loading || terminos.checking) return <LoadingScreen mensaje="Generando reporte…" icono="📊" />
+  if (checking || r.loading || terminos.checking) return <LoadingScreen mensaje="Generando reporte…" icono="reportes" />
 
   if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
@@ -65,11 +66,11 @@ export default function Reportes() {
   }
 
   const totalesVentas = { neto: r.resumen.netoGravado, iva: r.resumen.ivaDebitoFiscal, total: r.resumen.totalFacturado }
-  const totalesCompras = { neto: r.resumen.gastosOperativos - r.resumen.ivaCreditoFiscal, iva: r.resumen.ivaCreditoFiscal, total: r.resumen.gastosOperativos }
+  const totalesCompras = { neto: r.resumen.gastosOperativos - r.resumen.ivaCreditoGastos, iva: r.resumen.ivaCreditoGastos, total: r.resumen.gastosOperativos }
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
-      <AppHeader
+    <main className="min-h-screen bg-fondo pb-20 md:pb-8 md:pl-56">
+      <AppHeader ocultarNavDesktop
         titulo="Reportes contables"
         locales={r.locales}
         localId={r.localId}
@@ -78,15 +79,15 @@ export default function Reportes() {
         acciones={
           <div className="flex items-center gap-1.5">
             <button onClick={() => exportar('PDF')} disabled={!!exportando}
-              className="px-2.5 py-2 bg-amber-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-amber-600 disabled:opacity-50">
+              className="px-2.5 py-2 press bg-primary-700 text-white border-none rounded-[14px] text-xs font-semibold cursor-pointer hover:bg-primary-600 disabled:opacity-50">
               {exportando === 'PDF' ? '…' : 'PDF'}
             </button>
             <button onClick={() => exportar('Excel')} disabled={!!exportando}
-              className="px-2.5 py-2 bg-emerald-500 text-white border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50">
+              className="px-2.5 py-2 bg-emerald-500 text-white border-none rounded-[14px] text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50">
               {exportando === 'Excel' ? '…' : 'Excel'}
             </button>
             <button onClick={() => setAyuda(true)} title="¿Cómo leer esto?"
-              className="px-2.5 py-2 bg-blue-50 text-blue-700 border-none rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-100">
+              className="px-2.5 py-2 bg-primary-50 text-primary-700 border-none rounded-[14px] text-xs font-semibold cursor-pointer hover:bg-primary-50">
               ?
             </button>
           </div>
@@ -97,14 +98,14 @@ export default function Reportes() {
         <FiltrosReporte periodo={r.periodo} onPreset={r.aplicarPreset} onFechas={r.aplicarFechas} />
 
         {guard.estado === 'restricted' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm text-blue-900 m-0">
+          <div className="bg-primary-50 border border-primary-500/30 rounded-[14px] p-3 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-primary-700 m-0">
               {guard.vencioPrueba
                 ? 'Tu prueba de 30 días terminó. Podés ver y exportar tus reportes cuando quieras.'
                 : 'Este local tiene el acceso restringido a solo Reportes.'}
             </p>
             <a href="/planes"
-              className="text-xs font-bold text-blue-700 bg-white border border-blue-300 rounded px-3 py-1.5 hover:bg-blue-100 shrink-0">
+              className="text-xs font-bold text-primary-700 bg-white border border-primary-500/30 rounded px-3 py-1.5 hover:bg-primary-50 shrink-0">
               Ver planes →
             </a>
           </div>
@@ -113,12 +114,14 @@ export default function Reportes() {
         <AvisosCalidad calidad={r.calidad} />
 
         {!r.discriminaIva && r.localActual && (
-          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 m-0">
+          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-[14px] p-3 m-0">
             {r.localActual.condicion_fiscal === 'Mixto'
               ? 'Los locales seleccionados tienen condiciones fiscales distintas, así que no se discrimina IVA en el consolidado. Elegí un local para ver el detalle fiscal.'
               : `Este local está como ${r.localActual.condicion_fiscal || 'sin condición fiscal definida'}, así que los importes se muestran sin discriminar IVA.`}
           </p>
         )}
+
+        <TarjetaNegocio porDia={r.porDia} periodo={r.periodo} />
 
         <ResumenEjecutivo resumen={r.resumen} discriminaIva={r.discriminaIva} />
 
@@ -149,7 +152,7 @@ export default function Reportes() {
       </div>
 
       <ReportGuide isOpen={ayuda} onClose={() => setAyuda(false)} />
-      <BottomNav activeTab="reportes" />
+      <BottomNav activeTab="reportes" lateral />
     </main>
   )
 }

@@ -15,7 +15,7 @@ import ConfirmDialog from '../ui/ConfirmDialog'
 import EmptyState from '../ui/EmptyState'
 import Button from '../ui/Button'
 
-const COLOR_ROL = { owner: 'bg-purple-100 text-purple-800', cajero: 'bg-blue-100 text-blue-800', empleado: 'bg-gray-100 text-gray-800' }
+const COLOR_ROL = { owner: 'bg-purple-100 text-purple-800', cajero: 'bg-primary-50 text-primary-700', empleado: 'bg-gray-100 text-gray-800' }
 const ICONO_ROL = { owner: '👑', cajero: '💼', empleado: '👷' }
 
 export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [], suscripcion, localId, userId, onCambio }) {
@@ -93,7 +93,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
         ) : (
           <div className="space-y-2">
             {miembros.map(m => (
-              <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-white rounded-lg border border-gray-200 flex-wrap">
+              <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-white rounded-[20px] border border-black/5 shadow-suave flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-lg ${COLOR_ROL[m.rol]}`}>{ICONO_ROL[m.rol]}</div>
                   <div className="min-w-0">
@@ -127,7 +127,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
           {verInactivos && (
             <div className="space-y-2 mt-2">
               {inactivos.map(m => (
-                <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-[20px] border border-black/5 shadow-suave">
                   <div className="min-w-0">
                     <div className="font-semibold text-gray-700 text-sm truncate">{m.perfil?.nombre || m.perfil?.email || 'Usuario'}</div>
                     <div className="text-xs text-gray-500 truncate">{m.perfil?.email} · era {LABEL_ROL[m.rol]}</div>

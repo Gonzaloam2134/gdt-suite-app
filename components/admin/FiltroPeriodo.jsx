@@ -15,19 +15,19 @@ export default function FiltroPeriodo({ periodo, onPreset, onFechas }) {
   const personalizado = periodo.preset === 'personalizado'
 
   return (
-    <div className="bg-white p-4 rounded-xl border border-gray-200">
+    <div className="bg-white p-4 rounded-[20px] border border-black/5 shadow-suave">
       <h3 className="text-sm font-bold text-gray-700 mb-3 m-0">Período</h3>
       <div className="flex gap-2 mb-3 flex-wrap">
         {PRESETS.map(p => (
           <button key={p.id} onClick={() => onPreset(p.id)}
             className={`px-3 py-1.5 border-none rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-              periodo.preset === p.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+              periodo.preset === p.id ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
             {p.label}
           </button>
         ))}
         <button onClick={() => onFechas(desde, hasta)}
           className={`px-3 py-1.5 border-none rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            personalizado ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+            personalizado ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
           Personalizado
         </button>
       </div>
@@ -45,7 +45,7 @@ export default function FiltroPeriodo({ periodo, onPreset, onFechas }) {
               className="p-2 border border-gray-300 rounded-md text-sm" />
           </div>
           <button onClick={() => onFechas(desde, hasta)}
-            className="px-4 py-2 bg-blue-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600">
+            className="px-4 py-2 press bg-primary-600 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-primary-700">
             Aplicar
           </button>
         </div>

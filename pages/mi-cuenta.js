@@ -7,6 +7,8 @@ import { ROLES } from '../lib/constants/roles'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
+import Icono from '../components/ui/Icono'
+import MenuSesion from '../components/layout/MenuSesion'
 import SuscripcionTab from '../components/admin/SuscripcionTab'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
@@ -44,13 +46,13 @@ export default function MiCuenta() {
   const localesPropios = locales.filter(l => l.rol === ROLES.OWNER)
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-10">
-      <AppHeader titulo="Mi cuenta" locales={locales} localId={null} />
+    <main className="min-h-screen bg-fondo pb-20 md:pb-10 md:pl-56">
+      <AppHeader ocultarNavDesktop sinLocal titulo="Mi cuenta" />
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <SuscripcionTab suscripcion={suscripcion} onCambio={cargar} />
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-[20px] border border-black/5 shadow-suave p-5">
           <h2 className="text-base font-bold text-gray-900 m-0 mb-3">
             Este plan cubre {localesPropios.length} local{localesPropios.length === 1 ? '' : 'es'}
           </h2>
@@ -60,7 +62,7 @@ export default function MiCuenta() {
             <ul className="space-y-1.5 pl-0 list-none m-0">
               {localesPropios.map(l => (
                 <li key={l.id} className="flex items-center gap-2 text-sm text-gray-700">
-                  <span className="text-gray-400">🏪</span>
+                  <Icono nombre="inicio" size={16} className="text-gray-400" />
                   <span className="font-semibold text-gray-900">{l.nombre}</span>
                   {l.rubro && <span className="text-gray-400">· {l.rubro}</span>}
                 </li>
@@ -68,9 +70,12 @@ export default function MiCuenta() {
             </ul>
           )}
         </div>
+
+        {/* En mobile no hay barra lateral: las acciones de sesión viven acá */}
+        <div className="md:hidden"><MenuSesion /></div>
       </div>
 
-      <BottomNav activeTab="mi-cuenta" />
+      <BottomNav activeTab="mi-cuenta" lateral />
     </main>
   )
 }
