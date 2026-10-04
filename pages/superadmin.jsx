@@ -257,10 +257,10 @@ export default function SuperAdmin() {
 
   if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
-  if (loading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><p>Cargando panel de super admin...</p></div>
+  if (loading) return <div className="min-h-screen bg-fondo flex items-center justify-center"><p>Cargando panel de super admin...</p></div>
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-8">
+    <main className="min-h-screen bg-fondo pb-8">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -302,7 +302,7 @@ export default function SuperAdmin() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-semibold cursor-pointer border-none rounded-t-lg whitespace-nowrap transition-colors ${
-                activeTab === tab.id ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                activeTab === tab.id ? 'bg-white text-primary-600 border-b-2 border-primary-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {tab.label}
@@ -316,13 +316,13 @@ export default function SuperAdmin() {
         </div>
         {tabsPuedeIzq && (
           <button type="button" aria-label="Ver pestañas anteriores" onClick={() => desplazarTabs(-1)}
-            className="absolute left-0 top-0 bottom-1 flex items-center pl-0.5 pr-3 border-none cursor-pointer bg-gradient-to-r from-slate-100 via-slate-100 to-transparent">
+            className="absolute left-0 top-0 bottom-1 flex items-center pl-0.5 pr-3 border-none cursor-pointer bg-gradient-to-r from-fondo via-fondo to-transparent">
             <span className="w-6 h-6 rounded-full bg-white shadow border border-gray-300 flex items-center justify-center text-gray-600 text-sm leading-none">‹</span>
           </button>
         )}
         {tabsPuedeDer && (
           <button type="button" aria-label="Ver más pestañas" onClick={() => desplazarTabs(1)}
-            className="absolute right-0 top-0 bottom-1 flex items-center pr-0.5 pl-3 border-none cursor-pointer bg-gradient-to-l from-slate-100 via-slate-100 to-transparent">
+            className="absolute right-0 top-0 bottom-1 flex items-center pr-0.5 pl-3 border-none cursor-pointer bg-gradient-to-l from-fondo via-fondo to-transparent">
             <span className="w-6 h-6 rounded-full bg-white shadow border border-gray-300 flex items-center justify-center text-gray-600 text-sm leading-none">›</span>
           </button>
         )}
@@ -331,8 +331,8 @@ export default function SuperAdmin() {
         {/* TAB: DASHBOARD GLOBAL */}
         {activeTab === 'dashboard' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 👑 Bienvenido al panel de super administrador. Acá tenés una vista global de toda la plataforma GDT Suite.
               </p>
             </div>
@@ -340,7 +340,7 @@ export default function SuperAdmin() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-6 rounded-xl border border-gray-200">
                 <div className="text-xs text-gray-500 font-semibold mb-2">🏪 LOCALES REGISTRADOS</div>
-                <div className="text-3xl font-extrabold text-blue-700">{globalStats.locales}</div>
+                <div className="text-3xl font-extrabold text-primary-700">{globalStats.locales}</div>
                 <div className="text-xs text-gray-400 mt-1">Total en la plataforma</div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
@@ -360,8 +360,8 @@ export default function SuperAdmin() {
         {/* TAB: CONSULTAS */}
         {activeTab === 'contactos' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 📬 Tenés <strong>{contactos.filter(c => c.estado === 'pendiente').length}</strong> consultas pendientes de {contactos.length} totales.
               </p>
             </div>
@@ -373,7 +373,7 @@ export default function SuperAdmin() {
                   onClick={() => setFiltroEstado(estado)}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
                     filtroEstado === estado
-                      ? 'bg-blue-500 text-white'
+                      ? 'press bg-primary-600 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -441,7 +441,7 @@ export default function SuperAdmin() {
                     {esPendiente && !estaRespondiendo && (
                       <button
                         onClick={() => setRespondiendoId(contacto.id)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600"
+                        className="px-4 py-2 press bg-primary-600 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-primary-700"
                       >
                         ✏️ Responder
                       </button>
@@ -454,7 +454,7 @@ export default function SuperAdmin() {
                           onChange={(e) => setRespuestaTexto(e.target.value)}
                           placeholder="Escribí tu respuesta..."
                           rows={3}
-                          className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-vertical"
+                          className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none resize-vertical"
                         />
                         <div className="flex gap-2">
                           <button
@@ -488,8 +488,8 @@ export default function SuperAdmin() {
         {/* TAB: USUARIOS */}
         {activeTab === 'usuarios' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 👥 Gestioná los usuarios de la plataforma. Podés cambiar el rol global.
                 El email de inicio de sesión se administra desde Supabase Auth, no desde acá.
               </p>
@@ -509,7 +509,7 @@ export default function SuperAdmin() {
                           <div className="font-bold text-gray-900 text-sm">{usuario.nombre || 'Sin nombre'}</div>
                           <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                             usuario.rol_global === 'super_user' ? 'bg-purple-100 text-purple-700' :
-                            usuario.rol_global === 'owner' ? 'bg-blue-100 text-blue-700' :
+                            usuario.rol_global === 'owner' ? 'bg-primary-50 text-primary-700' :
                             usuario.rol_global === 'cajero' ? 'bg-green-100 text-green-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
@@ -581,7 +581,7 @@ export default function SuperAdmin() {
                       <div className="flex gap-2 flex-wrap">
                         <button
                           onClick={() => { setEditandoUsuario(usuario.id); setNuevoRol(usuario.rol_global) }}
-                          className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600"
+                          className="px-4 py-2 press bg-primary-600 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-primary-700"
                         >
                           ✏️ Editar rol
                         </button>
@@ -603,8 +603,8 @@ export default function SuperAdmin() {
         {/* TAB: LOCALES */}
         {activeTab === 'locales' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 🏪 Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
               </p>
             </div>
@@ -614,7 +614,7 @@ export default function SuperAdmin() {
               placeholder="Buscar local por nombre..."
               value={filtroLocal}
               onChange={(e) => setFiltroLocal(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
             />
 
             <div className="space-y-2">
@@ -689,8 +689,8 @@ export default function SuperAdmin() {
         {/* TAB: SUSCRIPCIONES Y PAGOS */}
         {activeTab === 'suscripciones' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 💳 Gestioná el estado de pago de cada local. Podés restringir funcionalidades o suspender el acceso si no pagan.
               </p>
             </div>
@@ -702,7 +702,7 @@ export default function SuperAdmin() {
                   onClick={() => setFiltroSuscripcion(estado)}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
                     filtroSuscripcion === estado
-                      ? 'bg-blue-500 text-white'
+                      ? 'press bg-primary-600 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -794,8 +794,8 @@ export default function SuperAdmin() {
         {/* TAB: CONFIGURACIÓN */}
         {activeTab === 'config' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 ⚙️ Configuración global de la plataforma. Estos valores afectan a todos los usuarios y locales.
               </p>
             </div>
@@ -810,7 +810,7 @@ export default function SuperAdmin() {
                     type="number"
                     value={config.max_locales_por_usuario}
                     onChange={(e) => setConfig({...config, max_locales_por_usuario: parseInt(e.target.value) || 0})}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   />
                 </div>
 
@@ -821,7 +821,7 @@ export default function SuperAdmin() {
                     step="0.1"
                     value={config.comision_default}
                     onChange={(e) => setConfig({...config, comision_default: parseFloat(e.target.value) || 0})}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   />
                 </div>
 
@@ -831,7 +831,7 @@ export default function SuperAdmin() {
                     type="number"
                     value={config.plazo_acreditacion_default}
                     onChange={(e) => setConfig({...config, plazo_acreditacion_default: parseInt(e.target.value) || 0})}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   />
                 </div>
 
@@ -840,7 +840,7 @@ export default function SuperAdmin() {
                   <select
                     value={config.mantenimiento_activo ? 'si' : 'no'}
                     onChange={(e) => setConfig({...config, mantenimiento_activo: e.target.value === 'si'})}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   >
                     <option value="no">Desactivado</option>
                     <option value="si">Activado (bloquea accesos)</option>
@@ -850,7 +850,7 @@ export default function SuperAdmin() {
 
               <button
                 onClick={handleGuardarConfig}
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600"
+                className="px-6 py-3 press bg-primary-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700"
               >
                 💾 Guardar configuración
               </button>
@@ -929,8 +929,8 @@ export default function SuperAdmin() {
         {/* TAB: ANUNCIOS */}
         {activeTab === 'anuncios' && (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 m-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+              <p className="text-sm text-primary-700 m-0">
                 📢 Publicá anuncios que todos los usuarios verán al iniciar sesión.
               </p>
             </div>
@@ -946,7 +946,7 @@ export default function SuperAdmin() {
                     value={nuevoAnuncio.titulo}
                     onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, titulo: e.target.value})}
                     placeholder="Ej: Nueva funcionalidad disponible"
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   />
                 </div>
 
@@ -957,7 +957,7 @@ export default function SuperAdmin() {
                     onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, mensaje: e.target.value})}
                     placeholder="Escribí el mensaje del anuncio..."
                     rows={4}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-vertical"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none resize-vertical"
                   />
                 </div>
 
@@ -966,7 +966,7 @@ export default function SuperAdmin() {
                   <select
                     value={nuevoAnuncio.tipo}
                     onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, tipo: e.target.value})}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   >
                     <option value="info">ℹ️ Información</option>
                     <option value="warning">⚠️ Advertencia</option>
@@ -1007,7 +1007,7 @@ export default function SuperAdmin() {
                       </select>
                       <div className="flex gap-2">
                         <button onClick={handleGuardarEdicion} disabled={guardandoEdicion}
-                          className="px-4 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600 disabled:opacity-50">
+                          className="px-4 py-2 press bg-primary-600 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-primary-700 disabled:opacity-50">
                           {guardandoEdicion ? 'Guardando…' : 'Guardar cambios'}
                         </button>
                         <button onClick={() => setEditandoAnuncio(null)}
@@ -1036,7 +1036,7 @@ export default function SuperAdmin() {
                         </div>
                         <div className="flex gap-2 mt-3">
                           <button onClick={() => setEditandoAnuncio({ id: anuncio.id, titulo: anuncio.titulo, mensaje: anuncio.mensaje, tipo: anuncio.tipo })}
-                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold cursor-pointer hover:bg-blue-200">
+                            className="px-3 py-1 bg-primary-50 text-primary-700 rounded text-xs font-semibold cursor-pointer hover:bg-primary-500/20">
                             Editar
                           </button>
                           <button onClick={() => handleToggleActivo(anuncio)}
@@ -1092,8 +1092,8 @@ export default function SuperAdmin() {
 
           return (
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800 m-0">
+              <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+                <p className="text-sm text-primary-700 m-0">
                   💰 Lo que ya cobraste, y una proyección de lo que deberías seguir cobrando si nadie
                   cancela ni falla ningún pago — es optimista a propósito, no una garantía.
                 </p>
@@ -1106,7 +1106,7 @@ export default function SuperAdmin() {
                 </div>
                 <div className="bg-white rounded-lg border border-gray-200 p-5">
                   <div className="text-xs text-gray-500 font-semibold uppercase">Ingreso mensual recurrente (MRR)</div>
-                  <div className="text-2xl font-extrabold text-blue-700 mt-1">{formatCurrency(mrr)}</div>
+                  <div className="text-2xl font-extrabold text-primary-700 mt-1">{formatCurrency(mrr)}</div>
                   <div className="text-xs text-gray-400 mt-1">Suscripciones activas hoy — las anuales cuentan a 1/12</div>
                 </div>
               </div>
@@ -1125,8 +1125,8 @@ export default function SuperAdmin() {
                       <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip formatter={(v) => v == null ? '—' : formatCurrency(v)} />
                       <Legend />
-                      <Bar dataKey="real" name="Cobrado" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="proyectado" name="Proyectado" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="real" name="Cobrado" fill="#019C62" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="proyectado" name="Proyectado" fill="#9ADBC0" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
