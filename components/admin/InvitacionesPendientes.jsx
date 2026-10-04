@@ -66,7 +66,7 @@ export default function InvitacionesPendientes({ invitaciones, onCambio }) {
         {pendientes.map(inv => {
           const vencida = new Date(inv.expira_en) < new Date()
           return (
-            <div key={inv.id} className="p-3 bg-white rounded-lg border border-gray-200">
+            <div key={inv.id} className="p-3 bg-white rounded-[20px] border border-black/5 shadow-suave">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="font-semibold text-gray-900 text-sm truncate">
@@ -83,7 +83,7 @@ export default function InvitacionesPendientes({ invitaciones, onCambio }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   {vencida ? (
                     <button onClick={() => renovar(inv)} disabled={ocupado === inv.id}
-                      className="px-3 py-1.5 bg-blue-100 text-blue-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-blue-200 disabled:opacity-50">
+                      className="px-3 py-1.5 bg-primary-50 text-primary-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-primary-500/30 disabled:opacity-50">
                       Renovar link
                     </button>
                   ) : (

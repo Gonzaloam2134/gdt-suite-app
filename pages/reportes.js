@@ -69,8 +69,8 @@ export default function Reportes() {
   const totalesCompras = { neto: r.resumen.gastosOperativos - r.resumen.ivaCreditoFiscal, iva: r.resumen.ivaCreditoFiscal, total: r.resumen.gastosOperativos }
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
-      <AppHeader
+    <main className="min-h-screen bg-fondo pb-20 md:pb-8 md:pl-56">
+      <AppHeader ocultarNavDesktop
         titulo="Reportes contables"
         locales={r.locales}
         localId={r.localId}
@@ -152,7 +152,7 @@ export default function Reportes() {
       </div>
 
       <ReportGuide isOpen={ayuda} onClose={() => setAyuda(false)} />
-      <BottomNav activeTab="reportes" />
+      <BottomNav activeTab="reportes" lateral />
     </main>
   )
 }

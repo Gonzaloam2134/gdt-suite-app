@@ -116,8 +116,8 @@ export default function MisLocales() {
   const puedeCrear = locales.length === 0 || (localesPropios.length > 0 && !sinCupoLocales)
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
-      <AppHeader titulo="Mis locales" locales={locales} localId={null} />
+    <main className="min-h-screen bg-fondo pb-20 md:pb-8 md:pl-56">
+      <AppHeader ocultarNavDesktop titulo="Mis locales" locales={locales} localId={null} />
 
       <div className="max-w-5xl mx-auto p-3 md:p-4 space-y-4">
         <AvisoAbrirEnChrome />
@@ -200,7 +200,7 @@ export default function MisLocales() {
       )}
 
       <ContactModal isOpen={contacto} onClose={() => setContacto(false)} user={user} paginaOrigen="locales" />
-      <BottomNav activeTab="inicio" />
+      <BottomNav activeTab="inicio" lateral />
     </main>
   )
 }

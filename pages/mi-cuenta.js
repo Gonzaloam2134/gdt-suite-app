@@ -44,13 +44,13 @@ export default function MiCuenta() {
   const localesPropios = locales.filter(l => l.rol === ROLES.OWNER)
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-10">
-      <AppHeader titulo="Mi cuenta" locales={locales} localId={null} />
+    <main className="min-h-screen bg-fondo pb-20 md:pb-10 md:pl-56">
+      <AppHeader ocultarNavDesktop titulo="Mi cuenta" locales={locales} localId={null} />
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <SuscripcionTab suscripcion={suscripcion} onCambio={cargar} />
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-[20px] border border-black/5 shadow-suave p-5">
           <h2 className="text-base font-bold text-gray-900 m-0 mb-3">
             Este plan cubre {localesPropios.length} local{localesPropios.length === 1 ? '' : 'es'}
           </h2>
@@ -70,7 +70,7 @@ export default function MiCuenta() {
         </div>
       </div>
 
-      <BottomNav activeTab="mi-cuenta" />
+      <BottomNav activeTab="mi-cuenta" lateral />
     </main>
   )
 }

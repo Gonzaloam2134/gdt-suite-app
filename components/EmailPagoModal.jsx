@@ -20,11 +20,11 @@ export default function EmailPagoModal({ isOpen, onClose, segmento, precio, cicl
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="💳 Confirmar pago" size="sm"
-      headerClassName="bg-blue-600 text-white"
+      headerClassName="bg-primary-600 text-white"
       footer={<>
-        <button onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>
+        <button onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-[14px] text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>
         <button onClick={() => onConfirmar(email)} disabled={!valido || procesando}
-          className="px-4 py-2.5 bg-blue-600 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-700 disabled:opacity-50">
+          className="px-4 py-2.5 bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700 disabled:opacity-50">
           {procesando ? 'Redirigiendo…' : 'Ir a pagar'}
         </button>
       </>}>
@@ -37,7 +37,7 @@ export default function EmailPagoModal({ isOpen, onClose, segmento, precio, cicl
       <input id="email-pago" type="email" value={email} autoFocus
         onChange={(e) => setEmail(e.target.value)}
         placeholder="tu@email.com"
-        className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+        className="w-full p-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-600 outline-none" />
       <p className="text-xs text-gray-400 mt-2 m-0">
         Tiene que ser el email de tu cuenta de Mercado Pago — no hace falta que sea el mismo con el que entrás a GDT Suite.
       </p>

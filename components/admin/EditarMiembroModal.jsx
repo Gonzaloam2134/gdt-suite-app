@@ -22,9 +22,9 @@ export default function EditarMiembroModal({ isOpen, onClose, miembro, onGuardar
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Editar miembro" subtitle={miembro.perfil?.email}
       footer={<>
-        <button onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>
+        <button onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-[14px] text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>
         <button onClick={() => onGuardar({ rol, nombre })} disabled={procesando}
-          className="px-4 py-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 disabled:opacity-50">
+          className="px-4 py-2.5 bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700 disabled:opacity-50">
           {procesando ? 'Guardando…' : 'Guardar'}
         </button>
       </>}>
@@ -32,19 +32,19 @@ export default function EditarMiembroModal({ isOpen, onClose, miembro, onGuardar
         <div>
           <label htmlFor="m-nombre" className="block text-sm font-semibold text-gray-700 mb-2">Nombre</label>
           <input id="m-nombre" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            className="w-full p-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-600 outline-none" />
         </div>
         <div>
           <label htmlFor="m-rol" className="block text-sm font-semibold text-gray-700 mb-2">Rol en este local</label>
           <select id="m-rol" value={rol} onChange={(e) => setRol(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg text-sm">
+            className="w-full p-3 border border-gray-300 rounded-[14px] text-sm">
             {ROLES_INVITABLES.map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
           </select>
           <p className="text-xs text-gray-500 mt-2 m-0">
             El cajero abre/cierra caja y carga cobros y gastos. El empleado solo carga cobros — no gastos, no abre ni cierra caja.
           </p>
           {rol !== miembro.rol && (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 m-0">
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-[14px] p-2 mt-2 m-0">
               Si esta persona también trabaja en otro de tus locales, el cambio la afecta en todos:
               cada persona tiene un solo rol.
             </p>
