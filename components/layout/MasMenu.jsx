@@ -11,12 +11,14 @@ import MenuSesion from './MenuSesion'
  * frecuentes. Configuración, cuenta y recursos viven acá para no competir con
  * Cobrar/Caja/Reportes.
  */
-export default function MasMenu({ lateral = false }) {
+export default function MasMenu({ lateral = false, activeTab }) {
   const router = useRouter()
   const { hasRole } = useUserRole()
   const [abierto, setAbierto] = useState(false)
   const ref = useRef(null)
   useClickOutside(ref, () => setAbierto(false), abierto)
+
+  const secundarioActivo = ['admin', 'mi-cuenta', 'planes', 'anuncios'].includes(activeTab)
 
   const items = [
     hasRole([ROLES.OWNER]) && { label: 'Configuración', icono: 'admin', path: '/admin' },
@@ -69,7 +71,7 @@ export default function MasMenu({ lateral = false }) {
         className={`press flex-1 min-h-[52px] py-2 flex flex-col items-center gap-0.5 bg-transparent border-none cursor-pointer ${abierto ? 'text-primary-600' : 'text-gray-500'}`}
       >
         <Icono nombre="admin" size={24} />
-        <span className={`text-[11px] ${abierto ? 'font-bold' : 'font-medium'}`}>Más</span>
+        <span className={`text-[11px] ${abierto || secundarioActivo ? 'font-bold' : 'font-medium'}`}>Más</span>
       </button>
       {abierto && (
         <div role="menu" className="absolute bottom-[calc(100%+8px)] right-2 w-56 bg-white rounded-[18px] border border-black/5 shadow-suave p-1.5 animate-pop-in">
