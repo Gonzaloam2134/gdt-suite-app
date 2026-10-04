@@ -14,8 +14,8 @@ const Fila = ({ label, valor, negativo, destacada, ayuda }) => (
 
 export default function ResumenEjecutivo({ resumen, discriminaIva }) {
   return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <header className="bg-slate-800 px-4 py-3">
+    <section className="bg-white rounded-[20px] border border-black/5 shadow-suave overflow-hidden">
+      <header className="bg-primary-700 px-4 py-3">
         <h2 className="text-white font-bold m-0 text-base">Resultado del período</h2>
       </header>
       <div className="p-4">
@@ -29,7 +29,7 @@ export default function ResumenEjecutivo({ resumen, discriminaIva }) {
         <Fila label="Resultado" valor={resumen.resultadoEjercicio} destacada negativo={resumen.resultadoEjercicio < 0} />
 
         {discriminaIva && (
-          <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="mt-4 p-3 bg-fondo rounded-[14px] border border-black/5">
             <div className="flex justify-between items-baseline">
               <span className="text-sm font-semibold text-gray-700">
                 Posición IVA

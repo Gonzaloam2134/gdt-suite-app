@@ -64,7 +64,7 @@ export default function TablaLibro({ tipo, filas, totales, discriminaIva }) {
           {filas.length > LIMITE && (
             <footer className="px-4 py-2 border-t border-gray-100 text-center">
               <button onClick={() => setVerTodo(v => !v)}
-                className="text-xs text-blue-600 font-semibold bg-transparent border-none cursor-pointer hover:underline">
+                className="text-xs text-primary-600 font-semibold bg-transparent border-none cursor-pointer hover:underline">
                 {verTodo ? 'Ver menos' : `Ver los ${filas.length} registros`}
               </button>
             </footer>

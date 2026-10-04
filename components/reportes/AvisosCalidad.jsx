@@ -1,7 +1,7 @@
 const ESTILO = {
   alto:  { fondo: 'bg-red-50 border-red-200', texto: 'text-red-800', icono: '⚠️' },
   medio: { fondo: 'bg-amber-50 border-amber-200', texto: 'text-amber-800', icono: '⚠️' },
-  info:  { fondo: 'bg-blue-50 border-blue-200', texto: 'text-blue-800', icono: 'ℹ️' },
+  info:  { fondo: 'bg-primary-50 border-primary-500/30', texto: 'text-primary-700', icono: 'ℹ️' },
 }
 
 /**
@@ -16,7 +16,7 @@ export default function AvisosCalidad({ calidad }) {
       {calidad.avisos.map((a, i) => {
         const e = ESTILO[a.nivel] || ESTILO.info
         return (
-          <div key={i} className={`flex items-start gap-2 p-3 rounded-lg border ${e.fondo}`}>
+          <div key={i} className={`flex items-start gap-2 p-3 rounded-[14px] border ${e.fondo}`}>
             <span className="shrink-0">{e.icono}</span>
             <p className={`text-sm m-0 ${e.texto}`}>{a.texto}</p>
           </div>
