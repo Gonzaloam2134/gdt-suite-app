@@ -84,7 +84,7 @@ export default function MisLocales() {
       const local = await crearLocal({
         nombre: datos.businessName?.trim() || 'Mi negocio',
         rubro: datos.rubro || 'Otro',
-        condicionFiscal: datos.condicionFiscal || 'Consumidor Final',
+        condicionFiscal: datos.condicionFiscal || 'No inscripto',
         creadoPor: user.id,
       })
       await agregarOwner(local.id, user.id)
