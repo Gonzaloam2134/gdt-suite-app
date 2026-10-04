@@ -16,6 +16,7 @@ import { agruparPagosPorMes, proyectarCashflow, totalCobradoHistorico, mrrActual
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabaseClient'
 import { crearAnuncio, actualizarAnuncio, cambiarActivoAnuncio, eliminarAnuncio } from '../lib/services/anuncios'
+import Icono, { iconoDeAnuncio } from '../components/ui/Icono'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
@@ -253,7 +254,7 @@ export default function SuperAdmin() {
     }
   }
 
-  if (checking || cargandoRol || !esSuperUser || terminos.checking) return <LoadingScreen mensaje="Verificando acceso…" icono="👑" />
+  if (checking || cargandoRol || !esSuperUser || terminos.checking) return <LoadingScreen mensaje="Verificando acceso…" icono="corona" />
 
   if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 
@@ -264,7 +265,7 @@ export default function SuperAdmin() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="m-0 text-lg font-bold text-gray-900">👑 Super Admin</h1>
+            <h1 className="m-0 text-lg font-bold text-gray-900 inline-flex items-center gap-2"><span className="text-primary-600"><Icono nombre="corona" size={22} /></span>Super Admin</h1>
             <p className="mt-0.5 text-xs text-gray-500">Panel de control global de la plataforma</p>
           </div>
           <div className="flex gap-2">
@@ -289,14 +290,14 @@ export default function SuperAdmin() {
         <div className="relative mb-4">
         <div ref={tabsScrollRef} onScroll={actualizarSombrasTabs} className="flex gap-2 border-b border-gray-200 overflow-x-auto">
           {[
-            { id: 'dashboard', label: '📊 Dashboard Global' },
-            { id: 'contactos', label: '📬 Consultas' },
-            { id: 'usuarios', label: '👥 Usuarios' },
-            { id: 'locales', label: '🏪 Locales' },
-            { id: 'suscripciones', label: '💳 Suscripciones' },
-            { id: 'config', label: '⚙️ Configuración' },
-            { id: 'anuncios', label: '📢 Anuncios' },
-            { id: 'cashflow', label: '💰 Cashflow' }
+            { id: 'dashboard', label: 'Dashboard Global', icono: 'reportes' },
+            { id: 'contactos', label: 'Consultas', icono: 'mail' },
+            { id: 'usuarios', label: 'Usuarios', icono: 'equipo' },
+            { id: 'locales', label: 'Locales', icono: 'inicio' },
+            { id: 'suscripciones', label: 'Suscripciones', icono: 'tarjeta' },
+            { id: 'config', label: 'Configuración', icono: 'admin' },
+            { id: 'anuncios', label: 'Anuncios', icono: 'novedades' },
+            { id: 'cashflow', label: 'Cashflow', icono: 'dinero' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -305,7 +306,7 @@ export default function SuperAdmin() {
                 activeTab === tab.id ? 'bg-white text-primary-600 border-b-2 border-primary-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {tab.label}
+              <span className="inline-flex items-center gap-2"><Icono nombre={tab.icono} size={18} />{tab.label}</span>
               {tab.id === 'contactos' && contactos.filter(c => c.estado === 'pendiente').length > 0 && (
                 <span className="ml-2 px-2 py-0.5 bg-red-500 text-white rounded-full text-xs">
                   {contactos.filter(c => c.estado === 'pendiente').length}
@@ -333,23 +334,23 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                👑 Bienvenido al panel de super administrador. Acá tenés una vista global de toda la plataforma GDT Suite.
+                <Icono nombre="corona" size={16} className="inline-block align-text-bottom mr-1.5 " />Bienvenido al panel de super administrador. Acá tenés una vista global de toda la plataforma GDT Suite.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2">🏪 LOCALES REGISTRADOS</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2"><Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />LOCALES REGISTRADOS</div>
                 <div className="text-3xl font-extrabold text-primary-700">{globalStats.locales}</div>
                 <div className="text-xs text-gray-400 mt-1">Total en la plataforma</div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2">👥 USUARIOS ACTIVOS</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2"><Icono nombre="equipo" size={16} className="inline-block align-text-bottom mr-1.5 " />USUARIOS ACTIVOS</div>
                 <div className="text-3xl font-extrabold text-green-700">{globalStats.usuarios}</div>
                 <div className="text-xs text-gray-400 mt-1">Cuentas registradas</div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
-                <div className="text-xs text-gray-500 font-semibold mb-2">💳 TRANSACCIONES</div>
+                <div className="text-xs text-gray-500 font-semibold mb-2"><Icono nombre="tarjeta" size={16} className="inline-block align-text-bottom mr-1.5 " />TRANSACCIONES</div>
                 <div className="text-3xl font-extrabold text-purple-700">{globalStats.transacciones}</div>
                 <div className="text-xs text-gray-400 mt-1">Total procesadas</div>
               </div>
@@ -362,7 +363,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                📬 Tenés <strong>{contactos.filter(c => c.estado === 'pendiente').length}</strong> consultas pendientes de {contactos.length} totales.
+                <Icono nombre="mail" size={16} className="inline-block align-text-bottom mr-1.5 " />Tenés <strong>{contactos.filter(c => c.estado === 'pendiente').length}</strong> consultas pendientes de {contactos.length} totales.
               </p>
             </div>
 
@@ -414,10 +415,10 @@ export default function SuperAdmin() {
                         </div>
                         <h4 className="font-bold text-gray-900 text-sm mb-1">{contacto.asunto}</h4>
                         <div className="text-xs text-gray-500 space-y-0.5">
-                          <div>👤 {contacto.perfil?.email || 'Usuario desconocido'}</div>
-                          {contacto.local?.nombre && <div>🏪 {contacto.local.nombre}</div>}
-                          <div>📍 Desde: {contacto.pagina_origen || 'Web'}</div>
-                          <div>🕐 {new Date(contacto.creado_en).toLocaleString('es-AR')}</div>
+                          <div><Icono nombre="cuenta" size={16} className="inline-block align-text-bottom mr-1.5 " />{contacto.perfil?.email || 'Usuario desconocido'}</div>
+                          {contacto.local?.nombre && <div><Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />{contacto.local.nombre}</div>}
+                          <div>Desde: {contacto.pagina_origen || 'Web'}</div>
+                          <div><Icono nombre="reloj" size={16} className="inline-block align-text-bottom mr-1.5 " />{new Date(contacto.creado_en).toLocaleString('es-AR')}</div>
                         </div>
                       </div>
                     </div>
@@ -428,7 +429,7 @@ export default function SuperAdmin() {
 
                     {contacto.respuesta && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                        <div className="text-xs text-green-700 font-bold mb-1">✅ RESPUESTA:</div>
+                        <div className="text-xs text-green-700 font-bold mb-1"><Icono nombre="check" size={16} className="inline-block align-text-bottom mr-1.5 " />RESPUESTA:</div>
                         <div className="text-sm text-green-900 whitespace-pre-wrap">{contacto.respuesta}</div>
                         {contacto.respondido_en && (
                           <div className="text-xs text-green-600 mt-1">
@@ -443,7 +444,7 @@ export default function SuperAdmin() {
                         onClick={() => setRespondiendoId(contacto.id)}
                         className="px-4 py-2 press bg-primary-600 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-primary-700"
                       >
-                        ✏️ Responder
+                        Responder
                       </button>
                     )}
 
@@ -461,7 +462,7 @@ export default function SuperAdmin() {
                             onClick={() => handleResponderContacto(contacto.id)}
                             className="px-4 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
                           >
-                            📤 Enviar respuesta
+                            Enviar respuesta
                           </button>
                           <button
                             onClick={() => { setRespondiendoId(null); setRespuestaTexto('') }}
@@ -478,7 +479,7 @@ export default function SuperAdmin() {
 
             {contactos.length === 0 && (
               <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-                <div className="text-5xl mb-3">📭</div>
+                <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="vacio" size={44} /></div>
                 <p className="text-gray-500 text-sm">No hay consultas de soporte aún.</p>
               </div>
             )}
@@ -490,7 +491,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                👥 Gestioná los usuarios de la plataforma. Podés cambiar el rol global.
+                <Icono nombre="equipo" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná los usuarios de la plataforma. Podés cambiar el rol global.
                 El email de inicio de sesión se administra desde Supabase Auth, no desde acá.
               </p>
             </div>
@@ -540,7 +541,7 @@ export default function SuperAdmin() {
                             onClick={() => handleActualizarUsuario(usuario.id)}
                             className="px-4 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
                           >
-                            💾 Guardar cambios
+                            Guardar cambios
                           </button>
                           <button
                             onClick={() => { setEditandoUsuario(null); setNuevoRol('') }}
@@ -567,7 +568,7 @@ export default function SuperAdmin() {
                             onClick={() => setConfirmarEmail({ id: usuario.id, emailActual: usuario.email, emailNuevo: nuevoEmail })}
                             className="px-4 py-2 bg-amber-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            💾 Guardar cambios
+                            Guardar cambios
                           </button>
                           <button
                             onClick={() => { setEditandoEmail(null); setNuevoEmail('') }}
@@ -583,13 +584,13 @@ export default function SuperAdmin() {
                           onClick={() => { setEditandoUsuario(usuario.id); setNuevoRol(usuario.rol_global) }}
                           className="px-4 py-2 press bg-primary-600 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-primary-700"
                         >
-                          ✏️ Editar rol
+                          Editar rol
                         </button>
                         <button
                           onClick={() => { setEditandoEmail(usuario.id); setNuevoEmail(usuario.email || '') }}
                           className="px-4 py-2 bg-amber-100 text-amber-700 rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-200"
                         >
-                          ✉️ Editar email
+                          Editar email
                         </button>
                       </div>
                     )}
@@ -605,7 +606,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                🏪 Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
+                <Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
               </p>
             </div>
 
@@ -639,16 +640,16 @@ export default function SuperAdmin() {
                             {estaSuspendido && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">SUSPENDIDO</span>}
                           </div>
                           <div className="text-xs text-gray-500 space-y-0.5">
-                            <div>🏢 Rubro: {local.rubro || 'Sin rubro'}</div>
-                            <div>📄 Condición fiscal: {local.condicion_fiscal || 'Sin especificar'}</div>
-                            <div>🕐 Creado: {new Date(local.creado_en).toLocaleDateString('es-AR')}</div>
+                            <div>Rubro: {local.rubro || 'Sin rubro'}</div>
+                            <div>Condición fiscal: {local.condicion_fiscal || 'Sin especificar'}</div>
+                            <div><Icono nombre="reloj" size={16} className="inline-block align-text-bottom mr-1.5 " />Creado: {new Date(local.creado_en).toLocaleDateString('es-AR')}</div>
                           </div>
                         </div>
                       </div>
 
                       {local.miembros_locales && local.miembros_locales.length > 0 && (
                         <div className="mb-3 text-xs text-gray-600">
-                          <div className="font-semibold mb-1">👥 Miembros ({miembrosActivos} activos):</div>
+                          <div className="font-semibold mb-1"><Icono nombre="equipo" size={16} className="inline-block align-text-bottom mr-1.5 " />Miembros ({miembrosActivos} activos):</div>
                           {local.miembros_locales.slice(0, 5).map((m, idx) => (
                             <div key={idx} className="flex items-center gap-2">
                               <span>{m.perfiles?.email || 'Usuario'}</span>
@@ -670,7 +671,7 @@ export default function SuperAdmin() {
                             : 'bg-red-500 text-white hover:bg-red-600'
                         }`}
                       >
-                        {estaSuspendido ? '✅ Activar local' : '🚫 Suspender local'}
+                        {estaSuspendido ? 'Activar local' : 'Suspender local'}
                       </button>
                     </div>
                   )
@@ -679,7 +680,7 @@ export default function SuperAdmin() {
 
             {todosLosLocales.filter(l => l.nombre.toLowerCase().includes(filtroLocal.toLowerCase())).length === 0 && (
               <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-                <div className="text-5xl mb-3">🔍</div>
+                <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="buscar" size={44} /></div>
                 <p className="text-gray-500 text-sm">No se encontraron locales.</p>
               </div>
             )}
@@ -691,7 +692,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                💳 Gestioná el estado de pago de cada local. Podés restringir funcionalidades o suspender el acceso si no pagan.
+                <Icono nombre="tarjeta" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná el estado de pago de cada local. Podés restringir funcionalidades o suspender el acceso si no pagan.
               </p>
             </div>
 
@@ -706,7 +707,7 @@ export default function SuperAdmin() {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {estado === 'todos' ? 'Todos' : estado === 'active' ? '🟢 Activos' : estado === 'restricted' ? '🟡 Restringidos' : '🔴 Suspendidos'}
+                  {estado === 'todos' ? 'Todos' : <span className="inline-flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${estado === 'active' ? 'bg-green-500' : estado === 'restricted' ? 'bg-amber-500' : 'bg-red-500'}`} />{estado === 'active' ? 'Activos' : estado === 'restricted' ? 'Restringidos' : 'Suspendidos'}</span>}
                   {estado !== 'todos' && ` (${suscripciones.filter(s => s.estado === estado).length})`}
                 </button>
               ))}
@@ -743,9 +744,9 @@ export default function SuperAdmin() {
                             )}
                           </div>
                           <div className="text-xs text-gray-600 space-y-1">
-                            <div>👤 Owner: {sub.ownerEmail}</div>
+                            <div><Icono nombre="cuenta" size={16} className="inline-block align-text-bottom mr-1.5 " />Owner: {sub.ownerEmail}</div>
                             <div>
-                              📦 Plan: <span className="font-semibold uppercase">{sub.plan}</span>
+                              Plan: <span className="font-semibold uppercase">{sub.plan}</span>
                               {sub.plan === 'pago' && sub.segmento && (
                                 <span className="ml-1 text-gray-500">
                                   · {LABEL_SEGMENTO[sub.segmento] || sub.segmento}
@@ -753,7 +754,7 @@ export default function SuperAdmin() {
                                 </span>
                               )}
                             </div>
-                            <div>📅 Vencimiento: {sub.fecha_vencimiento ? new Date(sub.fecha_vencimiento).toLocaleDateString('es-AR') : 'Sin fecha'}</div>
+                            <div>Vencimiento: {sub.fecha_vencimiento ? new Date(sub.fecha_vencimiento).toLocaleDateString('es-AR') : 'Sin fecha'}</div>
                           </div>
                         </div>
 
@@ -763,7 +764,7 @@ export default function SuperAdmin() {
                               onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'active' })}
                               className="px-3 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600"
                             >
-                              ✅ Activar / Desbloquear
+                              Activar / Desbloquear
                             </button>
                           )}
                           {sub.estado !== 'restricted' && (
@@ -771,7 +772,7 @@ export default function SuperAdmin() {
                               onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'restricted' })}
                               className="px-3 py-2 bg-amber-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-amber-600"
                             >
-                              🟡 Restringir (Solo Reportes)
+                              Restringir (solo Reportes)
                             </button>
                           )}
                           {sub.estado !== 'suspended' && (
@@ -779,7 +780,7 @@ export default function SuperAdmin() {
                               onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'suspended' })}
                               className="px-3 py-2 bg-red-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-red-600"
                             >
-                              🔴 Suspender Acceso Total
+                              Suspender acceso total
                             </button>
                           )}
                         </div>
@@ -796,7 +797,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                ⚙️ Configuración global de la plataforma. Estos valores afectan a todos los usuarios y locales.
+                <Icono nombre="admin" size={16} className="inline-block align-text-bottom mr-1.5 " />Configuración global de la plataforma. Estos valores afectan a todos los usuarios y locales.
               </p>
             </div>
 
@@ -852,7 +853,7 @@ export default function SuperAdmin() {
                 onClick={handleGuardarConfig}
                 className="px-6 py-3 press bg-primary-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700"
               >
-                💾 Guardar configuración
+                Guardar configuración
               </button>
             </div>
 
@@ -882,7 +883,7 @@ export default function SuperAdmin() {
                         disabled={!cambio || guardandoPrecio === plan.id}
                         className="px-3 py-2 bg-green-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        {guardandoPrecio === plan.id ? 'Guardando…' : '💾 Guardar'}
+                        {guardandoPrecio === plan.id ? 'Guardando…' : 'Guardar'}
                       </button>
                     </div>
                   )
@@ -895,7 +896,7 @@ export default function SuperAdmin() {
 
             <details className="bg-white rounded-lg border border-gray-200 p-6">
               <summary className="text-base font-bold text-gray-900 cursor-pointer m-0">
-                🔒 Auditoría de acciones globales ({auditoriaGlobal.length})
+                <Icono nombre="candado" size={16} className="inline-block align-text-bottom mr-1.5 " />Auditoría de acciones globales ({auditoriaGlobal.length})
               </summary>
               <p className="text-xs text-gray-500 mt-2 mb-4">
                 Registro de acciones sensibles de superadmin que no pertenecen a ningún
@@ -931,7 +932,7 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
               <p className="text-sm text-primary-700 m-0">
-                📢 Publicá anuncios que todos los usuarios verán al iniciar sesión.
+                <Icono nombre="novedades" size={16} className="inline-block align-text-bottom mr-1.5 " />Publicá anuncios que todos los usuarios verán al iniciar sesión.
               </p>
             </div>
 
@@ -962,16 +963,16 @@ export default function SuperAdmin() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo:</label>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">Tipo: <span className="text-primary-600"><Icono nombre={iconoDeAnuncio(nuevoAnuncio.tipo)} size={18} /></span></label>
                   <select
                     value={nuevoAnuncio.tipo}
                     onChange={(e) => setNuevoAnuncio({...nuevoAnuncio, tipo: e.target.value})}
                     className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                   >
-                    <option value="info">ℹ️ Información</option>
-                    <option value="warning">⚠️ Advertencia</option>
-                    <option value="success">✅ Éxito</option>
-                    <option value="feature">🚀 Nueva feature</option>
+                    <option value="info">Información</option>
+                    <option value="warning">Advertencia</option>
+                    <option value="success">Éxito</option>
+                    <option value="feature">Nueva feature</option>
                   </select>
                 </div>
 
@@ -980,7 +981,7 @@ export default function SuperAdmin() {
                   disabled={publicando}
                   className="px-6 py-3 bg-green-500 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-green-600 disabled:opacity-50"
                 >
-                  {publicando ? 'Publicando…' : '📤 Publicar anuncio'}
+                  {publicando ? 'Publicando…' : 'Publicar anuncio'}
                 </button>
               </div>
             </div>
@@ -1000,10 +1001,10 @@ export default function SuperAdmin() {
                       <select value={editandoAnuncio.tipo}
                         onChange={(e) => setEditandoAnuncio({ ...editandoAnuncio, tipo: e.target.value })}
                         className="w-full p-2 border border-gray-300 rounded-md text-sm">
-                        <option value="info">ℹ️ Info</option>
-                        <option value="warning">⚠️ Advertencia</option>
-                        <option value="success">✅ Éxito</option>
-                        <option value="feature">🚀 Novedad</option>
+                        <option value="info">Info</option>
+                        <option value="warning">Advertencia</option>
+                        <option value="success">Éxito</option>
+                        <option value="feature">Novedad</option>
                       </select>
                       <div className="flex gap-2">
                         <button onClick={handleGuardarEdicion} disabled={guardandoEdicion}
@@ -1018,11 +1019,7 @@ export default function SuperAdmin() {
                     </div>
                   ) : (
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl">
-                        {anuncio.tipo === 'info' ? 'ℹ️' :
-                         anuncio.tipo === 'warning' ? '⚠️' :
-                         anuncio.tipo === 'success' ? '✅' : '🚀'}
-                      </div>
+                      <div className="text-primary-600 shrink-0"><Icono nombre={iconoDeAnuncio(anuncio.tipo)} size={26} /></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-gray-900 text-sm mb-1 m-0">{anuncio.titulo}</h4>
@@ -1055,7 +1052,7 @@ export default function SuperAdmin() {
               ))}
               {anuncios.length === 0 && (
                 <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
-                  <div className="text-4xl mb-2">📭</div>
+                  <div className="mb-2 text-primary-600/70 flex justify-center"><Icono nombre="vacio" size={40} /></div>
                   <p className="text-gray-500 text-sm">No hay anuncios publicados</p>
                 </div>
               )}
@@ -1094,7 +1091,7 @@ export default function SuperAdmin() {
             <div className="space-y-4">
               <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
                 <p className="text-sm text-primary-700 m-0">
-                  💰 Lo que ya cobraste, y una proyección de lo que deberías seguir cobrando si nadie
+                  <Icono nombre="dinero" size={16} className="inline-block align-text-bottom mr-1.5 " />Lo que ya cobraste, y una proyección de lo que deberías seguir cobrando si nadie
                   cancela ni falla ningún pago — es optimista a propósito, no una garantía.
                 </p>
               </div>

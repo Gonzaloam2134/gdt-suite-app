@@ -12,7 +12,7 @@
 const rr = (x, y, w, h, r) =>
   `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`
 
-const Recortado = ({ d }) => <path fillRule="evenodd" d={d} />
+const Recortado = ({ d, ...resto }) => <path fillRule="evenodd" d={d} {...resto} />
 const Suave = (props) => <path opacity=".5" {...props} />
 
 const DIBUJOS = {
@@ -78,8 +78,30 @@ const DIBUJOS = {
     <path d={rr(4, 3.5, 10, 17, 3)} />
     <path d="M15.2 8.6 20 12l-4.8 3.4v-2.2H11v-2.4h4.2Z" />
   </>,
+  // Estados y tipos de aviso
+  alerta: <Recortado d={`M12 3.5q1.2 0 1.9 1.2l7.3 12.9q.6 1.2 0 2.1-.6.8-1.8.8H4.6q-1.2 0-1.8-.8-.6-.9 0-2.1l7.3-12.9Q10.8 3.5 12 3.5Z${rr(11, 9.5, 2, 5.5, 1)}M10.8 17.4a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0Z`} />,
+  check: <Recortado d="M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0ZM7.6 12.4l1.3-1.3 2.2 2.2 4.5-4.5 1.3 1.3-5.8 5.8Z" />,
+  info: <Recortado d={`M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0Z${rr(11, 10.8, 2, 6, 1)}M10.8 8a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0Z`} />,
+  cohete: <>
+    <Recortado d="M12 2.5Q17 6 17 12v3H7v-3Q7 6 12 2.5ZM10.2 9.5a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0Z" />
+    <path opacity=".5" d="M7 12 4 16v2l3-2ZM17 12l3 4v2l-3-2ZM10 16.5h4L12 21Z" />
+  </>,
+  reloj: <Recortado d={`M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0Z${rr(11, 6.5, 2, 6.2, 1)}${rr(11, 11, 5, 2, 1)}`} />,
+  dinero: <Recortado d={`${rr(3, 6.5, 18, 11, 3.5)}M9.4 12a2.6 2.6 0 1 0 5.2 0 2.6 2.6 0 1 0-5.2 0Z`} />,
+  buscar: <>
+    <Recortado d="M3.5 10.5a7 7 0 1 0 14 0 7 7 0 1 0-14 0ZM6 10.5a4.5 4.5 0 1 0 9 0 4.5 4.5 0 1 0-9 0Z" />
+    <rect x="15.2" y="15.2" width="8" height="2.8" rx="1.4" transform="rotate(45 15.2 15.2)" opacity=".5" />
+  </>,
+  candado: <>
+    <Recortado d={`${rr(8, 3.5, 8, 10, 4)}${rr(10.2, 5.7, 3.6, 8, 1.8)}`} opacity=".5" />
+    <Recortado d="M8 10.5h8q3 0 3 3v4q0 3-3 3H8q-3 0-3-3v-4q0-3 3-3ZM10.8 15a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0Z" />
+  </>,
+  corona: <path d="M4 8l4 4 4-7 4 7 4-4-1.5 10.5q-.1 1-1.1 1H6.6q-1 0-1.1-1Z" />,
   mail: <Recortado d={`${rr(3, 5.5, 18, 13, 3.5)}M5.8 9l1.1-1.3L12 11.6l5.1-3.9L18.2 9 12 13.8Z`} />,
 }
+
+/** Ícono de cada tipo de anuncio (los mismos tipos que usa la base: warning, success, feature, urgent, info). */
+export const iconoDeAnuncio = (tipo) => ({ warning: 'alerta', success: 'check', feature: 'cohete', urgent: 'alerta', info: 'info' }[tipo] || 'info')
 
 export const tieneIcono = (nombre) => Object.prototype.hasOwnProperty.call(DIBUJOS, nombre)
 

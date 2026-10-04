@@ -1,26 +1,27 @@
 import Modal from '../ui/Modal'
+import Icono, { iconoDeAnuncio } from '../ui/Icono'
 import { formatFecha } from '../../lib/format'
 
-const ESTILO = {
-  warning: { color: 'bg-amber-500 text-white', icono: '⚠️' },
-  success: { color: 'bg-green-600 text-white', icono: '✅' },
-  feature: { color: 'bg-purple-600 text-white', icono: '🚀' },
-  urgent:  { color: 'bg-red-600 text-white', icono: '🚨' },
-  info:    { color: 'bg-primary-700 text-white', icono: 'ℹ️' },
+// Color del ícono según el tipo de aviso
+const TONO = {
+  warning: 'text-warning-600',
+  urgent: 'text-danger-600',
+  success: 'text-primary-600',
+  feature: 'text-primary-600',
+  info: 'text-gray-500',
 }
 
 /** Novedades sin leer, una por una. Al cerrarlas quedan marcadas en la base. */
 export default function AnunciosModal({ anuncios, indice, onSiguiente, onCerrar }) {
   const anuncio = anuncios[indice]
   if (!anuncio) return null
-  const estilo = ESTILO[anuncio.tipo] || ESTILO.info
+  const tono = TONO[anuncio.tipo] || TONO.info
   const esUltimo = indice >= anuncios.length - 1
 
   return (
     <Modal isOpen onClose={onCerrar} size="lg"
-      title={`${estilo.icono} ${anuncio.titulo}`}
+      title={<span className="inline-flex items-center gap-2.5"><span className={tono}><Icono nombre={iconoDeAnuncio(anuncio.tipo)} size={24} /></span>{anuncio.titulo}</span>}
       subtitle={anuncios.length > 1 ? `Novedad ${indice + 1} de ${anuncios.length}` : null}
-      headerClassName={estilo.color}
       footer={
         <button onClick={esUltimo ? onCerrar : onSiguiente}
           className="px-5 py-2.5 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700">
