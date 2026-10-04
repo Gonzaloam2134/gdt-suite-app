@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Sparkline from './Sparkline'
-import { serieDiaria, calcularTendencia } from './tendenciaNegocio'
+import { serieDiaria, calcularTendencia } from '../../lib/domain/tendenciaNegocio'
 import { formatCurrency, formatFecha } from '../../lib/format'
 import { desdeFechaISO } from '../../lib/dates'
 

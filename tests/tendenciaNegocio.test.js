@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { serieDiaria, calcularTendencia } from '../components/reportes/tendenciaNegocio'
+import { serieDiaria, calcularTendencia } from '../lib/domain/tendenciaNegocio'
 
 const dia = (n) => `2026-09-${String(n).padStart(2, '0')}`
 

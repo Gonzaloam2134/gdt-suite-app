@@ -13,7 +13,7 @@ import { discriminaIva } from '../lib/constants/transacciones'
 export function useReportes(userId) {
   const [locales, setLocales] = useState([])
   const [localId, setLocalId] = useState('todos')
-  const [periodo, setPeriodo] = useState(() => ({ ...periodoRapido('este-mes'), preset: 'este-mes' }))
+  const [periodo, setPeriodo] = useState(() => ({ ...periodoRapido('ultimos-30'), preset: 'ultimos-30' }))
   const [transacciones, setTransacciones] = useState([])
   const [cierres, setCierres] = useState([])
   const [loading, setLoading] = useState(true)
