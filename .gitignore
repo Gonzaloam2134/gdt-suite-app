@@ -18,3 +18,6 @@ public/workbox-*.js.map
 # Caché local de `supabase link` (project-ref, versiones, URL del pooler) —
 # se regenera en cada máquina, no es config del proyecto
 supabase/.temp/
+
+# Estado local del plugin Clawness (ledger, memoria, config) — no es código del proyecto
+.clawness/
