@@ -17,12 +17,21 @@ export default function Login() {
   // suscripción (local suspendido/restringido), así que saltear /locales acá
   // no pierde esa validación.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) return
+      if (await esSuperUser(session.user.id)) { router.replace('/superadmin'); return }
       const localId = typeof window !== 'undefined' ? localStorage.getItem('activeLocalId') : null
       router.replace(localId ? '/dashboard' : '/locales')
     })
   }, [router])
+
+  // El super admin no tiene locales propios ni tiene sentido que pase por
+  // /locales (ver CLAUDE.md: "Dueño"/"Cajero" son los roles operativos) —
+  // entra directo al panel global, que es la única pantalla que usa.
+  const esSuperUser = async (userId) => {
+    const { data } = await supabase.from('perfiles').select('rol_global').eq('id', userId).maybeSingle()
+    return data?.rol_global === 'super_user'
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -37,6 +46,7 @@ export default function Login() {
       if (error) throw error
 
       toast.success('Bienvenido')
+      if (await esSuperUser(data.user.id)) { router.push('/superadmin'); return }
       // Si llegó desde un link de invitación, lo devolvemos ahí para aceptarla
       const { invitacion } = router.query
       router.push(invitacion ? `/invitacion?token=${invitacion}` : '/locales')
