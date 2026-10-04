@@ -30,7 +30,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
               </button>
             )
           })}
-          <MasMenu />
+          <MasMenu activeTab={activeTab} />
         </div>
       </nav>
 
@@ -49,7 +49,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
               </button>
             )
           })}
-          <MasMenu lateral />
+          <MasMenu lateral activeTab={activeTab} />
         </nav>
       )}
     </>
