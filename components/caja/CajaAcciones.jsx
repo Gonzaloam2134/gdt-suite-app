@@ -1,45 +1,33 @@
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES_OPERAN_CAJA, ROLES_REGISTRAN_COBRO } from '../../lib/constants/roles'
-import Button from '../ui/Button'
 
 /**
- * Barra de acciones del día.
- * - Owner y cajero: abren/cierran caja, cargan cobros y gastos.
- * - Empleado: solo carga cobros (ej. vendedor de mostrador). No abre ni
- *   cierra caja, no paga gastos — eso lo maneja quien tiene el cajón.
- * Si el usuario no puede hacer nada acá, lo decimos: una barra vacía no explica nada.
+ * Botones grandes de Cobro/Gasto (solo con la caja abierta, hoy).
+ * - Owner y cajero: cargan cobros y gastos.
+ * - Empleado: solo carga cobros (ej. vendedor de mostrador).
+ * Si el usuario no puede hacer nada acá, lo decimos: un hueco vacío no explica nada.
  */
-export default function CajaAcciones({ cajaAbierta, huerfana, onAbrir, onCerrar, onHistorial, onCobro, onGasto }) {
+export default function CajaAcciones({ onCobro, onGasto }) {
   const { hasRole, loading } = useUserRole()
   const puedeOperar = hasRole(ROLES_OPERAN_CAJA)
   const puedeCobrar = hasRole(ROLES_REGISTRAN_COBRO)
 
-  return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          {puedeOperar && (cajaAbierta
-            ? <Button variant="danger" size="sm" onClick={onCerrar}>🔒 Cerrar caja</Button>
-            : <Button variant="success" size="sm" onClick={onAbrir} disabled={!!huerfana}
-                title={huerfana ? 'Cerrá la caja anterior antes de abrir la de hoy' : ''}>🔓 Abrir caja</Button>)}
-          <Button variant="ghost" size="sm" onClick={onHistorial} title="Historial de cierres">
-            📋 <span className="hidden md:inline">Historial</span>
-          </Button>
-        </div>
+  if (!puedeCobrar) {
+    return loading ? null : <p className="text-xs text-gray-500 m-0 text-center">Podés ver la caja, pero no registrar movimientos en este local.</p>
+  }
 
-        {puedeCobrar ? (
-          <div className="flex items-center gap-2">
-            <Button variant="success" onClick={onCobro} disabled={!cajaAbierta}
-              title={cajaAbierta ? '' : 'Falta que abran la caja para registrar cobros'}>+ Cobro</Button>
-            {puedeOperar && (
-              <Button variant="danger" onClick={onGasto} disabled={!cajaAbierta}
-                title={cajaAbierta ? '' : 'Abrí la caja para registrar gastos'}>+ Gasto</Button>
-            )}
-          </div>
-        ) : !loading && (
-          <p className="text-xs text-gray-500 m-0">Podés ver la caja, pero no registrar movimientos en este local.</p>
-        )}
-      </div>
+  return (
+    <div className={`grid gap-3 ${puedeOperar ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      <button onClick={onCobro}
+        className="press min-h-[64px] rounded-[20px] bg-success-700 text-white text-lg font-bold border-none cursor-pointer shadow-suave hover:bg-success-800">
+        + Cobro
+      </button>
+      {puedeOperar && (
+        <button onClick={onGasto}
+          className="press min-h-[64px] rounded-[20px] bg-white text-danger-700 text-lg font-bold border-2 border-danger-600/30 cursor-pointer shadow-suave hover:bg-danger-50">
+          + Gasto
+        </button>
+      )}
     </div>
   )
 }

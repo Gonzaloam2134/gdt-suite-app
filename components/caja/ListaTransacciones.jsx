@@ -15,9 +15,10 @@ const COLOR = { cobro: 'text-green-700', gasto: 'text-red-700' }
  * ('cobro'|'gasto') para color/signo; ya no es una lista separada por tipo.
  * Mobile: filas expandibles. Desktop: tabla. Misma definición para los dos.
  */
-export default function ListaTransacciones({ items, onReversar }) {
+export default function ListaTransacciones({ items, onReversar, titulo = 'Movimientos de hoy', soloLectura = false }) {
   const { hasRole } = useUserRole()
-  const puedeReversar = hasRole(ROLES_OPERAN_CAJA)
+  // En un día pasado la lista es solo lectura: anular ahí tocaría una caja ya cerrada.
+  const puedeReversar = hasRole(ROLES_OPERAN_CAJA) && !soloLectura
   const [expandida, setExpandida] = useState(null)
   const paginacion = usePaginacion(items, 15)
   const activos = items.filter(t => !t.anulada && !t.reversa).length
@@ -25,7 +26,7 @@ export default function ListaTransacciones({ items, onReversar }) {
 
   if (items.length === 0) {
     return (
-      <SeccionColapsable titulo="Movimientos de hoy" badge={0}>
+      <SeccionColapsable titulo={titulo} badge={0}>
         <EmptyState icono="🧾" titulo="No hay movimientos en este día" />
       </SeccionColapsable>
     )
@@ -35,7 +36,7 @@ export default function ListaTransacciones({ items, onReversar }) {
   const puedeCancelar = (t) => puedeReversar && !t.anulada && !t.reversa
 
   return (
-    <SeccionColapsable titulo="Movimientos de hoy" paginacion={paginacion}
+    <SeccionColapsable titulo={titulo} paginacion={paginacion}
       badge={marcados > 0 ? `${activos} + ${marcados} anulado${marcados > 1 ? 's' : ''}` : activos}>
       {/* Mobile */}
       <div className="md:hidden divide-y divide-gray-100">
@@ -67,7 +68,7 @@ export default function ListaTransacciones({ items, onReversar }) {
                   )}
                   {puedeCancelar(t) && (
                     <div className="pt-2 border-t border-gray-200 flex justify-end">
-                      <button onClick={() => onReversar(t)} className="px-3 py-1.5 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
+                      <button onClick={() => onReversar(t)} className="press min-h-[44px] px-4 bg-warning-50 text-warning-700 border-none rounded-[12px] text-sm font-semibold cursor-pointer hover:bg-amber-100">↩️ Anular</button>
                     </div>
                   )}
                 </div>
@@ -93,7 +94,7 @@ export default function ListaTransacciones({ items, onReversar }) {
             {paginacion.visibles.map((t) => {
               const marcada = t.anulada || t.reversa
               return (
-                <tr key={t.id} className={`border-b border-gray-100 ${marcada ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'}`}>
+                <tr key={t.id} className={`fila-hover border-b border-gray-100 ${marcada ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'}`}>
                   <td className={`p-2 ${marcada ? 'text-gray-400' : 'text-gray-900'}`}>{formatHora(t.creado_en)}</td>
                   <td className={`p-2 ${marcada ? 'text-gray-400' : 'text-gray-700'}`}>{t.medios_pago?.nombre || '-'}</td>
                   <td className={`p-2 ${marcada ? 'text-gray-400' : 'text-gray-700'}`}>
@@ -104,7 +105,7 @@ export default function ListaTransacciones({ items, onReversar }) {
                   <td className={`p-2 text-right font-bold ${marcada ? 'text-gray-400 line-through' : COLOR[t.tipoMovimiento]}`}>{formatCurrency(t.monto)}</td>
                   <td className="p-2 text-center">
                     {puedeCancelar(t) && (
-                      <button onClick={() => onReversar(t)} className="px-2 py-1 bg-amber-100 text-amber-700 border-none rounded text-xs font-semibold cursor-pointer hover:bg-amber-200">↩️ Cancelar</button>
+                      <button onClick={() => onReversar(t)} className="accion-fila press px-3 py-1.5 bg-warning-50 text-warning-700 border-none rounded-[10px] text-xs font-semibold cursor-pointer hover:bg-amber-100 transition-opacity duration-150">↩️ Anular</button>
                     )}
                   </td>
                 </tr>
