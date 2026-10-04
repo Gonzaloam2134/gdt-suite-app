@@ -35,7 +35,7 @@ export default function Reportes() {
   const [ayuda, setAyuda] = useState(false)
   const [exportando, setExportando] = useState(null)
 
-  if (checking || r.loading || terminos.checking) return <LoadingScreen mensaje="Generando reporte…" icono="📊" />
+  if (checking || r.loading || terminos.checking) return <LoadingScreen mensaje="Generando reporte…" icono="reportes" />
 
   if (terminos.debeAceptar) return <TerminosBloqueoModal isOpen onAceptar={terminos.aceptar} />
 

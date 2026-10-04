@@ -90,7 +90,7 @@ export default function MediosPagoTab({ mediosPago, localId, userId, onCambio })
       </div>
 
       {mediosPago.length === 0 ? (
-        <EmptyState icono="💳" titulo="No hay medios de pago" descripcion="Agregá al menos efectivo para poder registrar cobros." />
+        <EmptyState icono="tarjeta" titulo="No hay medios de pago" descripcion="Agregá al menos efectivo para poder registrar cobros." />
       ) : (
         <ul className="space-y-2 list-none p-0 m-0">
           {mediosPago.map(m => (

@@ -27,7 +27,7 @@ export default function ListaTransacciones({ items, onReversar, titulo = 'Movimi
   if (items.length === 0) {
     return (
       <SeccionColapsable titulo={titulo} badge={0}>
-        <EmptyState icono="🧾" titulo="No hay movimientos en este día" />
+        <EmptyState icono="recibo" titulo="No hay movimientos en este día" />
       </SeccionColapsable>
     )
   }

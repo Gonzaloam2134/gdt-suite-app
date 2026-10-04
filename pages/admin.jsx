@@ -21,11 +21,11 @@ import ListaLogs from '../components/admin/ListaLogs'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
 const TABS_OWNER = [
-  { id: 'resumen', label: '📊 Resumen' },
-  { id: 'miembros', label: '👥 Equipo' },
-  { id: 'medios-pago', label: '💳 Medios de pago' },
-  { id: 'mercadopago', label: '🏪 Mercado Pago' },
-  { id: 'logs', label: '📋 Auditoría' },
+  { id: 'resumen', label: 'Resumen', icono: 'reportes' },
+  { id: 'miembros', label: 'Equipo', icono: 'equipo' },
+  { id: 'medios-pago', label: 'Medios de pago', icono: 'tarjeta' },
+  { id: 'mercadopago', label: 'Mercado Pago', icono: 'inicio' },
+  { id: 'logs', label: 'Auditoría', icono: 'historial' },
 ]
 
 export default function AdminPanel() {

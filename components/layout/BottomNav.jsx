@@ -2,6 +2,7 @@ import { useRouter } from 'next/router'
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES } from '../../lib/constants/roles'
 import MenuSesion from './MenuSesion'
+import Icono from '../ui/Icono'
 
 /**
  * Navegación principal. Presente en todas las pantallas, incluida la de
@@ -14,13 +15,13 @@ import MenuSesion from './MenuSesion'
  * desktop usa la nav del AppHeader.
  */
 const TABS = [
-  { id: 'inicio',   label: 'Inicio',   icon: '🏪', path: '/locales' },
-  { id: 'caja',     label: 'Caja',     icon: '💰', path: '/dashboard', requiereLocal: true },
-  { id: 'reportes', label: 'Reportes', icon: '📊', path: '/reportes' },
-  { id: 'admin',    label: 'Admin',    icon: '⚙️', path: '/admin', roles: [ROLES.OWNER], requiereLocal: true },
+  { id: 'inicio',   label: 'Inicio',   icono: 'inicio', path: '/locales' },
+  { id: 'caja',     label: 'Caja',     icono: 'caja', path: '/dashboard', requiereLocal: true },
+  { id: 'reportes', label: 'Reportes', icono: 'reportes', path: '/reportes' },
+  { id: 'admin',    label: 'Admin',    icono: 'admin', path: '/admin', roles: [ROLES.OWNER], requiereLocal: true },
   // Plan y cuenta son de la persona, no de un local: no requiere local activo.
   // Solo se esconde si ya se sabe que el rol no es de dueño (cajero/empleado).
-  { id: 'mi-cuenta', label: 'Mi cuenta', icon: '👤', path: '/mi-cuenta', ocultaPara: [ROLES.CAJERO, ROLES.EMPLEADO] },
+  { id: 'mi-cuenta', label: 'Mi cuenta', icono: 'cuenta', path: '/mi-cuenta', ocultaPara: [ROLES.CAJERO, ROLES.EMPLEADO] },
 ]
 
 export default function BottomNav({ activeTab, lateral = false }) {
@@ -38,7 +39,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
             return (
               <button key={tab.id} aria-current={activa ? 'page' : undefined} onClick={() => ir(tab)}
                 className={`press flex-1 min-h-[52px] py-2 flex flex-col items-center gap-0.5 bg-transparent border-none cursor-pointer ${activa ? 'text-primary-600' : 'text-gray-500'}`}>
-                <span className="text-xl leading-none">{tab.icon}</span>
+                <Icono nombre={tab.icono} size={24} />
                 <span className={`text-[11px] ${activa ? 'font-bold' : 'font-medium'}`}>{tab.label}</span>
               </button>
             )
@@ -58,7 +59,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
               <button key={tab.id} aria-current={activa ? 'page' : undefined} onClick={() => ir(tab)}
                 className={`press flex items-center gap-3 px-3 py-2.5 rounded-[14px] border-none cursor-pointer text-left text-sm transition-colors ${
                   activa ? 'bg-primary-50 text-primary-700 font-bold' : 'bg-transparent text-gray-600 font-medium hover:bg-gray-100'}`}>
-                <span className="text-lg leading-none">{tab.icon}</span>{tab.label}
+                <Icono nombre={tab.icono} size={22} />{tab.label}
               </button>
             )
           })}

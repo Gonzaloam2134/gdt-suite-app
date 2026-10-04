@@ -2,6 +2,7 @@ import { formatHora, formatCurrency } from '../../lib/format'
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES_OPERAN_CAJA } from '../../lib/constants/roles'
 import Button from '../ui/Button'
+import Icono from '../ui/Icono'
 import StatusBadge from '../ui/StatusBadge'
 
 /**
@@ -40,7 +41,7 @@ export default function EstadoCaja({ cajaAbierta, huerfana, onAbrir, onCerrar, o
       </div>
 
       <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
-        <button onClick={onHistorial} className="text-xs font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:underline p-0">📋 Historial de cierres</button>
+        <button onClick={onHistorial} className="text-xs font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:underline p-0 inline-flex items-center gap-1.5"><Icono nombre="historial" size={16} /> Historial de cierres</button>
         <button onClick={onAyuda} className="text-xs font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:underline p-0">Ayuda</button>
       </div>
     </section>

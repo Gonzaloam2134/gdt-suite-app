@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
+import Icono from '../ui/Icono'
 
 /**
  * Con 5 pestañas (Resumen, Miembros, Medios de pago, Suscripción,
@@ -41,7 +42,7 @@ export default function Tabs({ tabs, activa, onChange }) {
           <button key={t.id} role="tab" aria-selected={activa === t.id} onClick={() => onChange(t.id)}
             className={`px-4 py-2 text-sm font-semibold cursor-pointer border-none rounded-t-[14px] whitespace-nowrap transition-colors ${
               activa === t.id ? 'bg-white text-primary-600 border-b-2 border-primary-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            {t.label}
+            <span className="inline-flex items-center gap-2">{t.icono && <Icono nombre={t.icono} size={18} />}{t.label}</span>
           </button>
         ))}
       </div>

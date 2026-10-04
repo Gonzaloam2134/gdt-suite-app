@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useUserRole } from '../../lib/UserRoleContext'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useSignOut } from '../../hooks/useSignOut'
+import Icono from '../ui/Icono'
 import GuiaInstalacionModal from './GuiaInstalacionModal'
 
 /**
@@ -26,11 +27,11 @@ export default function MenuSesion({ desplegable = false }) {
 
   const items = (
     <>
-      <Item onClick={() => { setAbierto(false); setGuia(true) }}>📲 Instalar app</Item>
-      <Item onClick={() => ir('/anuncios')}>📣 Novedades</Item>
-      {esSuperUser && <Item onClick={() => ir('/superadmin')}>🌐 Panel global</Item>}
+      <Item icono="instalar" onClick={() => { setAbierto(false); setGuia(true) }}>Instalar app</Item>
+      <Item icono="novedades" onClick={() => ir('/anuncios')}>Novedades</Item>
+      {esSuperUser && <Item icono="global" onClick={() => ir('/superadmin')}>Panel global</Item>}
       <hr className="my-1 border-0 border-t border-gray-100" />
-      <Item onClick={signOut} peligro>Cerrar sesión</Item>
+      <Item icono="salir" onClick={signOut} peligro>Cerrar sesión</Item>
     </>
   )
 
@@ -68,10 +69,10 @@ const Avatar = ({ inicial }) => (
   <span className="w-8 h-8 shrink-0 rounded-full bg-primary-50 text-primary-700 text-sm font-bold flex items-center justify-center">{inicial}</span>
 )
 
-const Item = ({ children, onClick, peligro }) => (
+const Item = ({ children, onClick, peligro, icono }) => (
   <button role="menuitem" onClick={onClick}
-    className={`press w-full px-3 py-2.5 text-left text-sm rounded-[12px] bg-transparent border-none cursor-pointer min-h-[44px] md:min-h-0 ${
+    className={`press w-full px-3 py-2.5 flex items-center gap-2.5 text-left text-sm rounded-[12px] bg-transparent border-none cursor-pointer min-h-[44px] md:min-h-0 ${
       peligro ? 'text-danger-700 hover:bg-danger-50' : 'text-gray-700 hover:bg-gray-100'}`}>
-    {children}
+    {icono && <Icono nombre={icono} size={18} />}{children}
   </button>
 )

@@ -55,7 +55,7 @@ export default function MisLocales() {
       .then(pares => setSuscripciones(Object.fromEntries(pares)))
   }, [locales])
 
-  if (checking || !cargado) return <LoadingScreen mensaje="Cargando tus locales…" icono="🏪" />
+  if (checking || !cargado) return <LoadingScreen mensaje="Cargando tus locales…" icono="inicio" />
 
   const cerrarAnuncios = async () => {
     setVerAnuncios(false)
@@ -126,7 +126,7 @@ export default function MisLocales() {
 
         {locales.length === 0 ? (
           <EmptyState
-            icono="🏪"
+            icono="inicio"
             titulo="Todavía no tenés ningún local"
             descripcion="Creá el primero para empezar a registrar la caja del día."
             accion={

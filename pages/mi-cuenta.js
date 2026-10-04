@@ -7,6 +7,7 @@ import { ROLES } from '../lib/constants/roles'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
+import Icono from '../components/ui/Icono'
 import MenuSesion from '../components/layout/MenuSesion'
 import SuscripcionTab from '../components/admin/SuscripcionTab'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
@@ -61,7 +62,7 @@ export default function MiCuenta() {
             <ul className="space-y-1.5 pl-0 list-none m-0">
               {localesPropios.map(l => (
                 <li key={l.id} className="flex items-center gap-2 text-sm text-gray-700">
-                  <span className="text-gray-400">🏪</span>
+                  <Icono nombre="inicio" size={16} className="text-gray-400" />
                   <span className="font-semibold text-gray-900">{l.nombre}</span>
                   {l.rubro && <span className="text-gray-400">· {l.rubro}</span>}
                 </li>

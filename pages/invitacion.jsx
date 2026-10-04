@@ -5,6 +5,7 @@ import { verInvitacion, aceptarInvitacion } from '../lib/services/miembros'
 import { getSession } from '../lib/services/auth'
 import { useUserRole } from '../lib/UserRoleContext'
 import { LABEL_ROL } from '../lib/constants/roles'
+import Icono from '../components/ui/Icono'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AvisoAbrirEnChrome from '../components/layout/AvisoAbrirEnChrome'
 
@@ -34,7 +35,7 @@ export default function Invitacion() {
   }, [token])
 
   if (!token && router.isReady) return <Mensaje icono="🔗" titulo="Link incompleto" texto="Pedile a quien te invitó que te lo mande de nuevo." />
-  if (cargando || !router.isReady) return <LoadingScreen mensaje="Verificando invitación…" icono="✉️" />
+  if (cargando || !router.isReady) return <LoadingScreen mensaje="Verificando invitación…" icono="mail" />
 
   if (!invitacion) return <Mensaje icono="❌" titulo="Invitación no encontrada" texto="El link no es válido o ya fue eliminado." />
   if (invitacion.estado === 'aceptada') return <Mensaje icono="✅" titulo="Esta invitación ya fue usada" texto="Si ya tenés cuenta, iniciá sesión para entrar al local." accion={{ label: 'Ir a iniciar sesión', onClick: () => router.push('/') }} />
@@ -59,7 +60,7 @@ export default function Invitacion() {
   return (
     <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 max-w-md w-full p-6 text-center">
-        <div className="text-5xl mb-3">🏪</div>
+        <div className="mb-3 text-primary-600 flex justify-center"><Icono nombre="inicio" size={56} /></div>
         <h1 className="text-xl font-bold text-gray-900 m-0">Te invitaron a {invitacion.local_nombre}</h1>
         <p className="text-sm text-gray-600 mt-2 m-0">
           {invitacion.nombre_invitado ? `${invitacion.nombre_invitado}, vas ` : 'Vas '}

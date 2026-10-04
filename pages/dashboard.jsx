@@ -75,7 +75,7 @@ export default function Dashboard() {
   // useActiveLocal ya redirige a /locales cuando no hay local activo; esto es
   // la red de seguridad para cuando ese redirect tarda o se interrumpe.
   if (!localId) return <SinLocalSeleccionado onIr={() => router.replace('/locales')} />
-  if (!local) return <LoadingScreen mensaje="Cargando local…" icono="🏪" />
+  if (!local) return <LoadingScreen mensaje="Cargando local…" icono="inicio" />
 
   const abrirHistorial = async () => { if (await caja.cargarHistorial()) setModal('historial') }
 
