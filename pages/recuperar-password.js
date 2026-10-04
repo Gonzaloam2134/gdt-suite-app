@@ -36,8 +36,8 @@ export default function RecuperarPassword() {
 
   if (enviado) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+      <div className="min-h-screen bg-fondo flex items-center justify-center p-4">
+        <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8 text-center">
           <div className="text-6xl mb-4">📬</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Revisá tu email</h1>
           <p className="text-sm text-gray-600">
@@ -46,7 +46,7 @@ export default function RecuperarPassword() {
           </p>
           <button
             onClick={() => router.push('/')}
-            className="mt-6 w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+            className="mt-6 w-full py-3 press bg-primary-600 text-white font-semibold rounded-[14px] cursor-pointer hover:bg-primary-700 transition-colors"
           >
             Volver al login
           </button>
@@ -56,8 +56,8 @@ export default function RecuperarPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-slate-800 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-fondo flex items-center justify-center p-4">
+      <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="text-6xl mb-3">🔐</div>
           <h1 className="text-2xl font-bold text-gray-900 m-0">Recuperar contraseña</h1>
@@ -76,7 +76,7 @@ export default function RecuperarPassword() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="tu@email.com"
               autoComplete="email"
             />
@@ -85,7 +85,7 @@ export default function RecuperarPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-500 text-white font-semibold rounded-lg cursor-pointer hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 press bg-primary-600 text-white font-semibold rounded-[14px] cursor-pointer hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Enviando...' : 'Enviar link de recuperación'}
           </button>
@@ -94,7 +94,7 @@ export default function RecuperarPassword() {
         <div className="mt-6 text-center">
           <button
             onClick={() => router.push('/')}
-            className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer bg-none border-none underline"
+            className="text-sm text-primary-700 hover:text-primary-700 cursor-pointer bg-none border-none underline"
           >
             Volver al login
           </button>

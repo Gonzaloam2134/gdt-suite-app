@@ -57,7 +57,7 @@ export default function Invitacion() {
   const irARegistro = () => router.push(`/registro?invitacion=${token}&email=${encodeURIComponent(invitacion.email_invitado || '')}`)
 
   return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 max-w-md w-full p-6 text-center">
         <div className="text-5xl mb-3">🏪</div>
         <h1 className="text-xl font-bold text-gray-900 m-0">Te invitaron a {invitacion.local_nombre}</h1>
@@ -66,7 +66,7 @@ export default function Invitacion() {
           a entrar como <strong>{LABEL_ROL[invitacion.rol] || invitacion.rol}</strong>.
         </p>
 
-        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-left text-xs text-gray-600">
+        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-[14px] text-left text-xs text-gray-600">
           {invitacion.rol === 'cajero'
             ? 'Como cajero vas a poder abrir y cerrar la caja, y registrar cobros y gastos.'
             : 'Como empleado vas a poder cargar los cobros de tus ventas. Abrir/cerrar caja y los gastos los maneja el dueño o un cajero.'}
@@ -78,17 +78,17 @@ export default function Invitacion() {
 
         {autenticado ? (
           <button onClick={aceptar} disabled={aceptando}
-            className="mt-5 w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600 disabled:opacity-50">
+            className="mt-5 w-full p-3 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700 disabled:opacity-50">
             {aceptando ? 'Entrando…' : 'Aceptar invitación'}
           </button>
         ) : (
           <>
             <button onClick={irARegistro}
-              className="mt-5 w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+              className="mt-5 w-full p-3 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700">
               Crear mi cuenta
             </button>
             <button onClick={() => router.push(`/?invitacion=${token}`)}
-              className="mt-2 w-full p-3 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">
+              className="mt-2 w-full p-3 bg-gray-100 text-gray-700 border-none rounded-[14px] text-sm font-semibold cursor-pointer hover:bg-gray-200">
               Ya tengo cuenta, iniciar sesión
             </button>
             <p className="text-xs text-gray-400 mt-3 m-0">
@@ -103,14 +103,14 @@ export default function Invitacion() {
 
 function Mensaje({ icono, titulo, texto, accion }) {
   return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 max-w-md w-full p-6 text-center">
         <div className="text-5xl mb-3">{icono}</div>
         <h1 className="text-lg font-bold text-gray-900 m-0">{titulo}</h1>
         <p className="text-sm text-gray-600 mt-2 m-0">{texto}</p>
         {accion && (
           <button onClick={accion.onClick}
-            className="mt-5 w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+            className="mt-5 w-full p-3 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700">
             {accion.label}
           </button>
         )}
