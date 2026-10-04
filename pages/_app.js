@@ -9,7 +9,7 @@ export default function App({ Component, pageProps }) {
       <Head>
         {/* viewport-fit=cover: para que el contenido llegue hasta el borde en
             celulares con notch (iPhone), en vez de dejar una franja en blanco */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Head>
       <Component {...pageProps} />
       <Toaster 

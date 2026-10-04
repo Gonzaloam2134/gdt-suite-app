@@ -15,6 +15,7 @@ import ReportGuide from '../components/ReportGuide'
 import FiltrosReporte from '../components/reportes/FiltrosReporte'
 import AvisosCalidad from '../components/reportes/AvisosCalidad'
 import ResumenEjecutivo from '../components/reportes/ResumenEjecutivo'
+import TarjetaNegocio from '../components/reportes/TarjetaNegocio'
 import ResumenPorAlicuota from '../components/reportes/ResumenPorAlicuota'
 import ResumenMedios from '../components/reportes/ResumenMedios'
 import ConciliacionCaja from '../components/reportes/ConciliacionCaja'
@@ -119,6 +120,8 @@ export default function Reportes() {
               : `Este local está como ${r.localActual.condicion_fiscal || 'sin condición fiscal definida'}, así que los importes se muestran sin discriminar IVA.`}
           </p>
         )}
+
+        <TarjetaNegocio porDia={r.porDia} periodo={r.periodo} />
 
         <ResumenEjecutivo resumen={r.resumen} discriminaIva={r.discriminaIva} />
 
