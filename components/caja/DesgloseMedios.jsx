@@ -6,7 +6,7 @@ export default function DesgloseMedios({ medios }) {
   if (medios.length === 0) return null
 
   return (
-    <SeccionColapsable titulo="💳 Desglose por medio de pago" badge={medios.length}>
+    <SeccionColapsable titulo="💳 Desglose por medio de pago" badge={medios.length} abiertaPorDefecto={false}>
       <div className="md:hidden divide-y divide-gray-100">
         {medios.map((m) => (
           <div key={m.nombre} className="p-3 flex items-center justify-between gap-3">

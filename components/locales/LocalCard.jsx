@@ -2,14 +2,19 @@ import { formatCurrency } from '../../lib/format'
 import { LABEL_ROL } from '../../lib/constants/roles'
 
 /** Tarjeta de un local con lo que pasó hoy. El dueño entra y ya sabe cómo viene el día. */
-export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo, diasRestantesPrueba, pruebaVencida }) {
+export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo, diasRestantesPrueba, pruebaVencida, sinCerrar }) {
   const r = resumen || { ventas: 0, gastos: 0, movimientos: 0 }
   const avisarPrueba = !deshabilitado && !pruebaVencida
     && diasRestantesPrueba !== null && diasRestantesPrueba !== undefined && diasRestantesPrueba <= 7
 
+  // "Necesita atención": solo lo accionable que ya sabemos (suspendido, prueba por
+  // vencer o vencida, caja de un día anterior sin cerrar). Sin eso, la tarjeta es "normal".
+  const necesitaAtencion = deshabilitado || avisarPrueba || (!deshabilitado && pruebaVencida) || sinCerrar
+
   return (
-    <div className={`bg-white rounded-[20px] border border-black/5 shadow-suave overflow-hidden transition-colors ${
-      deshabilitado ? 'border-black/5 opacity-70' : 'border-black/5 hover:border-primary-500/40'}`}>
+    <div className={`bg-white rounded-[20px] border shadow-suave overflow-hidden transition-colors ${
+      deshabilitado ? 'border-danger-500/30 opacity-80'
+        : necesitaAtencion ? 'border-warning-500/50' : 'border-black/5 hover:border-primary-500/40'}`}>
       <button onClick={deshabilitado ? undefined : onEntrar} disabled={deshabilitado}
         className="w-full text-left p-4 bg-transparent border-none cursor-pointer disabled:cursor-not-allowed">
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -24,6 +29,9 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
             {cajaAbierta ? 'Caja abierta' : 'Caja cerrada'}
           </span>
         </div>
+        {necesitaAtencion && !deshabilitado && (
+          <p className="text-xs font-bold text-warning-700 m-0 mb-2">⚠ Necesita atención</p>
+        )}
 
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="p-2 bg-green-50 rounded-[14px]">
@@ -40,6 +48,11 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
           </div>
         </div>
 
+        {sinCerrar && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 mt-3 m-0">
+            Quedó una caja de un día anterior sin cerrar. Entrá para cerrarla.
+          </p>
+        )}
         {deshabilitado && motivo && (
           <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-3 m-0">{motivo}</p>
         )}

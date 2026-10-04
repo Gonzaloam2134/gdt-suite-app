@@ -152,7 +152,7 @@ export default function Reportes() {
       </div>
 
       <ReportGuide isOpen={ayuda} onClose={() => setAyuda(false)} />
-      <BottomNav activeTab="reportes" lateral />
+      <BottomNav activeTab="reportes" lateral cantidadLocales={r.locales.length} />
     </main>
   )
 }

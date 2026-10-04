@@ -20,12 +20,14 @@ import MercadoPagoClienteTab from '../components/admin/MercadoPagoClienteTab'
 import ListaLogs from '../components/admin/ListaLogs'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
+// Configuración: lo que se arma una vez (equipo, medios de cobro, Mercado Pago) primero;
+// lo que se consulta (actividad, resumen del período) después.
 const TABS_OWNER = [
-  { id: 'resumen', label: 'Resumen', icono: 'reportes' },
   { id: 'miembros', label: 'Equipo', icono: 'equipo' },
-  { id: 'medios-pago', label: 'Medios de pago', icono: 'tarjeta' },
+  { id: 'medios-pago', label: 'Medios de cobro', icono: 'tarjeta' },
   { id: 'mercadopago', label: 'Mercado Pago', icono: 'inicio' },
-  { id: 'logs', label: 'Auditoría', icono: 'historial' },
+  { id: 'logs', label: 'Actividad', icono: 'historial' },
+  { id: 'resumen', label: 'Resumen del período', icono: 'reportes' },
 ]
 
 export default function AdminPanel() {
@@ -44,7 +46,7 @@ export default function AdminPanel() {
   const guardSuscripcion = useSuscripcionGuard(cargandoRol ? null : (esSuperUser ? null : activeLocalId), 'total')
   const { local, stats, miembros, inactivos, invitaciones, mediosPago, suscripcion, logs, periodo, loading, aplicarPreset, aplicarFechas, recargar } = useAdminData()
   const { locales } = useMisLocales(userId)
-  const [tab, setTab] = useState(router.query.tab || 'resumen')
+  const [tab, setTab] = useState(router.query.tab || 'miembros')
 
   useEffect(() => { if (router.query.tab) setTab(router.query.tab) }, [router.query.tab])
 
@@ -76,7 +78,7 @@ export default function AdminPanel() {
         <div className="max-w-6xl mx-auto p-4">
           <p className="text-sm text-gray-600">Elegí un local para administrarlo.</p>
         </div>
-        <BottomNav activeTab="admin" lateral />
+        <BottomNav activeTab="admin" lateral cantidadLocales={locales.length} />
       </main>
     )
   }
@@ -94,7 +96,7 @@ export default function AdminPanel() {
           </p>
           <ListaLogs logs={logs} titulo="Mis acciones" />
         </div>
-        <BottomNav activeTab="admin" lateral />
+        <BottomNav activeTab="admin" lateral cantidadLocales={locales.length} />
       </main>
     )
   }
@@ -125,7 +127,7 @@ export default function AdminPanel() {
         {tab === 'logs' && <ListaLogs logs={logs} titulo="Auditoría del local" />}
       </div>
 
-      <BottomNav activeTab="admin" lateral />
+      <BottomNav activeTab="admin" lateral cantidadLocales={locales.length} />
     </main>
   )
 }

@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import Modal from './ui/Modal'
+import Button from './ui/Button'
+import { useUserRole } from '../lib/UserRoleContext'
+import { usePreferencia } from '../hooks/usePreferencia'
+import { ROLES_OPERAN_CAJA } from '../lib/constants/roles'
 import { listarMediosPago } from '../lib/services/mediosPago'
 import { registrarCobro, registrarGasto } from '../lib/services/transacciones'
 import { registrarAccion } from '../lib/services/auditoria'
@@ -12,9 +16,9 @@ import { iconoMedio } from '../lib/constants/mediosPago'
 import { mensajeError } from '../lib/errorMessage'
 
 const CONFIG = {
-  cobro: { titulo: '💵 Registrar cobro', header: 'bg-green-600 text-white', boton: 'bg-green-500 hover:bg-green-600',
+  cobro: { titulo: 'Cobrar', variante: 'success', textoBoton: 'Cobrar',
            accion: ACCIONES.COBRO_REGISTRADO, servicio: registrarCobro, etiquetaMedio: 'Cómo te pagaron' },
-  gasto: { titulo: '💸 Registrar gasto', header: 'bg-red-600 text-white', boton: 'bg-red-500 hover:bg-red-600',
+  gasto: { titulo: 'Registrar gasto', variante: 'danger', textoBoton: 'Guardar gasto',
            accion: ACCIONES.GASTO_REGISTRADO, servicio: registrarGasto, etiquetaMedio: 'Cómo lo pagaste' },
 }
 
@@ -24,6 +28,13 @@ const CONFIG = {
  */
 export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId, local, onSuccess }) {
   const cfg = CONFIG[tipo]
+  const { hasRole } = useUserRole()
+  // Quien solo cobra (empleado) registra el hecho y nada más: la comisión, el IVA y
+  // los datos para el contador se calculan solos, con los valores por defecto del local.
+  const verTecnico = hasRole(ROLES_OPERAN_CAJA)
+  // GDT recuerda con qué medio se cobró la última vez (por local y tipo): lo más
+  // común queda preseleccionado y registrar una venta es escribir el monto y listo.
+  const [ultimoMedio, setUltimoMedio] = usePreferencia(`mov.ultimoMedio.${tipo}.${localId}`, null)
   const [medios, setMedios] = useState([])
   const [cargandoMedios, setCargandoMedios] = useState(true)
   const [medioId, setMedioId] = useState('')
@@ -41,12 +52,13 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
     listarMediosPago(localId, { soloHabilitados: true })
       .then((data) => {
         setMedios(data)
-        if (data.length) setMedioId(data[0].id)
+        if (data.length) setMedioId((data.find(m => m.id === ultimoMedio) || data[0]).id)
       })
       .catch(() => toast.error('No se pudieron cargar los medios de pago'))
       .finally(() => setCargandoMedios(false))
     setComprobante(COMPROBANTE_POR_CONDICION[local?.condicion_fiscal] || 'SIN_COMPROBANTE')
     setAlicuota(conIva ? 21 : 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, localId, local?.condicion_fiscal, conIva])
 
   const MONTO_MAXIMO = 99999999.99 // límite razonable para no persistir errores de tipeo (ej: notación científica)
@@ -80,7 +92,8 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
         localId, userId, accion: cfg.accion, tabla: 'transacciones', registroId: tx.id,
         detalles: { monto: montoNum, medio: medio?.nombre, descripcion },
       })
-      toast.success(tipo === 'cobro' ? 'Cobro registrado' : 'Gasto registrado')
+      setUltimoMedio(medio.id)
+      toast.success(tipo === 'cobro' ? `Cobro de ${formatCurrency(montoNum)} registrado` : `Gasto de ${formatCurrency(montoNum)} registrado`)
       onSuccess?.()
       cerrar()
     } catch (err) {
@@ -90,12 +103,12 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={cerrar} title={cfg.titulo} headerClassName={cfg.header}
+    <Modal isOpen={isOpen} onClose={cerrar} title={cfg.titulo} size="sm"
       footer={<>
-        <button onClick={cerrar} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>
-        <button onClick={guardar} disabled={guardando} className={`px-4 py-2.5 text-white border-none rounded-lg text-sm font-bold cursor-pointer disabled:opacity-50 ${cfg.boton}`}>
-          {guardando ? 'Guardando…' : 'Guardar'}
-        </button>
+        <Button variant="secondary" onClick={cerrar} className="!rounded-[14px]">Cancelar</Button>
+        <Button variant={cfg.variante} onClick={guardar} disabled={guardando} className="!rounded-[14px] min-h-[44px] flex-1 md:flex-none">
+          {guardando ? 'Guardando…' : cfg.textoBoton}
+        </Button>
       </>}>
       <form onSubmit={guardar} className="space-y-4">
         {/* Medio de pago primero: el teclado numérico que abre el monto (autoFocus,
@@ -105,10 +118,10 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
           <div className="grid grid-cols-2 gap-2">
             {medios.map((m) => (
               <button key={m.id} type="button" onClick={() => setMedioId(m.id)} aria-pressed={medioId === m.id}
-                className={`p-2.5 rounded-lg border-2 text-sm text-left cursor-pointer transition-colors ${
-                  medioId === m.id ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                className={`press p-3 min-h-[48px] rounded-[14px] border-2 text-sm text-left cursor-pointer transition-colors ${
+                  medioId === m.id ? 'border-primary-600 bg-primary-50 font-semibold' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                 <span className="mr-1">{m.icono || iconoMedio(m.tipo)}</span>{m.nombre}
-                {m.comision_porcentaje > 0 && <div className="text-xs text-gray-500 font-normal">{m.comision_porcentaje}% comisión</div>}
+                {verTecnico && m.comision_porcentaje > 0 && <div className="text-xs text-gray-500 font-normal">{m.comision_porcentaje}% comisión</div>}
               </button>
             ))}
           </div>
@@ -119,7 +132,7 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
           <label htmlFor="mov-monto" className="block text-sm font-semibold text-gray-700 mb-2">Monto</label>
           <input id="mov-monto" type="number" step="0.01" min="0" inputMode="decimal" value={monto} autoFocus required
             onChange={(e) => setMonto(e.target.value)} placeholder="0,00"
-            className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 outline-none" />
+            className="w-full p-3.5 border border-gray-300 rounded-[14px] text-2xl font-bold focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none" />
         </div>
 
         <div>
@@ -128,16 +141,16 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
           </label>
           <input id="mov-desc" type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
             placeholder={tipo === 'cobro' ? 'Ej: venta mostrador' : 'Ej: verdulería, luz, insumos'}
-            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            className="w-full p-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none" />
         </div>
 
-        <details className="border border-gray-200 rounded-lg">
+        {verTecnico && <details className="border border-gray-200 rounded-[14px]">
           <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">Datos para el contador</summary>
           <div className="p-3 pt-0 space-y-3">
             <div>
               <label htmlFor="mov-comprobante" className="block text-xs font-semibold text-gray-600 mb-1">Comprobante</label>
               <select id="mov-comprobante" value={comprobante} onChange={(e) => setComprobante(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                className="w-full p-2 border border-gray-300 rounded-[12px] text-sm">
                 {TIPOS_COMPROBANTE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
@@ -145,16 +158,16 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
               <div>
                 <label htmlFor="mov-alicuota" className="block text-xs font-semibold text-gray-600 mb-1">IVA</label>
                 <select id="mov-alicuota" value={alicuota} onChange={(e) => setAlicuota(parseFloat(e.target.value))}
-                  className="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                  className="w-full p-2 border border-gray-300 rounded-[12px] text-sm">
                   {ALICUOTAS_IVA.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                 </select>
               </div>
             )}
           </div>
-        </details>
+        </details>}
 
-        {previa && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs space-y-1">
+        {verTecnico && previa && (
+          <div className="bg-gray-50 border border-gray-200 rounded-[14px] p-3 text-xs space-y-1">
             {conIva && alicuota > 0 && (
               <div className="flex justify-between"><span className="text-gray-500">Neto / IVA</span>
                 <span className="font-semibold">{formatCurrency(previa.neto)} + {formatCurrency(previa.iva)}</span></div>

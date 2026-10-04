@@ -4,16 +4,28 @@ import { ROLES } from '../../lib/constants/roles'
 import MasMenu from './MasMenu'
 import Icono from '../ui/Icono'
 
+/**
+ * Navegación por rol: lo frecuente a la vista, el resto en "Más".
+ * - Empleado: Cobrar (+ Inicio solo si tiene varios locales).
+ * - Cajero: Caja.
+ * - Dueño: Caja y Reportes.
+ * Con un solo local no hay "Inicio": no hay nada que elegir, se entra directo a la caja.
+ * `cantidadLocales` lo pasa cada página (ya tiene la lista); sin ese dato se muestra Inicio.
+ */
 const TABS = [
   { id: 'inicio', label: 'Inicio', icono: 'inicio', path: '/locales' },
   { id: 'caja', label: 'Caja', icono: 'caja', path: '/dashboard', requiereLocal: true },
   { id: 'reportes', label: 'Reportes', icono: 'reportes', path: '/reportes', roles: [ROLES.OWNER] },
 ]
 
-export default function BottomNav({ activeTab, lateral = false }) {
+export default function BottomNav({ activeTab, lateral = false, cantidadLocales }) {
   const router = useRouter()
   const { hasRole, role, activeLocalId } = useUserRole()
-  const tabs = TABS.filter(t => !t.roles || hasRole(t.roles))
+  const unSoloLocal = cantidadLocales === 1
+  const tabs = TABS
+    .filter(t => !t.roles || hasRole(t.roles))
+    .filter(t => !(t.id === 'inicio' && unSoloLocal))
+    .map(t => (t.id === 'caja' && role === ROLES.EMPLEADO ? { ...t, label: 'Cobrar' } : t))
   const ir = (tab) => router.push(tab.requiereLocal && !activeLocalId ? '/locales' : tab.path)
 
   return (
@@ -30,7 +42,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
               </button>
             )
           })}
-          <MasMenu activeTab={activeTab} />
+          <MasMenu activeTab={activeTab} unSoloLocal={unSoloLocal} />
         </div>
       </nav>
 
@@ -49,7 +61,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
               </button>
             )
           })}
-          <MasMenu lateral activeTab={activeTab} />
+          <MasMenu lateral activeTab={activeTab} unSoloLocal={unSoloLocal} />
         </nav>
       )}
     </>

@@ -75,7 +75,7 @@ export default function MiCuenta() {
         <div className="md:hidden"><MenuSesion /></div>
       </div>
 
-      <BottomNav activeTab="mi-cuenta" lateral />
+      <BottomNav activeTab="mi-cuenta" lateral cantidadLocales={locales.length} />
     </main>
   )
 }

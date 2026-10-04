@@ -235,7 +235,7 @@ export default function Planes() {
         confirmLabel="Elegir igual"
       />
 
-      <BottomNav activeTab="planes" lateral />
+      <BottomNav activeTab="planes" lateral cantidadLocales={locales.length} />
     </main>
   )
 }

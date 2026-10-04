@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { useAuthGuard } from '../hooks/useAuthGuard'
@@ -35,7 +35,7 @@ export default function MisLocales() {
   const { user, checking } = useAuthGuard()
   const { cambiarLocal } = useUserRole()
   const { locales, cargado, recargar } = useMisLocales(user?.id)
-  const { resumen, abiertas, totales } = useResumenLocales(locales)
+  const { resumen, abiertas, sinCerrar, totales } = useResumenLocales(locales)
   const { pendientes, cargado: anunciosCargados, marcarComoLeidos } = useAnuncios(user?.id)
 
   const [indiceAnuncio, setIndiceAnuncio] = useState(0)
@@ -43,6 +43,7 @@ export default function MisLocales() {
   const [onboarding, setOnboarding] = useState(false)
   const [contacto, setContacto] = useState(false)
   const [suscripciones, setSuscripciones] = useState({})
+  const [entradaDirectaFallo, setEntradaDirectaFallo] = useState(false)   // local suspendido: no se puede entrar, hay que mostrar la lista
 
   useEffect(() => {
     if (anunciosCargados && pendientes.length > 0) { setIndiceAnuncio(0); setVerAnuncios(true) }
@@ -55,8 +56,6 @@ export default function MisLocales() {
       .then(pares => setSuscripciones(Object.fromEntries(pares)))
   }, [locales])
 
-  if (checking || !cargado) return <LoadingScreen mensaje="Cargando tus locales…" icono="inicio" />
-
   const cerrarAnuncios = async () => {
     setVerAnuncios(false)
     await marcarComoLeidos(pendientes.map(a => a.id))
@@ -66,7 +65,7 @@ export default function MisLocales() {
     const { estado, vencioPrueba } = estadoEfectivo(suscripciones[local.id])
     if (estado === 'suspended') {
       toast.error('Local suspendido. Regularizá el pago para acceder.')
-      return
+      return false
     }
     await cambiarLocal(local.id)
     if (estado === 'restricted') {
@@ -74,9 +73,10 @@ export default function MisLocales() {
         ? 'Tu prueba de 30 días terminó. Podés ver tus reportes; escribinos para seguir usando la caja.'
         : 'Acceso restringido: solo podés ver Reportes.', { icon: '⚠️' })
       router.push('/reportes')
-      return
+      return true
     }
     router.push(destino)
+    return true
   }
 
   const crear = async (datos) => {
@@ -107,10 +107,34 @@ export default function MisLocales() {
     }
   }
 
+  // Con un solo local no hay nada que elegir: se entra directo a la caja (como abrir el cuaderno).
+  // No salta si hay novedades por leer, si se está creando un local o si se pidió ver la lista
+  // (Más → Mis locales).
+  const entroSolo = useRef(false)
+  useEffect(() => {
+    if (entroSolo.current || !router.isReady || router.query.ver) return
+    if (!cargado || !anunciosCargados || locales.length !== 1 || verAnuncios || onboarding) return
+    if (suscripciones[locales[0].id] === undefined) return
+    entroSolo.current = true
+    entrar(locales[0]).then(ok => { if (!ok) setEntradaDirectaFallo(true) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargado, anunciosCargados, locales, verAnuncios, onboarding, suscripciones, router.isReady, router.query.ver])
+
+  if (checking || !cargado || (locales.length === 1 && !router.query.ver && !verAnuncios && !onboarding && !entradaDirectaFallo)) {
+    return <LoadingScreen mensaje="Cargando tus locales…" icono="inicio" />
+  }
+
   const localesPropios = locales.filter(l => l.rol === ROLES.OWNER)
   // La suscripción es por cuenta: cualquiera de mis locales propios devuelve
   // la misma fila, así que alcanza con mirar la del primero.
   const segmentoCuenta = suscripciones[localesPropios[0]?.id]?.plan === 'pago' ? suscripciones[localesPropios[0]?.id].segmento : null
+
+  // Lo que necesita atención va primero (suspendido, prueba por vencer/vencida, caja sin cerrar)
+  const puntaje = (l) => {
+    const sub = estadoEfectivo(suscripciones[l.id])
+    return (sub.estado === 'suspended' || sub.vencioPrueba ? 2 : 0) + (sinCerrar.has(l.id) ? 2 : 0) + (sub.diasRestantes !== null && sub.diasRestantes <= 7 ? 1 : 0)
+  }
+  const ordenadosPorAtencion = [...locales].sort((a, b) => puntaje(b) - puntaje(a))
 
   const sinCupoLocales = localesPropios.length > 0 && segmentoCuenta && superaLimiteLocales(segmentoCuenta, localesPropios.length)
   const puedeCrear = locales.length === 0 || (localesPropios.length > 0 && !sinCupoLocales)
@@ -139,7 +163,7 @@ export default function MisLocales() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {locales.map(local => {
+              {ordenadosPorAtencion.map(local => {
                 const sub = estadoEfectivo(suscripciones[local.id])
                 return (
                   <LocalCard
@@ -153,6 +177,7 @@ export default function MisLocales() {
                     motivo={sub.estado === 'suspended' ? 'Local suspendido por falta de pago.' : null}
                     diasRestantesPrueba={sub.diasRestantes}
                     pruebaVencida={sub.vencioPrueba}
+                    sinCerrar={sinCerrar.has(local.id)}
                   />
                 )
               })}
@@ -200,7 +225,7 @@ export default function MisLocales() {
       )}
 
       <ContactModal isOpen={contacto} onClose={() => setContacto(false)} user={user} paginaOrigen="locales" />
-      <BottomNav activeTab="inicio" lateral />
+      <BottomNav activeTab="inicio" lateral cantidadLocales={locales.length} />
     </main>
   )
 }
