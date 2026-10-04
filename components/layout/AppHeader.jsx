@@ -1,36 +1,35 @@
-import { useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { useUserRole } from '../../lib/UserRoleContext'
-import { useClickOutside } from '../../hooks/useClickOutside'
-import { useSignOut } from '../../hooks/useSignOut'
 import { ROLES } from '../../lib/constants/roles'
 import SelectorLocal from './SelectorLocal'
-import GuiaInstalacionModal from './GuiaInstalacionModal'
 
 /**
  * Cabecera común: título de la pantalla, selector de local siempre a mano
- * y menú con el resto de las secciones. Una sola definición para toda la app.
+ * y accesos a las secciones. Una sola definición para toda la app. Las
+ * acciones de sesión (instalar, novedades, cerrar sesión) viven en la barra
+ * lateral (MenuSesion), no acá.
  */
-export default function AppHeader({ titulo, subtitulo, locales = [], localId, onCambiarLocal, permiteTodos, acciones, ocultarNavDesktop = false }) {
+export default function AppHeader({ titulo, subtitulo, locales = [], localId, onCambiarLocal, permiteTodos, acciones, ocultarNavDesktop = false, sinLocal = false }) {
   const router = useRouter()
-  const signOut = useSignOut()
-  const { hasRole, esSuperUser } = useUserRole()
-  const [menu, setMenu] = useState(false)
-  const [guiaInstalacion, setGuiaInstalacion] = useState(false)
-  const ref = useRef(null)
-  useClickOutside(ref, () => setMenu(false), menu)
+  const { hasRole } = useUserRole()
 
-  const ir = (path) => { setMenu(false); router.push(path) }
+  const ir = (path) => router.push(path)
 
   return (
     <header className="bg-fondo/90 backdrop-blur-md border-b border-black/5 sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
       <div className="max-w-7xl mx-auto px-3 md:px-4 py-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
-          <SelectorLocal locales={locales} localId={localId} onCambiar={onCambiarLocal} permiteTodos={permiteTodos} />
-          <div className="hidden md:block min-w-0 border-l border-gray-200 pl-3">
-            <h1 className="m-0 text-sm font-bold text-gray-900 truncate">{titulo}</h1>
-            {subtitulo && <p className="mt-0 text-xs text-gray-500 truncate m-0">{subtitulo}</p>}
-          </div>
+          {sinLocal ? (
+            <h1 className="m-0 text-base font-bold text-gray-900 truncate">{titulo}</h1>
+          ) : (
+            <>
+              <SelectorLocal locales={locales} localId={localId} onCambiar={onCambiarLocal} permiteTodos={permiteTodos} />
+              <div className="hidden md:block min-w-0 border-l border-gray-200 pl-3">
+                <h1 className="m-0 text-sm font-bold text-gray-900 truncate">{titulo}</h1>
+                {subtitulo && <p className="mt-0 text-xs text-gray-500 truncate m-0">{subtitulo}</p>}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -46,29 +45,13 @@ export default function AppHeader({ titulo, subtitulo, locales = [], localId, on
             <BotonNav onClick={() => ir('/locales')} activo={router.pathname === '/locales'}>Mis locales</BotonNav>
           </nav>
 
-          <div className="relative" ref={ref}>
-            <button onClick={() => setMenu(o => !o)} aria-label="Menú" aria-expanded={menu}
-              className="p-2 bg-gray-100 text-gray-600 border-none rounded-lg cursor-pointer hover:bg-gray-200 leading-none">☰</button>
-            {menu && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-50">
-                <ItemMenu onClick={() => { setMenu(false); setGuiaInstalacion(true) }}>📲 Instalar app</ItemMenu>
-                <ItemMenu onClick={() => ir('/anuncios')}>Novedades</ItemMenu>
-                {hasRole([ROLES.OWNER]) && <ItemMenu onClick={() => ir('/mi-cuenta')}>💎 Mi cuenta</ItemMenu>}
-                {esSuperUser && <ItemMenu onClick={() => ir('/superadmin')}>Panel global</ItemMenu>}
-                <hr className="my-1 border-gray-200" />
-                <ItemMenu onClick={signOut} peligro>Cerrar sesión</ItemMenu>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
-      <GuiaInstalacionModal isOpen={guiaInstalacion} onClose={() => setGuiaInstalacion(false)} />
-
       {/* En mobile el título va debajo, porque arriba manda el selector de local */}
-      <div className="md:hidden px-3 pb-2">
+      {!sinLocal && <div className="md:hidden px-3 pb-2">
         <h1 className="m-0 text-xs font-semibold text-gray-500 truncate">{titulo}{subtitulo ? ` · ${subtitulo}` : ''}</h1>
-      </div>
+      </div>}
     </header>
   )
 }
@@ -81,10 +64,3 @@ const BotonNav = ({ children, onClick, activo }) => (
   </button>
 )
 
-const ItemMenu = ({ children, onClick, peligro }) => (
-  <button onClick={onClick}
-    className={`w-full px-4 py-2.5 text-left text-sm bg-transparent border-none cursor-pointer hover:bg-gray-50 ${
-      peligro ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'}`}>
-    {children}
-  </button>
-)

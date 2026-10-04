@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router'
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES } from '../../lib/constants/roles'
+import MenuSesion from './MenuSesion'
 
 /**
  * Navegación principal. Presente en todas las pantallas, incluida la de
@@ -17,12 +18,15 @@ const TABS = [
   { id: 'caja',     label: 'Caja',     icon: '💰', path: '/dashboard', requiereLocal: true },
   { id: 'reportes', label: 'Reportes', icon: '📊', path: '/reportes' },
   { id: 'admin',    label: 'Admin',    icon: '⚙️', path: '/admin', roles: [ROLES.OWNER], requiereLocal: true },
+  // Plan y cuenta son de la persona, no de un local: no requiere local activo.
+  // Solo se esconde si ya se sabe que el rol no es de dueño (cajero/empleado).
+  { id: 'mi-cuenta', label: 'Mi cuenta', icon: '👤', path: '/mi-cuenta', ocultaPara: [ROLES.CAJERO, ROLES.EMPLEADO] },
 ]
 
 export default function BottomNav({ activeTab, lateral = false }) {
   const router = useRouter()
-  const { hasRole, activeLocalId } = useUserRole()
-  const tabs = TABS.filter(t => !t.roles || hasRole(t.roles))
+  const { hasRole, role, activeLocalId } = useUserRole()
+  const tabs = TABS.filter(t => (!t.roles || hasRole(t.roles)) && !t.ocultaPara?.includes(role))
   const ir = (tab) => router.push(tab.requiereLocal && !activeLocalId ? '/locales' : tab.path)
 
   return (
@@ -55,6 +59,7 @@ export default function BottomNav({ activeTab, lateral = false }) {
               </button>
             )
           })}
+          <div className="mt-auto pt-3 border-t border-black/5"><MenuSesion desplegable /></div>
         </nav>
       )}
     </>

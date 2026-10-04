@@ -7,6 +7,7 @@ import { ROLES } from '../lib/constants/roles'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AppHeader from '../components/layout/AppHeader'
 import BottomNav from '../components/layout/BottomNav'
+import MenuSesion from '../components/layout/MenuSesion'
 import SuscripcionTab from '../components/admin/SuscripcionTab'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 
@@ -45,7 +46,7 @@ export default function MiCuenta() {
 
   return (
     <main className="min-h-screen bg-fondo pb-20 md:pb-10 md:pl-56">
-      <AppHeader ocultarNavDesktop titulo="Mi cuenta" locales={locales} localId={null} />
+      <AppHeader ocultarNavDesktop sinLocal titulo="Mi cuenta" />
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <SuscripcionTab suscripcion={suscripcion} onCambio={cargar} />
@@ -68,6 +69,9 @@ export default function MiCuenta() {
             </ul>
           )}
         </div>
+
+        {/* En mobile no hay barra lateral: las acciones de sesión viven acá */}
+        <div className="md:hidden"><MenuSesion /></div>
       </div>
 
       <BottomNav activeTab="mi-cuenta" lateral />
