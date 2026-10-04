@@ -6,7 +6,7 @@ const ESTILO = {
   success: { color: 'bg-green-600 text-white', icono: '✅' },
   feature: { color: 'bg-purple-600 text-white', icono: '🚀' },
   urgent:  { color: 'bg-red-600 text-white', icono: '🚨' },
-  info:    { color: 'bg-blue-600 text-white', icono: 'ℹ️' },
+  info:    { color: 'bg-primary-700 text-white', icono: 'ℹ️' },
 }
 
 /** Novedades sin leer, una por una. Al cerrarlas quedan marcadas en la base. */
@@ -23,7 +23,7 @@ export default function AnunciosModal({ anuncios, indice, onSiguiente, onCerrar 
       headerClassName={estilo.color}
       footer={
         <button onClick={esUltimo ? onCerrar : onSiguiente}
-          className="px-5 py-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+          className="px-5 py-2.5 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700">
           {esUltimo ? 'Entendido' : 'Siguiente'}
         </button>
       }>

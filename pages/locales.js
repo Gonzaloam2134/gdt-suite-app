@@ -131,7 +131,7 @@ export default function MisLocales() {
             descripcion="Creá el primero para empezar a registrar la caja del día."
             accion={
               <button onClick={() => setOnboarding(true)}
-                className="px-5 py-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+                className="px-5 py-3 press bg-primary-600 text-white border-none rounded-[14px] text-sm font-bold cursor-pointer hover:bg-primary-700">
                 Crear mi primer local
               </button>
             }
@@ -160,15 +160,15 @@ export default function MisLocales() {
 
             {puedeCrear ? (
               <button onClick={() => setOnboarding(true)}
-                className="w-full p-3 bg-white text-blue-700 border-2 border-dashed border-blue-300 rounded-xl text-sm font-bold cursor-pointer hover:bg-blue-50">
+                className="w-full p-3 bg-white text-primary-700 border-2 border-dashed border-primary-500/30 rounded-[20px] text-sm font-bold cursor-pointer hover:bg-primary-50">
                 + Agregar otro local
               </button>
             ) : sinCupoLocales && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-[20px] text-center">
                 <p className="text-sm text-amber-900 m-0">
                   Tu plan {LABEL_SEGMENTO[segmentoCuenta]} permite un solo local.
                 </p>
-                <a href="/planes" className="text-sm font-bold text-blue-700 hover:underline">
+                <a href="/planes" className="text-sm font-bold text-primary-700 hover:underline">
                   Actualizá a Multi-local para abrir otro →
                 </a>
               </div>
