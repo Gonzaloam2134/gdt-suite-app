@@ -21,10 +21,10 @@ export default function EstadoCaja({ cajaAbierta, huerfana, onAbrir, onCerrar, o
           {cajaAbierta
             ? <StatusBadge tone="success" dot label={`Caja abierta desde las ${formatHora(cajaAbierta.fecha_apertura)}`} />
             : <StatusBadge tone="warning" label="Caja cerrada" />}
-          {cajaAbierta && (
+          {cajaAbierta && puedeOperar && (
             <p className="m-0 mt-1.5 text-xs text-gray-500">
               Inicial {formatCurrency(cajaAbierta.monto_inicial_efectivo)}
-              {puedeOperar && (
+              {(
                 <button onClick={onEditarInicial}
                   className="ml-2 text-primary-700 font-semibold bg-transparent border-none cursor-pointer hover:underline p-0 text-xs">
                   ¿Te equivocaste?
@@ -40,10 +40,10 @@ export default function EstadoCaja({ cajaAbierta, huerfana, onAbrir, onCerrar, o
               title={huerfana ? 'Cerrá la caja anterior antes de abrir la de hoy' : ''}>Abrir caja</Button>)}
       </div>
 
-      <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+      {puedeOperar && <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
         <button onClick={onHistorial} className="text-xs font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:underline p-0 inline-flex items-center gap-1.5"><Icono nombre="historial" size={16} /> Historial de cierres</button>
         <button onClick={onAyuda} className="text-xs font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:underline p-0">Ayuda</button>
-      </div>
+      </div>}
     </section>
   )
 }

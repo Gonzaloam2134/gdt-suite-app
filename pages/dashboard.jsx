@@ -10,6 +10,10 @@ import { useTransaccionesDia } from '../hooks/useTransaccionesDia'
 import { hoyISO, aFechaISO } from '../lib/dates'
 import { useMisLocales } from '../hooks/useMisLocales'
 import { marcarBienvenidaVista } from '../lib/services/auth'
+import { ROLES } from '../lib/constants/roles'
+import { ROLES_OPERAN_CAJA } from '../lib/constants/roles'
+import InstalarAppBanner from '../components/layout/InstalarAppBanner'
+import AvisoAbrirEnChrome from '../components/layout/AvisoAbrirEnChrome'
 
 import LoadingScreen from '../components/ui/LoadingScreen'
 import BottomNav from '../components/layout/BottomNav'
@@ -34,7 +38,10 @@ export default function Dashboard() {
   const { user, checking } = useAuthGuard()
   const terminos = useTerminosGuard(user?.id)
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
-  const { esSuperUser, loading: cargandoRol, role, perfil, userId, recargar: recargarRol } = useUserRole()
+  const { esSuperUser, loading: cargandoRol, role, perfil, userId, recargar: recargarRol, hasRole } = useUserRole()
+  // Cada rol ve su caja: el empleado solo cobra, el cajero opera, el dueño ve la plata.
+  const opera = hasRole(ROLES_OPERAN_CAJA)
+  const vista = hasRole([ROLES.OWNER]) ? 'dueno' : opera ? 'cajero' : 'empleado'
   // El super admin no queda bloqueado por la suscripción de un local: la
   // administra desde /superadmin. OJO: hay que esperar a que el rol termine de
   // cargar antes de decidir esto — `esSuperUser` arranca en `false` mientras
@@ -51,7 +58,7 @@ export default function Dashboard() {
   // Una sola tira cronológica con cobros, gastos y sus reversas.
   const movimientos = [
     ...cobros.map(c => ({ ...c, tipoMovimiento: 'cobro' })),
-    ...gastos.map(g => ({ ...g, tipoMovimiento: 'gasto' })),
+    ...(opera ? gastos.map(g => ({ ...g, tipoMovimiento: 'gasto' })) : []),   // el empleado solo ve las ventas
   ].sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
 
   const caja = useCaja({ localId, userId: user?.id, onCambio: recargar })
@@ -90,7 +97,9 @@ export default function Dashboard() {
       />
 
       <div className="max-w-3xl mx-auto p-3 md:p-6 space-y-4">
-        <FechaNav fechaISO={fechaISO} onCambiar={setFechaISO} />
+        <AvisoAbrirEnChrome />
+        <InstalarAppBanner />
+        {opera && <FechaNav fechaISO={fechaISO} onCambiar={setFechaISO} />}
 
         {esHoyVista && caja.huerfana && (
           <AvisoCajaHuerfana fechaApertura={caja.huerfana.fecha_apertura} onResolver={() => setModal('cierre-huerfana')} />
@@ -108,13 +117,13 @@ export default function Dashboard() {
           <p className="text-center text-sm text-gray-500 py-8">Actualizando movimientos…</p>
         ) : (
           <>
-            {esHoyVista ? <KpiCards totales={totales} cajaAbierta={caja.cajaAbierta} /> : <ResumenDiaPasado totales={totales} />}
+            {esHoyVista ? <KpiCards totales={totales} cajaAbierta={caja.cajaAbierta} vista={vista} /> : <ResumenDiaPasado totales={totales} />}
             {esHoyVista && caja.cajaAbierta && <CajaAcciones onCobro={() => setModal('cobro')} onGasto={() => setModal('gasto')} />}
             {esHoyVista && <PorConfirmarMp localId={localId} local={local} />}
             <ListaTransacciones items={movimientos} onReversar={setAReversar} soloLectura={!esHoyVista}
-              titulo={esHoyVista ? 'Movimientos de hoy' : 'Movimientos del día'} />
-            <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />
-            <DesgloseMedios medios={desgloseMedios} />
+              titulo={!opera ? 'Ventas de hoy' : esHoyVista ? 'Movimientos de hoy' : 'Movimientos del día'} />
+            {vista === 'dueno' && <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />}
+            {vista === 'dueno' && <DesgloseMedios medios={desgloseMedios} />}
           </>
         )}
       </div>
@@ -134,7 +143,7 @@ export default function Dashboard() {
         }}
       />
 
-      <BottomNav activeTab="caja" lateral />
+      <BottomNav activeTab="caja" lateral cantidadLocales={locales.length} />
     </main>
   )
 }

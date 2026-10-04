@@ -11,7 +11,7 @@ import MenuSesion from './MenuSesion'
  * frecuentes. Configuración, cuenta y recursos viven acá para no competir con
  * Cobrar/Caja/Reportes.
  */
-export default function MasMenu({ lateral = false, activeTab }) {
+export default function MasMenu({ lateral = false, activeTab, unSoloLocal = false }) {
   const router = useRouter()
   const { hasRole } = useUserRole()
   const [abierto, setAbierto] = useState(false)
@@ -20,10 +20,14 @@ export default function MasMenu({ lateral = false, activeTab }) {
 
   const secundarioActivo = ['admin', 'mi-cuenta', 'planes', 'anuncios'].includes(activeTab)
 
+  // Lo ocasional, y solo lo que le sirve a cada rol: cajero y empleado no tienen
+  // configuración, plan ni cuenta que administrar (solo Novedades y su sesión).
+  const esDueno = hasRole([ROLES.OWNER])
   const items = [
-    hasRole([ROLES.OWNER]) && { label: 'Configuración', icono: 'admin', path: '/admin' },
-    { label: 'Mi cuenta', icono: 'cuenta', path: '/mi-cuenta' },
-    hasRole([ROLES.OWNER]) && { label: 'Planes', icono: 'tarjeta', path: '/planes' },
+    esDueno && { label: 'Configuración', icono: 'admin', path: '/admin' },
+    esDueno && unSoloLocal && { label: 'Mis locales', icono: 'inicio', path: '/locales?ver=1' },
+    esDueno && { label: 'Mi cuenta', icono: 'cuenta', path: '/mi-cuenta' },
+    esDueno && { label: 'Planes', icono: 'tarjeta', path: '/planes' },
     { label: 'Novedades', icono: 'novedades', path: '/anuncios' },
   ].filter(Boolean)
 
@@ -62,7 +66,7 @@ export default function MasMenu({ lateral = false, activeTab }) {
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex-1 flex" ref={ref}>
       <button
         type="button"
         onClick={() => setAbierto(v => !v)}

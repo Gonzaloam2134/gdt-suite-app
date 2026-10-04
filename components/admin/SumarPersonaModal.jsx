@@ -9,7 +9,13 @@ import { ROLES, ROLES_INVITABLES, LABEL_ROL } from '../../lib/constants/roles'
 import { LABEL_SEGMENTO } from '../../lib/constants/planes'
 import { mensajeError } from '../../lib/errorMessage'
 
-const ESTADO_INICIAL = { nombre: '', email: '', rol: ROLES.CAJERO, rolYaAsignado: null }
+// Por defecto el rol con menos permisos (solo cobra): se sube a Cajero solo si hace falta.
+const ESTADO_INICIAL = { nombre: '', email: '', rol: ROLES.EMPLEADO, rolYaAsignado: null }
+
+const QUE_PUEDE_HACER = {
+  [ROLES.EMPLEADO]: 'Solo cobra. No abre ni cierra la caja y no ve la plata.',
+  [ROLES.CAJERO]: 'Cobra, registra gastos y abre y cierra la caja.',
+}
 
 /**
  * Un solo modal con dos vistas: 'form' (alta) → 'confirmacion' (link listo
@@ -83,7 +89,7 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
       footer={<>
         <Button variant="secondary" onClick={cerrar}>Cancelar</Button>
         <Button variant="primary" onClick={invitar} disabled={invitando || sinCupo} title={sinCupo ? 'Llegaste al límite de tu plan' : ''}>
-          {invitando ? 'Creando…' : 'Sumar'}
+          {invitando ? 'Creando…' : 'Crear acceso'}
         </Button>
       </>}>
       <form onSubmit={invitar} className="space-y-3">
@@ -119,8 +125,9 @@ export default function SumarPersonaModal({ isOpen, onClose, localId, userId, se
           <select id="sp-rol" value={datos.rol} onChange={(e) => setDatos(d => ({ ...d, rol: e.target.value }))}
             disabled={!!datos.rolYaAsignado}
             className="w-full p-2.5 border border-gray-300 rounded-[14px] text-sm disabled:bg-gray-100 disabled:text-gray-500">
-            {ROLES_INVITABLES.map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
+            {[ROLES.EMPLEADO, ROLES.CAJERO].filter(r => ROLES_INVITABLES.includes(r)).map(r => <option key={r} value={r}>{LABEL_ROL[r]}</option>)}
           </select>
+          <p className="text-xs text-gray-500 mt-1 m-0">{QUE_PUEDE_HACER[datos.rol]}</p>
         </div>
 
         {datos.rolYaAsignado && (

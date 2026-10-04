@@ -8,7 +8,7 @@ export default function AcreditacionesDelDia({ acreditaciones }) {
   if (acreditaciones.length === 0) return null
 
   return (
-    <SeccionColapsable titulo="✅ Acreditaciones del día" badge={acreditaciones.length} paginacion={paginacion}>
+    <SeccionColapsable titulo="✅ Acreditaciones del día" badge={acreditaciones.length} paginacion={paginacion} abiertaPorDefecto={false}>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>

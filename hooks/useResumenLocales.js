@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react'
 import { resumenHoyPorLocal } from '../lib/services/transacciones'
-import { cajasAbiertasHoy } from '../lib/services/cierresCaja'
+import { cajasAbiertasHoy, getCajaAbiertaLocal } from '../lib/services/cierresCaja'
+import { esCajaDeHoy } from '../lib/domain/cajas'
 
 /** Ventas del día y estado de caja de cada local, para la pantalla de inicio. */
 export function useResumenLocales(locales) {
   const [resumen, setResumen] = useState({})
   const [abiertas, setAbiertas] = useState(new Set())
+  const [sinCerrar, setSinCerrar] = useState(new Set())   // locales con una caja de un día anterior que nunca se cerró
   const [cargado, setCargado] = useState(false)
 
   useEffect(() => {
     const ids = locales.map(l => l.id)
     if (!ids.length) { setCargado(true); return }
     let cancelado = false
-    Promise.all([resumenHoyPorLocal(ids), cajasAbiertasHoy(ids)])
-      .then(([r, a]) => { if (!cancelado) { setResumen(r); setAbiertas(a) } })
+    const buscarSinCerrar = () => Promise.all(ids.map(id =>
+      getCajaAbiertaLocal(id).then(c => (c && !esCajaDeHoy(c) ? id : null)).catch(() => null)))
+    Promise.all([resumenHoyPorLocal(ids), cajasAbiertasHoy(ids), buscarSinCerrar()])
+      .then(([r, a, viejas]) => { if (!cancelado) { setResumen(r); setAbiertas(a); setSinCerrar(new Set(viejas.filter(Boolean))) } })
       .catch(err => console.error('[useResumenLocales]', err))
       .finally(() => { if (!cancelado) setCargado(true) })
     return () => { cancelado = true }
@@ -24,5 +28,5 @@ export function useResumenLocales(locales) {
     { ventas: 0, gastos: 0, movimientos: 0 },
   )
 
-  return { resumen, abiertas, totales, cargado }
+  return { resumen, abiertas, sinCerrar, totales, cargado }
 }

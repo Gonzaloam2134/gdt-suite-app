@@ -1,11 +1,6 @@
-import { useRouter } from 'next/router'
 import SelectorLocal from './SelectorLocal'
 
 export default function AppHeader({ titulo, subtitulo, locales = [], localId, onCambiarLocal, permiteTodos, acciones, ocultarNavDesktop = false, sinLocal = false }) {
-  const router = useRouter()
-
-  const ir = (path) => router.push(path)
-
   return (
     <header className="bg-fondo/90 backdrop-blur-md border-b border-black/5 sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
       <div className="max-w-7xl mx-auto px-3 md:px-4 py-2.5 flex items-center justify-between gap-2">
@@ -24,7 +19,6 @@ export default function AppHeader({ titulo, subtitulo, locales = [], localId, on
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {acciones}
-          {ocultarNavDesktop && null}
         </div>
       </div>
       {!sinLocal && <div className="md:hidden px-3 pb-2">

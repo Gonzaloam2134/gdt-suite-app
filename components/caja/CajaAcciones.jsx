@@ -19,8 +19,8 @@ export default function CajaAcciones({ onCobro, onGasto }) {
   return (
     <div className={`grid gap-3 ${puedeOperar ? 'grid-cols-2' : 'grid-cols-1'}`}>
       <button onClick={onCobro}
-        className="press min-h-[64px] rounded-[20px] bg-success-700 text-white text-lg font-bold border-none cursor-pointer shadow-suave hover:bg-success-800">
-        + Cobro
+        className={`press rounded-[20px] bg-success-700 text-white font-bold border-none cursor-pointer shadow-suave hover:bg-success-800 ${puedeOperar ? 'min-h-[64px] text-lg' : 'min-h-[88px] text-2xl'}`}>
+        Cobrar
       </button>
       {puedeOperar && (
         <button onClick={onGasto}
