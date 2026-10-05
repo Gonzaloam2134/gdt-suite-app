@@ -101,7 +101,7 @@ export default function Reportes() {
           <div className="bg-primary-50 border border-primary-500/30 rounded-[14px] p-3 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-primary-700 m-0">
               {guard.vencioPrueba
-                ? 'Tu prueba de 30 días terminó. Podés ver y exportar tus reportes cuando quieras.'
+                ? 'Tu prueba de 7 días terminó. Podés ver y exportar tus reportes cuando quieras.'
                 : 'Este local tiene el acceso restringido a solo Reportes.'}
             </p>
             <a href="/planes"

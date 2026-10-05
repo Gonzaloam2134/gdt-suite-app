@@ -5,7 +5,7 @@ import { getSuscripcion } from '../lib/services/suscripciones'
 import { estadoEfectivo } from '../lib/domain/suscripciones'
 
 const MENSAJE_SUSPENDIDO = 'Local suspendido. Regularizá el pago para acceder.'
-const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 30 días terminó. Elegí tu plan para seguir usando la caja.'
+const MENSAJE_PRUEBA_VENCIDA = 'Tu prueba de 7 días terminó. Elegí tu plan para seguir usando la caja.'
 const MENSAJE_RESTRINGIDO = 'Acceso restringido: solo podés ver Reportes.'
 
 /**

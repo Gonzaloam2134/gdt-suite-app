@@ -65,10 +65,10 @@ export default function SuscripcionTab({ suscripcion, onCambio }) {
           <div className="space-y-2">
             <p className="text-sm text-gray-600 m-0">
               {vencioPrueba
-                ? 'Tu prueba de 30 días terminó.'
+                ? 'Tu prueba de 7 días terminó.'
                 : diasRestantes !== null
                   ? `Te quedan ${diasRestantes} día${diasRestantes === 1 ? '' : 's'} de prueba gratuita.`
-                  : 'Estás en la prueba gratuita de 30 días.'}
+                  : 'Estás en la prueba gratuita de 7 días.'}
             </p>
             <p className="text-xs text-gray-400 m-0">
               Durante la prueba tenés acceso a todo, sin límites de equipo ni de locales.

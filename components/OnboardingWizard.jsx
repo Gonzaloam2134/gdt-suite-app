@@ -7,7 +7,7 @@ import { formatCurrency } from '../lib/format'
 const ORDEN_SEGMENTOS = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
 
 // Qué plan tiene sentido según la escala elegida en el Paso 2 — solo para
-// resaltarlo en el resumen (Paso 4). La prueba de 30 días desbloquea todo
+// resaltarlo en el resumen (Paso 4). La prueba de 7 días desbloquea todo
 // sin importar el plan, así que esto es una sugerencia visual, no algo que
 // se guarde en la suscripción: "2-5" y "5+" caen en el mismo Multi-local
 // porque es el único segmento sin límite de locales (no hay un escalón
@@ -147,7 +147,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
             <div className="space-y-4">
               <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-3">
                 <p className="text-sm text-primary-700 m-0">
-                  🎁 Arrancás con <strong>30 días de prueba gratis</strong>, con todo desbloqueado.
+                  🎁 Arrancás con <strong>7 días de prueba gratis</strong>, con todo desbloqueado.
                   Sin tarjeta, sin compromiso.
                 </p>
               </div>
@@ -359,7 +359,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                 </div>
 
                 <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4 mt-4">
-                  <p className="text-sm font-bold text-primary-700 m-0 mb-1">🎁 30 días de prueba gratis</p>
+                  <p className="text-sm font-bold text-primary-700 m-0 mb-1">🎁 7 días de prueba gratis</p>
                   <p className="text-xs text-primary-700 m-0 mb-3">
                     Todo desbloqueado desde el primer día. Cuando termine, tus reportes siguen
                     disponibles siempre — elegís seguir con uno de estos planes cuando quieras:
