@@ -20,6 +20,7 @@ import Icono, { iconoDeAnuncio } from '../components/ui/Icono'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
+import BottomNav from '../components/layout/BottomNav'
 
 /**
  * Panel global de la plataforma. A diferencia del resto de la app, acá no hay
@@ -261,7 +262,7 @@ export default function SuperAdmin() {
   if (loading) return <div className="min-h-screen bg-fondo flex items-center justify-center"><p>Cargando panel de super admin...</p></div>
 
   return (
-    <main className="min-h-screen bg-fondo pb-8">
+    <main className="min-h-screen bg-fondo pb-20 md:pb-8 md:pl-56">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -1176,6 +1177,8 @@ export default function SuperAdmin() {
         title="Cambiar el email de acceso"
         message={`Esta persona va a dejar de poder entrar con "${confirmarEmail?.emailActual}" y va a tener que usar "${confirmarEmail?.emailNuevo}" de ahora en más. ¿Confirmás?`}
         confirmLabel={guardandoEmail ? 'Guardando…' : 'Sí, cambiar'} />
+
+      <BottomNav activeTab="panel-global" lateral cantidadLocales={0} />
     </main>
   )
 }

@@ -33,7 +33,7 @@ import AvisoAbrirEnChrome from '../components/layout/AvisoAbrirEnChrome'
 export default function MisLocales() {
   const router = useRouter()
   const { user, checking } = useAuthGuard()
-  const { cambiarLocal, esSuperUser, loading: cargandoRol } = useUserRole()
+  const { cambiarLocal, loading: cargandoRol } = useUserRole()
   const { locales, cargado, recargar } = useMisLocales(user?.id)
   const { resumen, abiertas, sinCerrar, totales } = useResumenLocales(locales)
   const { pendientes, cargado: anunciosCargados, marcarComoLeidos } = useAnuncios(user?.id)
@@ -120,20 +120,7 @@ export default function MisLocales() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargado, anunciosCargados, locales, verAnuncios, onboarding, suscripciones, router.isReady, router.query.ver])
 
-  // El super admin no tiene locales propios: esta pantalla (lista/alta de
-  // locales) no tiene nada que ofrecerle y antes lo dejaba varado en
-  // "Todavía no tenés ningún local". Entra directo al panel global, sea
-  // cual sea la puerta por la que haya llegado acá (login, refresh, URL
-  // directa — a diferencia del redirect de pages/index.js, que solo cubre
-  // el login).
-  const redirigiendoSuperAdmin = useRef(false)
-  useEffect(() => {
-    if (cargandoRol || !esSuperUser || redirigiendoSuperAdmin.current) return
-    redirigiendoSuperAdmin.current = true
-    router.replace('/superadmin')
-  }, [cargandoRol, esSuperUser, router])
-
-  if (checking || cargandoRol || esSuperUser || !cargado || (locales.length === 1 && !router.query.ver && !verAnuncios && !onboarding && !entradaDirectaFallo)) {
+  if (checking || cargandoRol || !cargado || (locales.length === 1 && !router.query.ver && !verAnuncios && !onboarding && !entradaDirectaFallo)) {
     return <LoadingScreen mensaje="Cargando tus locales…" icono="inicio" />
   }
 
