@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Modal from '../ui/Modal'
+import Icono from '../ui/Icono'
 import { formatCurrency, formatFechaLarga } from '../../lib/format'
 
 const Dato = ({ label, valor, className = 'text-gray-900' }) => (
@@ -19,7 +20,8 @@ export default function CierreCajaAnteriorModal({ isOpen, onClose, onConfirmar, 
   const confirmar = async () => { if (await onConfirmar(nota)) cerrar() }
 
   return (
-    <Modal isOpen={isOpen} onClose={cerrar} title="🔒 Cerrar caja anterior"
+    <Modal isOpen={isOpen} onClose={cerrar}
+      title={<span className="inline-flex items-center gap-2"><Icono nombre="candado" size={18} />Cerrar caja anterior</span>}
       subtitle={`Quedó abierta desde el ${formatFechaLarga(caja.fecha_apertura)}`} size="lg"
       headerClassName="bg-red-600 text-white"
       footer={<>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
+import Icono from '../ui/Icono'
 import { esIOS, esAndroid, esNavegadorEmbebido, corriendoInstalada } from '../../lib/entornoNavegador'
 
 /**
@@ -25,20 +26,21 @@ export default function GuiaInstalacionModal({ isOpen, onClose }) {
   if (!entorno) return null
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="📲 Instalar GDT Suite" size="md"
+    <Modal isOpen={isOpen} onClose={onClose}
+      title={<span className="inline-flex items-center gap-2"><Icono nombre="instalar" size={18} />Instalar GDT Suite</span>} size="md"
       headerClassName="bg-primary-700 text-white"
       footer={<button onClick={onClose} className="w-full p-3 bg-primary-600 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700">Entendido</button>}>
 
       {entorno.instalada ? (
         <div className="text-center py-4">
-          <div className="text-4xl mb-3">✅</div>
+          <div className="text-success-600 mb-3 flex justify-center"><Icono nombre="check" size={36} /></div>
           <p className="text-sm font-semibold text-gray-900 m-0">Ya la tenés instalada</p>
           <p className="text-xs text-gray-500 mt-1 m-0">Estás usando la app instalada, no hace falta nada más.</p>
         </div>
       ) : entorno.embebido ? (
         <div className="space-y-3">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-sm font-bold text-amber-900 m-0">⚠️ Tenés que abrir esto en Chrome</p>
+            <p className="text-sm font-bold text-amber-900 m-0 inline-flex items-center gap-1.5"><Icono nombre="alerta" size={16} />Tenés que abrir esto en Chrome</p>
             <p className="text-xs text-amber-800 mt-1 m-0">
               Estás viendo esta página dentro de WhatsApp (o Instagram/Facebook). Ese navegador
               interno no permite instalar apps. Salí de ahí primero:

@@ -1,6 +1,7 @@
 import { formatCurrency, formatHora } from '../../lib/format'
 import { usePaginacion } from '../../hooks/usePaginacion'
 import SeccionColapsable from '../ui/SeccionColapsable'
+import Icono from '../ui/Icono'
 
 /** Cobros con tarjeta/QR que se acreditan hoy, con su comisión y neto. */
 export default function AcreditacionesDelDia({ acreditaciones }) {
@@ -8,7 +9,9 @@ export default function AcreditacionesDelDia({ acreditaciones }) {
   if (acreditaciones.length === 0) return null
 
   return (
-    <SeccionColapsable titulo="✅ Acreditaciones del día" badge={acreditaciones.length} paginacion={paginacion} abiertaPorDefecto={false}>
+    <SeccionColapsable
+      titulo={<span className="inline-flex items-center gap-1.5"><Icono nombre="check" size={16} />Acreditaciones del día</span>}
+      badge={acreditaciones.length} paginacion={paginacion} abiertaPorDefecto={false}>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>

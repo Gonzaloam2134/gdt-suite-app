@@ -1,7 +1,9 @@
+import Icono from '../ui/Icono'
+
 const ESTILO = {
-  alto:  { fondo: 'bg-red-50 border-red-200', texto: 'text-red-800', icono: '⚠️' },
-  medio: { fondo: 'bg-amber-50 border-amber-200', texto: 'text-amber-800', icono: '⚠️' },
-  info:  { fondo: 'bg-primary-50 border-primary-500/30', texto: 'text-primary-700', icono: 'ℹ️' },
+  alto:  { fondo: 'bg-red-50 border-red-200', texto: 'text-red-800', icono: 'alerta' },
+  medio: { fondo: 'bg-amber-50 border-amber-200', texto: 'text-amber-800', icono: 'alerta' },
+  info:  { fondo: 'bg-primary-50 border-primary-500/30', texto: 'text-primary-700', icono: 'info' },
 }
 
 /**
@@ -17,7 +19,7 @@ export default function AvisosCalidad({ calidad }) {
         const e = ESTILO[a.nivel] || ESTILO.info
         return (
           <div key={i} className={`flex items-start gap-2 p-3 rounded-[14px] border ${e.fondo}`}>
-            <span className="shrink-0">{e.icono}</span>
+            <span className="shrink-0"><Icono nombre={e.icono} size={18} /></span>
             <p className={`text-sm m-0 ${e.texto}`}>{a.texto}</p>
           </div>
         )

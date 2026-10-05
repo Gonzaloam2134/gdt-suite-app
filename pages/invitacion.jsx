@@ -5,7 +5,7 @@ import { verInvitacion, aceptarInvitacion } from '../lib/services/miembros'
 import { getSession } from '../lib/services/auth'
 import { useUserRole } from '../lib/UserRoleContext'
 import { LABEL_ROL } from '../lib/constants/roles'
-import Icono from '../components/ui/Icono'
+import Icono, { tieneIcono } from '../components/ui/Icono'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import AvisoAbrirEnChrome from '../components/layout/AvisoAbrirEnChrome'
 
@@ -38,9 +38,9 @@ export default function Invitacion() {
   if (cargando || !router.isReady) return <LoadingScreen mensaje="Verificando invitación…" icono="mail" />
 
   if (!invitacion) return <Mensaje icono="❌" titulo="Invitación no encontrada" texto="El link no es válido o ya fue eliminado." />
-  if (invitacion.estado === 'aceptada') return <Mensaje icono="✅" titulo="Esta invitación ya fue usada" texto="Si ya tenés cuenta, iniciá sesión para entrar al local." accion={{ label: 'Ir a iniciar sesión', onClick: () => router.push('/') }} />
+  if (invitacion.estado === 'aceptada') return <Mensaje icono="check" titulo="Esta invitación ya fue usada" texto="Si ya tenés cuenta, iniciá sesión para entrar al local." accion={{ label: 'Ir a iniciar sesión', onClick: () => router.push('/') }} />
   if (invitacion.estado === 'rechazada') return <Mensaje icono="🚫" titulo="Invitación cancelada" texto="Quien te invitó dio de baja este link." />
-  if (invitacion.expirada || invitacion.estado === 'expirada') return <Mensaje icono="⏰" titulo="La invitación venció" texto="Los links duran 7 días. Pedile uno nuevo a quien te invitó." />
+  if (invitacion.expirada || invitacion.estado === 'expirada') return <Mensaje icono="reloj" titulo="La invitación venció" texto="Los links duran 7 días. Pedile uno nuevo a quien te invitó." />
 
   const aceptar = async () => {
     setAceptando(true)
@@ -106,7 +106,7 @@ function Mensaje({ icono, titulo, texto, accion }) {
   return (
     <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 max-w-md w-full p-6 text-center">
-        <div className="text-5xl mb-3">{icono}</div>
+        <div className="text-5xl mb-3 text-primary-600/70 flex justify-center">{tieneIcono(icono) ? <Icono nombre={icono} size={44} /> : icono}</div>
         <h1 className="text-lg font-bold text-gray-900 m-0">{titulo}</h1>
         <p className="text-sm text-gray-600 mt-2 m-0">{texto}</p>
         {accion && (

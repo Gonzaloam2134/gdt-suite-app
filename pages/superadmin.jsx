@@ -179,7 +179,7 @@ export default function SuperAdmin() {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'No se pudo cambiar el email')
       if (data?.warning) {
-        toast(data.warning, { icon: '⚠️' })
+        toast(data.warning, { icon: <Icono nombre="alerta" size={16} /> })
       } else {
         toast.success('Email actualizado — ya puede iniciar sesión con el nuevo')
       }

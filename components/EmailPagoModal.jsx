@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Modal from './ui/Modal'
+import Icono from './ui/Icono'
 import { LABEL_SEGMENTO } from '../lib/constants/planes'
 import { formatCurrency } from '../lib/format'
 
@@ -19,7 +20,8 @@ export default function EmailPagoModal({ isOpen, onClose, segmento, precio, cicl
   const valido = /\S+@\S+\.\S+/.test(email)
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="💳 Confirmar pago" size="sm"
+    <Modal isOpen={isOpen} onClose={onClose}
+      title={<span className="inline-flex items-center gap-2"><Icono nombre="tarjeta" size={18} />Confirmar pago</span>} size="sm"
       headerClassName="bg-primary-600 text-white"
       footer={<>
         <button onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-700 border-none rounded-[14px] text-sm font-semibold cursor-pointer hover:bg-gray-200">Cancelar</button>

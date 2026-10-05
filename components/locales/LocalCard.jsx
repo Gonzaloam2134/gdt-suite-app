@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../lib/format'
 import { LABEL_ROL } from '../../lib/constants/roles'
+import Icono from '../ui/Icono'
 
 /** Tarjeta de un local con lo que pasó hoy. El dueño entra y ya sabe cómo viene el día. */
 export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdmin, deshabilitado, motivo, diasRestantesPrueba, pruebaVencida, sinCerrar }) {
@@ -30,7 +31,7 @@ export default function LocalCard({ local, resumen, cajaAbierta, onEntrar, onAdm
           </span>
         </div>
         {necesitaAtencion && !deshabilitado && (
-          <p className="text-xs font-bold text-warning-700 m-0 mb-2">⚠ Necesita atención</p>
+          <p className="text-xs font-bold text-warning-700 m-0 mb-2 inline-flex items-center gap-1"><Icono nombre="alerta" size={14} />Necesita atención</p>
         )}
 
         <div className="grid grid-cols-3 gap-2 text-center">

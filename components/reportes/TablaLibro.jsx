@@ -18,7 +18,7 @@ export default function TablaLibro({ tipo, filas, totales, discriminaIva }) {
   return (
     <>
       {filas.length === 0 ? (
-        <EmptyState icono="📄" titulo={`Sin ${esVentas ? 'ventas' : 'compras'} en el período`} />
+        <EmptyState icono="recibo" titulo={`Sin ${esVentas ? 'ventas' : 'compras'} en el período`} />
       ) : (
         <>
           <div className="overflow-x-auto">

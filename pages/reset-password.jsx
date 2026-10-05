@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
+import Icono from '../components/ui/Icono'
 
 /**
  * Página a la que apunta el link del mail de recuperación (ver `redirectTo`
@@ -77,7 +78,7 @@ export default function ResetPassword() {
     return (
       <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl text-center">
-          <div className="text-5xl mb-3">🔐</div>
+          <div className="text-primary-600/70 mb-3 flex justify-center"><Icono nombre="candado" size={48} /></div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Verificando tu link…</h1>
           <p className="text-sm text-gray-600 m-0">Un segundo, estamos validando el link de recuperación.</p>
         </div>
@@ -89,7 +90,7 @@ export default function ResetPassword() {
     return (
       <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl text-center">
-          <div className="text-5xl mb-3">⚠️</div>
+          <div className="text-danger-600 mb-3 flex justify-center"><Icono nombre="alerta" size={48} /></div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Link inválido o vencido</h1>
           <p className="text-sm text-gray-600 mb-4">Pedí uno nuevo para poder cambiar tu contraseña.</p>
           <button
@@ -107,7 +108,7 @@ export default function ResetPassword() {
     <main className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl">
         <div className="text-center mb-6">
-          <div className="text-5xl mb-2">🔐</div>
+          <div className="text-primary-600/70 mb-2 flex justify-center"><Icono nombre="candado" size={48} /></div>
           <h1 className="m-0 text-2xl font-extrabold text-gray-900">Nueva contraseña</h1>
           <p className="mt-1 text-sm text-gray-500">
             Ingresá tu nueva contraseña

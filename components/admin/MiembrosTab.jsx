@@ -88,7 +88,7 @@ export default function MiembrosTab({ miembros, inactivos = [], invitaciones = [
       <div>
         <h3 className="text-sm font-bold text-gray-700 mb-3">Equipo ({miembros.length})</h3>
         {miembros.length === 0 ? (
-          <EmptyState icono="👥" titulo="Todavía no hay nadie en el equipo" descripcion="Sumá a tu cajero para que registre movimientos."
+          <EmptyState icono="equipo" titulo="Todavía no hay nadie en el equipo" descripcion="Sumá a tu cajero para que registre movimientos."
             accion={<Button variant="primary" onClick={() => setSumando(true)}>+ Sumar persona</Button>} />
         ) : (
           <div className="space-y-2">
