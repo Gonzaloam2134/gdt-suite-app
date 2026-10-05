@@ -30,7 +30,9 @@ export default function ResumenEjecutivo({ resumen, discriminaIva }) {
             ? `Incluye ${formatCurrency(resumen.comisionesIvaEstimado)} estimado sobre comisiones (21%) — no hay comprobante del medio de pago cargado, verificalo contra su factura real antes de presentar.`
             : undefined} />}
         <Fila label="Resultado" valor={resumen.resultadoEjercicio} destacada negativo={resumen.resultadoEjercicio < 0}
-          ayuda={resumen.ivaAPagar > 0 ? 'Incluye el IVA que todavía hay que girarle a AFIP — no es ganancia disponible.' : undefined} />
+          ayuda={resumen.ivaAPagar > 0
+            ? 'Según lo que registraste en la app. Incluye el IVA que todavía hay que girarle a AFIP — no es ganancia disponible.'
+            : 'Según lo que registraste en la app.'} />
 
         {discriminaIva && (
           <div className="mt-4 p-3 bg-fondo rounded-[14px] border border-black/5">

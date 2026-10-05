@@ -44,7 +44,7 @@ export default function ReportGuide({ isOpen, onClose }) {
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div className="text-2xl mb-1">💰</div>
                 <div className="font-bold text-green-900 text-sm">Lo que es tuyo</div>
-                <div className="text-xs text-green-700">Tu ganancia real</div>
+                <div className="text-xs text-green-700">Lo que te queda, según lo que cargaste</div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="text-2xl mb-1">🏛️</div>
@@ -157,10 +157,10 @@ export default function ReportGuide({ isOpen, onClose }) {
                 numero="5"
                 titulo="INGRESO NETO REAL"
                 color="green"
-                descripcion="Lo que EFECTIVAMENTE te entra después de sacar el IVA y las comisiones."
+                descripcion="Lo que te entra después de sacar las comisiones de los medios de pago."
                 ejemplo="$16.934.239"
-                destacada="🎯 ESTE ES TU NÚMERO REAL"
-                notaRegimen="Para todos: es la plata que realmente va a entrar a tu cuenta bancaria."
+                destacada="🎯 Es la plata que va a entrar a tu cuenta bancaria"
+                notaRegimen="🟦 Monotributista: es prácticamente tu número final. | 🟪 Responsable Inscripto: todavía incluye el IVA que cobraste — a eso hay que restarle lo que le debés a AFIP (ver 'IVA a pagar' más abajo) antes de saber qué es realmente tuyo."
               />
               <LineaExplicativa
                 numero="6"
@@ -182,10 +182,11 @@ export default function ReportGuide({ isOpen, onClose }) {
                 numero="8"
                 titulo="RESULTADO DEL EJERCICIO"
                 color="green"
-                descripcion="Tu GANANCIA REAL del mes. Después de pagarle al Estado, a las tarjetas y todos tus gastos."
+                descripcion="Lo que te queda después de las comisiones y los gastos operativos que registraste en la app."
                 ejemplo="$15.618.279"
-                destacada="🏆 ESTE ES EL NÚMERO QUE IMPORTA"
-                notaRegimen="Para todos: es lo que realmente te queda. Si es positivo, ganaste. Si es negativo, perdiste."
+                destacada="🏆 Es el número más importante del resumen"
+                advertencia="🟪 Responsable Inscripto: esta cifra todavía NO resta el IVA a pagar a AFIP — no es toda plata disponible hasta restarle esa cajita de más abajo."
+                notaRegimen="🟦 Monotributista: con esto alcanza, ya pagás todo en la cuota mensual. | 🟪 Responsable Inscripto: restale el 'IVA a pagar' de la cajita de abajo para saber qué te queda realmente. | En todos los casos: no incluye otros impuestos ni gastos que no hayas cargado como gasto."
               />
             </div>
 
@@ -304,9 +305,9 @@ export default function ReportGuide({ isOpen, onClose }) {
           >
             <div className="space-y-3">
               <div className="border-l-4 border-green-500 bg-green-50 p-3 rounded">
-                <div className="font-bold text-green-900 text-sm mb-1">💰 "¿Cuánto gané este mes?"</div>
+                <div className="font-bold text-green-900 text-sm mb-1">💰 "¿Cuánto me queda este mes?"</div>
                 <div className="text-xs text-green-800">
-                  Mirá el <strong>RESULTADO DEL EJERCICIO</strong> (la última línea del resumen). Ese es tu número.
+                  Mirá el <strong>RESULTADO DEL EJERCICIO</strong> (la última línea del resumen). Si sos Responsable Inscripto, restale todavía el <strong>IVA a pagar</strong> — recién ahí es plata disponible.
                 </div>
               </div>
               <div className="border-l-4 border-blue-500 bg-blue-50 p-3 rounded">

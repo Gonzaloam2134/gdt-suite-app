@@ -4,7 +4,7 @@ import {
   listarPendientesDeLocal, listarPendientesSinAsignar,
   asignarLocal, marcarConfirmado, descartarPendiente,
 } from '../lib/services/movimientosMpPendientes'
-import { registrarCobro } from '../lib/services/transacciones'
+import { registrarCobro, getTransaccionPorIdempotencyKey } from '../lib/services/transacciones'
 
 const conToken = async (path, options = {}) => {
   const { data: { session } } = await supabase.auth.getSession()
@@ -46,15 +46,38 @@ export function usePendientesDeLocal(localId) {
 
   useEffect(() => { cargar() }, [cargar])
 
-  /** Confirmar = crear la transacción real (nunca se carga sola) y recién ahí cerrar el pendiente. */
+  /**
+   * Confirmar = crear la transacción real (nunca se carga sola) y recién ahí
+   * cerrar el pendiente. Usa el propio `pendiente.id` como idempotency_key
+   * del cobro (ver MIGRACION_HARDENING_P2_1_IDEMPOTENCIA_COBRO_GASTO.sql):
+   * cada pendiente da como máximo UNA transacción, así que si la respuesta
+   * de un intento anterior se perdió y esta pantalla reintenta sola o la
+   * persona vuelve a tocar "Confirmar", el insert duplicado lo frena la base
+   * y se recupera la transacción que ya había quedado creada.
+   */
   const confirmar = async (pendiente, { medio, alicuota, tipoComprobante }) => {
-    const tx = await registrarCobro({
-      localId, medioPagoId: medio.id,
-      monto: Number(pendiente.monto),
-      descripcion: pendiente.descripcion || `Mercado Pago (${pendiente.origen})`,
-      alicuota, tipoComprobante,
-    })
-    await marcarConfirmado(pendiente.id, tx.id)
+    let tx
+    try {
+      tx = await registrarCobro({
+        localId, medioPagoId: medio.id,
+        monto: Number(pendiente.monto),
+        descripcion: pendiente.descripcion || `Mercado Pago (${pendiente.origen})`,
+        alicuota, tipoComprobante,
+        idempotencyKey: pendiente.id,
+      })
+    } catch (err) {
+      if (err?.code === '23505' && err?.message?.includes('tx_idempotency_key_unica')) {
+        tx = await getTransaccionPorIdempotencyKey(pendiente.id)
+        if (!tx) throw err   // no debería pasar — si no aparece, no ocultamos el error real
+      } else {
+        throw err
+      }
+    }
+    try {
+      await marcarConfirmado(pendiente.id, tx.id)
+    } catch {
+      // Ya estaba confirmado por el intento anterior — no es un error real.
+    }
     await cargar()
     return tx
   }
