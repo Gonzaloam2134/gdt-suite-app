@@ -70,7 +70,7 @@ export default function MisLocales() {
     await cambiarLocal(local.id)
     if (estado === 'restricted') {
       toast(vencioPrueba
-        ? 'Tu prueba de 30 días terminó. Podés ver tus reportes; escribinos para seguir usando la caja.'
+        ? 'Tu prueba de 7 días terminó. Podés ver tus reportes; escribinos para seguir usando la caja.'
         : 'Acceso restringido: solo podés ver Reportes.', { icon: '⚠️' })
       router.push('/reportes')
       return true
@@ -88,7 +88,7 @@ export default function MisLocales() {
         creadoPor: user.id,
       })
       await agregarOwner(local.id, user.id)
-      // La prueba de 30 días se crea sola (trigger crear_prueba_si_no_existe)
+      // La prueba de 7 días se crea sola (trigger crear_prueba_si_no_existe)
       // al insertar el primer local del dueño; en el segundo local en
       // adelante no hace nada, porque ya existe — un solo período por cuenta.
 
