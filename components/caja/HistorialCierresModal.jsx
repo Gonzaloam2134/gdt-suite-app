@@ -5,7 +5,7 @@ import { formatCurrency, formatFechaHora } from '../../lib/format'
 export default function HistorialCierresModal({ isOpen, onClose, cierres, nombreLocal }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📋 Historial de cierres" subtitle={nombreLocal} size="xl"
-      headerClassName="bg-indigo-600 text-white">
+      headerClassName="bg-primary-700 text-white">
       {cierres.length === 0 ? (
         <EmptyState titulo="Todavía no hay cierres" descripcion="Cuando cierres la caja, el detalle queda acá." />
       ) : (

@@ -16,7 +16,7 @@ export default function Confirmacion() {
           Puede tardar unos segundos. Cuando Mercado Pago nos confirme, tu plan queda activo automáticamente.
         </p>
         <button onClick={() => router.push('/locales')}
-          className="mt-2 w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer">
+          className="mt-2 w-full p-2.5 bg-primary-600 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700">
           Volver a mis locales
         </button>
       </div>

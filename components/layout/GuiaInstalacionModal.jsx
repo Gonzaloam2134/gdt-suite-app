@@ -26,8 +26,8 @@ export default function GuiaInstalacionModal({ isOpen, onClose }) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📲 Instalar GDT Suite" size="md"
-      headerClassName="bg-slate-800 text-white"
-      footer={<button onClick={onClose} className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">Entendido</button>}>
+      headerClassName="bg-primary-700 text-white"
+      footer={<button onClick={onClose} className="w-full p-3 bg-primary-600 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700">Entendido</button>}>
 
       {entorno.instalada ? (
         <div className="text-center py-4">

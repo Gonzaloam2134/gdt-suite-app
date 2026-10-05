@@ -96,11 +96,11 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
             <div className="space-y-4">
               
               {/* Info del usuario */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                <div className="text-xs text-blue-700 font-semibold mb-1">Tus datos (auto-detectados):</div>
-                <div className="text-blue-900">👤 {user?.email}</div>
-                {localId && <div className="text-blue-900">🏪 Local ID: {localId.substring(0, 8)}...</div>}
-                {paginaOrigen && <div className="text-blue-900">📍 Desde: {paginaOrigen}</div>}
+              <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-3 text-sm">
+                <div className="text-xs text-primary-700 font-semibold mb-1">Tus datos (auto-detectados):</div>
+                <div className="text-primary-900">👤 {user?.email}</div>
+                {localId && <div className="text-primary-900">🏪 Local ID: {localId.substring(0, 8)}...</div>}
+                {paginaOrigen && <div className="text-primary-900">📍 Desde: {paginaOrigen}</div>}
               </div>
 
               {/* Tipo de consulta */}
@@ -114,7 +114,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
                       onClick={() => setTipo(t.id)}
                       className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
                         tipo === t.id 
-                          ? 'border-blue-500 bg-blue-50' 
+                          ? 'border-primary-500 bg-primary-50' 
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -132,7 +132,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
                   type="text"
                   value={asunto}
                   onChange={(e) => setAsunto(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="Ej: Error al exportar reporte de marzo"
                   maxLength={100}
                 />
@@ -145,7 +145,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
                 <textarea
                   value={mensaje}
                   onChange={(e) => setMensaje(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-vertical"
+                  className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-vertical"
                   placeholder="Describí tu consulta con el mayor detalle posible..."
                   rows={5}
                   maxLength={2000}
@@ -173,7 +173,7 @@ export default function ContactModal({ isOpen, onClose, user, localId, paginaOri
             <button
               onClick={handleEnviar}
               disabled={enviando || !asunto.trim() || !mensaje.trim()}
-              className="flex-1 p-3 bg-blue-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 p-3 bg-primary-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {enviando ? 'Enviando...' : '📤 Enviar consulta'}
             </button>
