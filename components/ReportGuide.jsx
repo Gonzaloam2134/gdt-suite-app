@@ -14,10 +14,10 @@ export default function ReportGuide({ isOpen, onClose }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="bg-slate-800 p-5 text-white flex justify-between items-start">
+        <div className="bg-primary-700 p-5 text-white flex justify-between items-start">
           <div>
             <h2 className="text-xl font-bold">📖 Cómo leer tu reporte</h2>
-            <p className="text-sm text-slate-300 mt-1">Guía simple para entender cada número, sin importar tu régimen fiscal.</p>
+            <p className="text-sm text-primary-100 mt-1">Guía simple para entender cada número, sin importar tu régimen fiscal.</p>
           </div>
           <button 
             onClick={onClose}
@@ -367,7 +367,7 @@ export default function ReportGuide({ isOpen, onClose }) {
         <div className="p-4 bg-slate-50 border-t border-gray-200 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-slate-800 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-slate-700"
+            className="px-6 py-2 bg-primary-700 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-primary-600"
           >
             Entendido, cerrar
           </button>

@@ -51,7 +51,7 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
           {permiteTodos && (
             <button role="option" aria-selected={localId === 'todos'} onClick={() => elegir('todos')}
               className={`w-full px-4 py-2.5 text-left text-sm bg-transparent border-none cursor-pointer hover:bg-gray-50 ${
-                localId === 'todos' ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                localId === 'todos' ? 'text-primary-600 font-bold' : 'text-gray-700'}`}>
               Todos los locales
               <span className="block text-xs text-gray-400 font-normal">Consolidado</span>
             </button>
@@ -59,7 +59,7 @@ export default function SelectorLocal({ locales, localId, onCambiar, permiteTodo
           {locales.map(l => (
             <button key={l.id} role="option" aria-selected={localId === l.id} onClick={() => elegir(l.id)}
               className={`w-full px-4 py-2.5 text-left text-sm bg-transparent border-none cursor-pointer hover:bg-gray-50 truncate ${
-                localId === l.id ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                localId === l.id ? 'text-primary-600 font-bold' : 'text-gray-700'}`}>
               {l.nombre}
               {l.rubro && <span className="block text-xs text-gray-400 font-normal truncate">{l.rubro}</span>}
             </button>

@@ -29,18 +29,18 @@ export default function InstalarAppBanner() {
   }
 
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+    <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-blue-900 m-0">Instalá GDT Suite en tu celular</p>
-        <p className="text-xs text-blue-700 m-0">Abrí la caja como cualquier otra app, sin buscar el navegador.</p>
+        <p className="text-sm font-semibold text-primary-900 m-0">Instalá GDT Suite en tu celular</p>
+        <p className="text-xs text-primary-700 m-0">Abrí la caja como cualquier otra app, sin buscar el navegador.</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <button onClick={() => setDescartado(true)}
-          className="px-3 py-1.5 bg-transparent text-blue-700 border-none text-xs font-semibold cursor-pointer hover:underline">
+          className="px-3 py-1.5 bg-transparent text-primary-700 border-none text-xs font-semibold cursor-pointer hover:underline">
           Ahora no
         </button>
         <button onClick={instalar}
-          className="px-3 py-1.5 bg-blue-600 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-blue-700">
+          className="px-3 py-1.5 bg-primary-600 text-white border-none rounded-lg text-xs font-bold cursor-pointer hover:bg-primary-700">
           Instalar
         </button>
       </div>

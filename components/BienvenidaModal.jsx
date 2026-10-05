@@ -48,9 +48,9 @@ export default function BienvenidaModal({ isOpen, onClose, rol }) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={c.titulo} size="md"
-      headerClassName="bg-slate-800 text-white"
+      headerClassName="bg-primary-700 text-white"
       footer={<button onClick={onClose}
-        className="w-full p-3 bg-blue-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-600">
+        className="w-full p-3 bg-primary-600 text-white border-none rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700">
         Entendido, vamos
       </button>}>
       <p className="text-sm text-gray-700 m-0">{c.proposito}</p>

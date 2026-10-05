@@ -90,7 +90,7 @@ export default function MercadoPagoClienteTab({ local, localId, ownerId, locales
               Te vamos a pedir tu ubicación del navegador para completarlo mejor — si no la das, seguimos igual.
             </p>
             <button onClick={guardarDireccionYConectar} disabled={guardandoDireccion}
-              className="w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold hover:bg-blue-600 disabled:opacity-50">
+              className="w-full p-2.5 bg-primary-600 text-white border-none rounded-lg text-sm font-bold hover:bg-primary-700 disabled:opacity-50">
               {guardandoDireccion ? 'Guardando…' : 'Guardar y conectar Mercado Pago'}
             </button>
           </div>
@@ -98,7 +98,7 @@ export default function MercadoPagoClienteTab({ local, localId, ownerId, locales
 
         {!conectado && tieneDireccion && (
           <button onClick={conectar} disabled={conectando}
-            className="w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold hover:bg-blue-600 disabled:opacity-50">
+            className="w-full p-2.5 bg-primary-600 text-white border-none rounded-lg text-sm font-bold hover:bg-primary-700 disabled:opacity-50">
             {conectando ? 'Conectando…' : 'Conectar Mercado Pago'}
           </button>
         )}
@@ -108,7 +108,7 @@ export default function MercadoPagoClienteTab({ local, localId, ownerId, locales
             <p className="text-sm text-green-700 m-0">✓ Cuenta de Mercado Pago conectada.</p>
             <p className="text-xs text-gray-500 m-0">Falta vincular este local a una caja de esa cuenta.</p>
             <button onClick={vincular} disabled={vinculando}
-              className="w-full p-2.5 bg-blue-500 text-white border-none rounded-lg text-sm font-bold hover:bg-blue-600 disabled:opacity-50">
+              className="w-full p-2.5 bg-primary-600 text-white border-none rounded-lg text-sm font-bold hover:bg-primary-700 disabled:opacity-50">
               {vinculando ? 'Vinculando…' : 'Vincular este local'}
             </button>
           </div>

@@ -6,6 +6,18 @@ import { formatCurrency } from '../lib/format'
 
 const ORDEN_SEGMENTOS = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
 
+// Qué plan tiene sentido según la escala elegida en el Paso 2 — solo para
+// resaltarlo en el resumen (Paso 4). La prueba de 30 días desbloquea todo
+// sin importar el plan, así que esto es una sugerencia visual, no algo que
+// se guarde en la suscripción: "2-5" y "5+" caen en el mismo Multi-local
+// porque es el único segmento sin límite de locales (no hay un escalón
+// "Enterprise" en lib/constants/planes.js).
+const SEGMENTO_RECOMENDADO_POR_ESCALA = {
+  '1': SEGMENTO.BASICO,
+  '2-5': SEGMENTO.MULTI_LOCAL,
+  '5+': SEGMENTO.MULTI_LOCAL,
+}
+
 // Iconos automáticos por tipo de medio de pago
 const ICONOS_POR_TIPO = {
   efectivo: '💵',
@@ -115,13 +127,13 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
               {step === 3 && '💳 Medios de Pago'}
               {step === 4 && '✅ Resumen Final'}
             </h2>
-            <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+            <span className="text-xs font-semibold bg-primary-50 text-primary-700 px-3 py-1 rounded-full">
               Paso {step} de {skipScaleStep ? '3' : '4'}
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+            <div
+              className="bg-primary-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${(step / (skipScaleStep ? 3 : 4)) * 100}%` }}
             ></div>
           </div>
@@ -133,8 +145,8 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
           {/* PASO 1: Datos del negocio */}
           {step === 1 && (
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-900 m-0">
+              <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-3">
+                <p className="text-sm text-primary-700 m-0">
                   🎁 Arrancás con <strong>30 días de prueba gratis</strong>, con todo desbloqueado.
                   Sin tarjeta, sin compromiso.
                 </p>
@@ -146,7 +158,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   type="text"
                   value={formData.businessName}
                   onChange={(e) => updateField('businessName', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="Ej: Kiosco Don Pepe"
                   autoFocus
                 />
@@ -156,7 +168,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                 <select
                   value={formData.rubro}
                   onChange={(e) => updateField('rubro', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
                 >
                   <option value="Gastronomía">Gastronomía</option>
                   <option value="Indumentaria y Calzado">Indumentaria y Calzado</option>
@@ -184,7 +196,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                 <select
                   value={formData.condicionFiscal}
                   onChange={(e) => updateField('condicionFiscal', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
                 >
                   <option value="No inscripto">No inscripto</option>
                   <option value="Monotributo">Monotributo</option>
@@ -197,8 +209,8 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
           {/* PASO 2: Tu Escala (SOLO si NO es skipScaleStep) */}
           {step === 2 && !skipScaleStep && (
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-800 m-0">
+              <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4 mb-4">
+                <p className="text-sm text-primary-700 m-0">
                   💡 Esto nos ayuda a configurar tu cuenta de la mejor manera.
                 </p>
               </div>
@@ -211,7 +223,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   onClick={() => updateField('escala', '1')}
                   className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
                     formData.escala === '1' 
-                      ? 'border-blue-500 bg-blue-50' 
+                      ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -223,7 +235,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   onClick={() => updateField('escala', '2-5')}
                   className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
                     formData.escala === '2-5' 
-                      ? 'border-blue-500 bg-blue-50' 
+                      ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -235,12 +247,12 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   onClick={() => updateField('escala', '5+')}
                   className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
                     formData.escala === '5+' 
-                      ? 'border-blue-500 bg-blue-50' 
+                      ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <div className="font-bold text-gray-900">Más de 5 Locales</div>
-                  <div className="text-sm text-gray-600 mt-1">Para empresas en expansión (Plan Enterprise).</div>
+                  <div className="text-sm text-gray-600 mt-1">Para cadenas en expansión — mismo plan Multi-local, sin límite de locales.</div>
                 </button>
               </div>
             </div>
@@ -257,7 +269,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   <div 
                     key={index} 
                     className={`flex items-center justify-between p-4 border rounded-lg transition-all ${
-                      medio.habilitado ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50 opacity-70'
+                      medio.habilitado ? 'border-primary-500/40 bg-primary-50' : 'border-gray-200 bg-gray-50 opacity-70'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -274,7 +286,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                       type="button"
                       onClick={() => toggleMedioPago(index)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        medio.habilitado ? 'bg-blue-600' : 'bg-gray-300'
+                        medio.habilitado ? 'bg-primary-600' : 'bg-gray-300'
                       }`}
                     >
                       <span
@@ -346,23 +358,27 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   </p>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-                  <p className="text-sm font-bold text-blue-900 m-0 mb-1">🎁 30 días de prueba gratis</p>
-                  <p className="text-xs text-blue-800 m-0 mb-3">
+                <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4 mt-4">
+                  <p className="text-sm font-bold text-primary-700 m-0 mb-1">🎁 30 días de prueba gratis</p>
+                  <p className="text-xs text-primary-700 m-0 mb-3">
                     Todo desbloqueado desde el primer día. Cuando termine, tus reportes siguen
                     disponibles siempre — elegís seguir con uno de estos planes cuando quieras:
                   </p>
                   <div className="space-y-2">
                     {ORDEN_SEGMENTOS.map(seg => {
                       const precio = precios.find(p => p.segmento === seg && p.ciclo === 'mensual')
+                      const recomendado = !skipScaleStep && SEGMENTO_RECOMENDADO_POR_ESCALA[formData.escala] === seg
                       return (
-                        <div key={seg} className="flex items-start justify-between gap-3 text-xs bg-white rounded-lg p-2 border border-blue-100">
+                        <div key={seg} className={`flex items-start justify-between gap-3 text-xs bg-white rounded-lg p-2 border ${recomendado ? 'border-primary-500 ring-1 ring-primary-500/40' : 'border-primary-500/20'}`}>
                           <div className="min-w-0">
                             <span className="font-semibold text-gray-900">{LABEL_SEGMENTO[seg]}</span>
+                            {recomendado && (
+                              <span className="ml-2 inline-block px-1.5 py-0.5 rounded-full bg-primary-600 text-white text-[10px] font-bold align-middle">Para vos</span>
+                            )}
                             <span className="block text-gray-500">{DESCRIPCION_SEGMENTO[seg]}</span>
                           </div>
                           {precio && (
-                            <span className="shrink-0 font-bold text-blue-700 whitespace-nowrap">
+                            <span className="shrink-0 font-bold text-primary-700 whitespace-nowrap">
                               {formatCurrency(precio.precio)}<span className="font-normal text-gray-400">/mes</span>
                             </span>
                           )}
@@ -397,7 +413,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
           {step < 4 ? (
             <button
               onClick={handleNext}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-700 transition-colors shadow-sm"
+              className="px-6 py-3 bg-primary-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-primary-700 transition-colors shadow-sm"
             >
               Continuar →
             </button>

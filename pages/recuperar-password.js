@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
+import Icono from '../components/ui/Icono'
 
 /**
  * Pide el email y dispara el mail de recuperación. Antes esta página asumía
@@ -59,7 +60,7 @@ export default function RecuperarPassword() {
     <div className="min-h-screen bg-fondo flex items-center justify-center p-4">
       <div className="bg-white rounded-[26px] shadow-suave border border-black/5 w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🔐</div>
+          <div className="text-primary-600/70 mb-3 flex justify-center"><Icono nombre="candado" size={56} /></div>
           <h1 className="text-2xl font-bold text-gray-900 m-0">Recuperar contraseña</h1>
           <p className="text-sm text-gray-500 mt-1">Te mandamos un link para elegir una nueva</p>
         </div>

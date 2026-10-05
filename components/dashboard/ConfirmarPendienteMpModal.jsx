@@ -83,7 +83,7 @@ export default function ConfirmarPendienteMpModal({ pendiente, localId, local, i
             {medios.map((m) => (
               <button key={m.id} type="button" onClick={() => setMedioId(m.id)} aria-pressed={medioId === m.id}
                 className={`p-2.5 rounded-lg border-2 text-sm text-left cursor-pointer transition-colors ${
-                  medioId === m.id ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                  medioId === m.id ? 'border-primary-500 bg-primary-50 font-semibold' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                 <span className="mr-1">{m.icono || iconoMedio(m.tipo)}</span>{m.nombre}
               </button>
             ))}

@@ -18,14 +18,22 @@ const TABS = [
   { id: 'reportes', label: 'Reportes', icono: 'reportes', path: '/reportes', roles: [ROLES.OWNER] },
 ]
 
+// Solo para super_user (rol_global, independiente del rol por local): va
+// primero porque es lo que usa todos los días. Inicio/Caja quedan debajo
+// por si el super admin también es dueño/cajero de algún local propio.
+const TAB_PANEL_GLOBAL = { id: 'panel-global', label: 'Panel Global', icono: 'corona', path: '/superadmin' }
+
 export default function BottomNav({ activeTab, lateral = false, cantidadLocales }) {
   const router = useRouter()
-  const { hasRole, role, activeLocalId } = useUserRole()
+  const { hasRole, role, activeLocalId, esSuperUser } = useUserRole()
   const unSoloLocal = cantidadLocales === 1
-  const tabs = TABS
-    .filter(t => !t.roles || hasRole(t.roles))
-    .filter(t => !(t.id === 'inicio' && unSoloLocal))
-    .map(t => (t.id === 'caja' && role === ROLES.EMPLEADO ? { ...t, label: 'Cobrar' } : t))
+  const tabs = [
+    ...(esSuperUser ? [TAB_PANEL_GLOBAL] : []),
+    ...TABS
+      .filter(t => !t.roles || hasRole(t.roles))
+      .filter(t => !(t.id === 'inicio' && unSoloLocal))
+      .map(t => (t.id === 'caja' && role === ROLES.EMPLEADO ? { ...t, label: 'Cobrar' } : t)),
+  ]
   const ir = (tab) => router.push(tab.requiereLocal && !activeLocalId ? '/locales' : tab.path)
 
   return (
