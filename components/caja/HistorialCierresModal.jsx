@@ -15,10 +15,10 @@ export default function HistorialCierresModal({ isOpen, onClose, cierres, nombre
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
                 <th className="p-2 text-left font-bold">Fecha</th>
                 <th className="p-2 text-right font-bold">Inicial</th>
-                <th className="p-2 text-right font-bold">Cobros</th>
-                <th className="p-2 text-right font-bold">Gastos</th>
-                <th className="p-2 text-right font-bold">Contado</th>
-                <th className="p-2 text-right font-bold">Diferencia</th>
+                <th className="p-2 text-right font-bold">Cobros (todos los medios)</th>
+                <th className="p-2 text-right font-bold">Gastos (todos los medios)</th>
+                <th className="p-2 text-right font-bold">Contado (efectivo)</th>
+                <th className="p-2 text-right font-bold">Diferencia (efectivo)</th>
                 <th className="p-2 text-left font-bold">Obs.</th>
               </tr>
             </thead>

@@ -21,9 +21,13 @@ export default function ResumenEjecutivo({ resumen, discriminaIva }) {
       <div className="p-4">
         <Fila label="Total facturado" ayuda="Todo lo que cobraste, sin descontar nada" valor={resumen.totalFacturado} />
         {discriminaIva && <Fila label="(-) IVA débito fiscal" valor={resumen.ivaDebitoFiscal} negativo />}
-        {discriminaIva && <Fila label="Neto gravado" valor={resumen.netoGravado} />}
+        {discriminaIva && <Fila label="Neto gravado" valor={resumen.netoGravado}
+          ayuda="Dato para tu declaración de IVA — no es parte de la cuenta de las filas de abajo" />}
         <Fila label="(-) Comisiones de medios de pago" ayuda="Lo que se quedan las tarjetas y billeteras" valor={resumen.comisiones} negativo />
-        <Fila label="Ingreso neto real" ayuda="Lo que efectivamente entró" valor={resumen.ingresoNetoReal} />
+        <Fila label="Ingreso neto real" valor={resumen.ingresoNetoReal}
+          ayuda={discriminaIva
+            ? 'Total facturado menos comisiones. Todavía incluye el IVA débito fiscal (se resta en "IVA a pagar", más abajo).'
+            : 'Lo que efectivamente entró, después de las comisiones.'} />
         <Fila label="(-) Gastos operativos" valor={resumen.gastosOperativos} negativo />
         {discriminaIva && <Fila label="(+) IVA crédito fiscal" valor={resumen.ivaCreditoFiscal}
           ayuda={resumen.comisionesIvaEstimado > 0
