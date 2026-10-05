@@ -43,8 +43,18 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
   const [alicuota, setAlicuota] = useState(21)
   const [comprobante, setComprobante] = useState('SIN_COMPROBANTE')
   const [guardando, setGuardando] = useState(false)
+  // Un solo identificador por intento de cobro/gasto: se genera al abrir el
+  // modal y SE REUSA en cada reintento (nunca se regenera solo). Si la
+  // respuesta se pierde por un corte de red y la persona vuelve a tocar
+  // "Cobrar", el segundo insert llega con la misma key y el índice único de
+  // la base (tx_idempotency_key_unica) lo frena antes de duplicar la plata.
+  const [idempotencyKey, setIdempotencyKey] = useState(null)
 
   const conIva = discriminaIva(local?.condicion_fiscal)
+
+  useEffect(() => {
+    if (isOpen) setIdempotencyKey(crypto.randomUUID())
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen || !localId) return
@@ -87,6 +97,7 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
         localId, medioPagoId: medio.id, monto: montoNum, descripcion,
         alicuota: conIva ? alicuota : 0,
         tipoComprobante: comprobante,
+        idempotencyKey,
       })
       await registrarAccion({
         localId, userId, accion: cfg.accion, tabla: 'transacciones', registroId: tx.id,
@@ -97,7 +108,20 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
       onSuccess?.()
       cerrar()
     } catch (err) {
-      toast.error(`No se pudo guardar: ${mensajeError(err)}`)
+      // Reintento de un intento que SÍ se guardó pero cuya respuesta se
+      // perdió (corte de red): el índice único de la base lo frena en vez
+      // de duplicar la plata. No es un error real — ya está guardado.
+      if (err?.code === '23505' && err?.message?.includes('tx_idempotency_key_unica')) {
+        toast.success(tipo === 'cobro' ? 'Este cobro ya se había guardado — no se repitió' : 'Este gasto ya se había guardado — no se repitió')
+        onSuccess?.()
+        cerrar()
+        return
+      }
+      // Fallo real, pero puede que el servidor sí haya guardado el movimiento
+      // y lo que se perdió sea solo la respuesta — no decirle "falló" sin
+      // matices empuja a reintentar a ciegas. El reintento es seguro gracias
+      // a la misma idempotencyKey, pero avisamos para que revise antes.
+      toast.error(`No pudimos confirmar si se guardó: ${mensajeError(err)}. Revisá los movimientos antes de volver a intentarlo — si reintentás, no se va a duplicar.`)
       setGuardando(false)
     }
   }

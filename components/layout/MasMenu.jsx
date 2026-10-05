@@ -44,7 +44,9 @@ export default function MasMenu({ lateral = false, activeTab, unSoloLocal = fals
           onClick={() => setAbierto(v => !v)}
           aria-expanded={abierto}
           aria-haspopup="menu"
-          className="press w-full flex items-center gap-3 px-3 py-2.5 rounded-[14px] border-none cursor-pointer text-left text-sm font-medium text-gray-600 bg-transparent hover:bg-gray-100"
+          aria-current={secundarioActivo ? 'page' : undefined}
+          className={`press w-full flex items-center gap-3 px-3 py-2.5 rounded-[14px] border-none cursor-pointer text-left text-sm bg-transparent hover:bg-gray-100 ${
+            abierto || secundarioActivo ? 'text-primary-700 font-bold bg-primary-50' : 'text-gray-600 font-medium'}`}
         >
           <Icono nombre="admin" size={22} />
           Más
