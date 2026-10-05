@@ -6,6 +6,18 @@ import { formatCurrency } from '../lib/format'
 
 const ORDEN_SEGMENTOS = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
 
+// Qué plan tiene sentido según la escala elegida en el Paso 2 — solo para
+// resaltarlo en el resumen (Paso 4). La prueba de 30 días desbloquea todo
+// sin importar el plan, así que esto es una sugerencia visual, no algo que
+// se guarde en la suscripción: "2-5" y "5+" caen en el mismo Multi-local
+// porque es el único segmento sin límite de locales (no hay un escalón
+// "Enterprise" en lib/constants/planes.js).
+const SEGMENTO_RECOMENDADO_POR_ESCALA = {
+  '1': SEGMENTO.BASICO,
+  '2-5': SEGMENTO.MULTI_LOCAL,
+  '5+': SEGMENTO.MULTI_LOCAL,
+}
+
 // Iconos automáticos por tipo de medio de pago
 const ICONOS_POR_TIPO = {
   efectivo: '💵',
@@ -240,7 +252,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   }`}
                 >
                   <div className="font-bold text-gray-900">Más de 5 Locales</div>
-                  <div className="text-sm text-gray-600 mt-1">Para empresas en expansión (Plan Enterprise).</div>
+                  <div className="text-sm text-gray-600 mt-1">Para cadenas en expansión — mismo plan Multi-local, sin límite de locales.</div>
                 </button>
               </div>
             </div>
@@ -355,10 +367,14 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   <div className="space-y-2">
                     {ORDEN_SEGMENTOS.map(seg => {
                       const precio = precios.find(p => p.segmento === seg && p.ciclo === 'mensual')
+                      const recomendado = !skipScaleStep && SEGMENTO_RECOMENDADO_POR_ESCALA[formData.escala] === seg
                       return (
-                        <div key={seg} className="flex items-start justify-between gap-3 text-xs bg-white rounded-lg p-2 border border-primary-500/20">
+                        <div key={seg} className={`flex items-start justify-between gap-3 text-xs bg-white rounded-lg p-2 border ${recomendado ? 'border-primary-500 ring-1 ring-primary-500/40' : 'border-primary-500/20'}`}>
                           <div className="min-w-0">
                             <span className="font-semibold text-gray-900">{LABEL_SEGMENTO[seg]}</span>
+                            {recomendado && (
+                              <span className="ml-2 inline-block px-1.5 py-0.5 rounded-full bg-primary-600 text-white text-[10px] font-bold align-middle">Para vos</span>
+                            )}
                             <span className="block text-gray-500">{DESCRIPCION_SEGMENTO[seg]}</span>
                           </div>
                           {precio && (
