@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { aceptarTerminos } from '../lib/services/auth'
-import { VERSION_TERMINOS_ACTUAL } from '../lib/constants/legal'
+import { getTerminosVigentes } from '../lib/services/legal'
+import { VERSION_TERMINOS_DEFAULT } from '../lib/constants/legal'
 
 export default function Registro() {
   const [email, setEmail] = useState('')
@@ -13,6 +14,15 @@ export default function Registro() {
   const [loading, setLoading] = useState(false)
   const [pendienteConfirmacion, setPendienteConfirmacion] = useState(false)
   const router = useRouter()
+
+  // Versión vigente real (la edita super admin) — si todavía no cargó cuando
+  // se manda el formulario, se cae al default: el guard de la próxima
+  // pantalla la vuelve a chequear igual, así que no hay riesgo de que quede
+  // "aceptada" una versión que no es la vigente de verdad.
+  const [versionTerminos, setVersionTerminos] = useState(VERSION_TERMINOS_DEFAULT)
+  useEffect(() => {
+    getTerminosVigentes().then((v) => setVersionTerminos(v.version)).catch((err) => console.error('[registro]', err))
+  }, [])
 
   // Si viene de un link de invitación, precargamos el email y volvemos ahí al terminar
   const { invitacion, email: emailInvitado } = router.query
@@ -63,7 +73,7 @@ export default function Registro() {
       // Mismo momento en que se crea la cuenta: se registra la aceptación con
       // la versión vigente. Si esto falla, no se corta el registro — el
       // guard de términos se la va a volver a pedir en el próximo login.
-      aceptarTerminos(authData.user.id, VERSION_TERMINOS_ACTUAL).catch((err) =>
+      aceptarTerminos(authData.user.id, versionTerminos).catch((err) =>
         console.error('[registro] no se pudo guardar la aceptación de términos:', err))
 
       toast.success('Cuenta creada')

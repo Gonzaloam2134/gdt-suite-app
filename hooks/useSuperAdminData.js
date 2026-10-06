@@ -11,6 +11,10 @@ const CONFIG_DEFAULT = {
   comision_default: 2.5,
   plazo_acreditacion_default: 30,
   mantenimiento_activo: false,
+  // null → TerminosEditorTab y el resto de la app caen al default hardcodeado
+  // de lib/constants/legal.js (ver lib/domain/terminos.js resolverTerminosVigentes).
+  terminos_texto: null,
+  terminos_version: null,
 }
 
 /**
