@@ -1,14 +1,23 @@
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { TERMINOS_TEXTO } from '../lib/constants/legal'
+import { getTerminosVigentes } from '../lib/services/legal'
+import { TERMINOS_TEXTO_DEFAULT } from '../lib/constants/legal'
 import TerminosContenido from '../components/legal/TerminosContenido'
 
 /**
  * Pública, sin auth guard — hay que poder linkearla desde /registro antes
  * de que exista la cuenta, y desde el modal de bloqueo para quien ya la
- * tiene.
+ * tiene. El texto es el vigente editado por super admin (ver
+ * lib/services/legal.js); mientras carga o si falla, se ve el default
+ * hardcodeado en vez de una pantalla vacía.
  */
 export default function Terminos() {
   const router = useRouter()
+  const [texto, setTexto] = useState(TERMINOS_TEXTO_DEFAULT)
+
+  useEffect(() => {
+    getTerminosVigentes().then((v) => setTexto(v.texto)).catch((err) => console.error('[terminos]', err))
+  }, [])
 
   return (
     <main className="min-h-screen bg-slate-100 pb-12">
@@ -23,7 +32,7 @@ export default function Terminos() {
       </header>
 
       <div className="max-w-3xl mx-auto p-4 md:p-6 mt-4 bg-white rounded-xl border border-gray-200">
-        <TerminosContenido texto={TERMINOS_TEXTO} />
+        <TerminosContenido texto={texto} />
       </div>
     </main>
   )

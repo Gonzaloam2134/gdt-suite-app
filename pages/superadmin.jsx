@@ -20,6 +20,7 @@ import Icono, { iconoDeAnuncio } from '../components/ui/Icono'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
+import TerminosEditorTab from '../components/admin/TerminosEditorTab'
 import BottomNav from '../components/layout/BottomNav'
 
 /**
@@ -297,6 +298,7 @@ export default function SuperAdmin() {
             { id: 'locales', label: 'Locales', icono: 'inicio' },
             { id: 'suscripciones', label: 'Suscripciones', icono: 'tarjeta' },
             { id: 'config', label: 'Configuración', icono: 'admin' },
+            { id: 'terminos', label: 'Términos', icono: 'candado' },
             { id: 'anuncios', label: 'Anuncios', icono: 'novedades' },
             { id: 'cashflow', label: 'Cashflow', icono: 'dinero' }
           ].map(tab => (
@@ -926,6 +928,11 @@ export default function SuperAdmin() {
               </div>
             </details>
           </div>
+        )}
+
+        {/* TAB: TÉRMINOS Y CONDICIONES */}
+        {activeTab === 'terminos' && (
+          <TerminosEditorTab config={config} onGuardado={recargar} />
         )}
 
         {/* TAB: ANUNCIOS */}
