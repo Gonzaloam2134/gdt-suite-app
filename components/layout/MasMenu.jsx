@@ -28,6 +28,7 @@ export default function MasMenu({ lateral = false, activeTab, unSoloLocal = fals
     esDueno && unSoloLocal && { label: 'Mis locales', icono: 'inicio', path: '/locales?ver=1' },
     esDueno && { label: 'Mi cuenta', icono: 'cuenta', path: '/mi-cuenta' },
     esDueno && { label: 'Planes', icono: 'tarjeta', path: '/planes' },
+    { label: 'Ayuda', icono: 'info', path: '/ayuda' },
     { label: 'Novedades', icono: 'novedades', path: '/anuncios' },
   ].filter(Boolean)
 
