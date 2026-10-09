@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validarComprobante, construirRutaComprobante, TAMANO_MAXIMO_BYTES } from '../lib/domain/comprobantes'
+import { validarComprobante, construirRutaComprobante, debeComprimirse, TAMANO_MAXIMO_BYTES } from '../lib/domain/comprobantes'
 
 describe('validarComprobante', () => {
   it('sin archivo → error', () => {
@@ -46,5 +46,21 @@ describe('construirRutaComprobante', () => {
   it('mime type desconocido → extensión .bin en vez de romper', () => {
     const ruta = construirRutaComprobante('local-abc', 'tx-123', 'application/octet-stream')
     expect(ruta.endsWith('.bin')).toBe(true)
+  })
+})
+
+describe('debeComprimirse', () => {
+  it('jpg, png y webp se comprimen', () => {
+    expect(debeComprimirse('image/jpeg')).toBe(true)
+    expect(debeComprimirse('image/png')).toBe(true)
+    expect(debeComprimirse('image/webp')).toBe(true)
+  })
+
+  it('pdf no se toca (ya suele venir liviano)', () => {
+    expect(debeComprimirse('application/pdf')).toBe(false)
+  })
+
+  it('heic no se toca (canvas no lo decodifica de forma confiable)', () => {
+    expect(debeComprimirse('image/heic')).toBe(false)
   })
 })
