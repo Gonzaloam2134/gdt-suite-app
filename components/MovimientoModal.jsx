@@ -44,6 +44,8 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
   const [descripcion, setDescripcion] = useState('')
   const [alicuota, setAlicuota] = useState(21)
   const [comprobante, setComprobante] = useState('SIN_COMPROBANTE')
+  const [puntoVenta, setPuntoVenta] = useState('')
+  const [nroComprobante, setNroComprobante] = useState('')
   const [archivo, setArchivo] = useState(null)
   const [guardando, setGuardando] = useState(false)
   // Un solo identificador por intento de cobro/gasto: se genera al abrir el
@@ -85,7 +87,7 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
     return { neto, iva, comision, acredita: montoNum - comision }
   }, [montoNum, alicuota, medio, tipo, conIva])
 
-  const limpiar = () => { setMonto(''); setDescripcion(''); setArchivo(null); setGuardando(false) }
+  const limpiar = () => { setMonto(''); setDescripcion(''); setArchivo(null); setPuntoVenta(''); setNroComprobante(''); setGuardando(false) }
   const cerrar = () => { limpiar(); onClose() }
 
   const elegirArchivo = (e) => {
@@ -112,6 +114,8 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
         localId, medioPagoId: medio.id, monto: montoNum, descripcion,
         alicuota: conIva ? alicuota : 0,
         tipoComprobante: comprobante,
+        puntoVenta: puntoVenta.trim() || null,
+        nroComprobante: nroComprobante.trim() || null,
         idempotencyKey,
       })
       await registrarAccion({
@@ -209,6 +213,18 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
                 className="w-full p-2 border border-gray-300 rounded-[12px] text-sm">
                 {TIPOS_COMPROBANTE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="mov-punto-venta" className="block text-xs font-semibold text-gray-600 mb-1">Punto de venta (opcional)</label>
+                <input id="mov-punto-venta" type="text" value={puntoVenta} onChange={(e) => setPuntoVenta(e.target.value)}
+                  placeholder="Ej: 0001" className="w-full p-2 border border-gray-300 rounded-[12px] text-sm" />
+              </div>
+              <div>
+                <label htmlFor="mov-nro-comprobante" className="block text-xs font-semibold text-gray-600 mb-1">Número (opcional)</label>
+                <input id="mov-nro-comprobante" type="text" value={nroComprobante} onChange={(e) => setNroComprobante(e.target.value)}
+                  placeholder="Ej: 00012345" className="w-full p-2 border border-gray-300 rounded-[12px] text-sm" />
+              </div>
             </div>
             {conIva && (
               <div>
