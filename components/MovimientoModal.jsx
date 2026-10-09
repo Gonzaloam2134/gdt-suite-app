@@ -205,7 +205,7 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
         </div>
 
         {verTecnico && <details className="border border-gray-200 rounded-[14px]">
-          <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">Datos para el contador</summary>
+          <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">Facturación</summary>
           <div className="p-3 pt-0 space-y-3">
             <div>
               <label htmlFor="mov-comprobante" className="block text-xs font-semibold text-gray-600 mb-1">Comprobante</label>
