@@ -11,6 +11,8 @@ import { registrarAccion } from '../lib/services/auditoria'
 import { ACCIONES } from '../lib/constants/auditoria'
 import { ALICUOTAS_IVA, TIPOS_COMPROBANTE, COMPROBANTE_POR_CONDICION, discriminaIva } from '../lib/constants/transacciones'
 import { calcularIva, calcularComision } from '../lib/domain/transacciones'
+import { subirComprobante } from '../lib/services/comprobantes'
+import { validarComprobante } from '../lib/domain/comprobantes'
 import { formatCurrency } from '../lib/format'
 import { iconoMedio } from '../lib/constants/mediosPago'
 import { mensajeError } from '../lib/errorMessage'
@@ -42,6 +44,9 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
   const [descripcion, setDescripcion] = useState('')
   const [alicuota, setAlicuota] = useState(21)
   const [comprobante, setComprobante] = useState('SIN_COMPROBANTE')
+  const [puntoVenta, setPuntoVenta] = useState('')
+  const [nroComprobante, setNroComprobante] = useState('')
+  const [archivo, setArchivo] = useState(null)
   const [guardando, setGuardando] = useState(false)
   // Un solo identificador por intento de cobro/gasto: se genera al abrir el
   // modal y SE REUSA en cada reintento (nunca se regenera solo). Si la
@@ -82,8 +87,20 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
     return { neto, iva, comision, acredita: montoNum - comision }
   }, [montoNum, alicuota, medio, tipo, conIva])
 
-  const limpiar = () => { setMonto(''); setDescripcion(''); setGuardando(false) }
+  const limpiar = () => { setMonto(''); setDescripcion(''); setArchivo(null); setPuntoVenta(''); setNroComprobante(''); setGuardando(false) }
   const cerrar = () => { limpiar(); onClose() }
+
+  const elegirArchivo = (e) => {
+    const file = e.target.files?.[0] || null
+    if (!file) return setArchivo(null)
+    const validacion = validarComprobante(file)
+    if (!validacion.ok) {
+      toast.error(validacion.error)
+      e.target.value = ''
+      return
+    }
+    setArchivo(file)
+  }
 
   const guardar = async (e) => {
     e?.preventDefault()
@@ -97,6 +114,8 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
         localId, medioPagoId: medio.id, monto: montoNum, descripcion,
         alicuota: conIva ? alicuota : 0,
         tipoComprobante: comprobante,
+        puntoVenta: puntoVenta.trim() || null,
+        nroComprobante: nroComprobante.trim() || null,
         idempotencyKey,
       })
       await registrarAccion({
@@ -105,6 +124,13 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
       })
       setUltimoMedio(medio.id)
       toast.success(tipo === 'cobro' ? `Cobro de ${formatCurrency(montoNum)} registrado` : `Gasto de ${formatCurrency(montoNum)} registrado`)
+      // El movimiento ya quedó guardado — si falla subir el comprobante, no
+      // tiene sentido mostrar error de guardado: se avisa aparte y se puede
+      // adjuntar después desde la lista del día.
+      if (archivo) {
+        subirComprobante(tx.id, localId, archivo)
+          .catch((err) => toast.error(`El movimiento se guardó, pero el comprobante no se pudo subir: ${mensajeError(err)}`))
+      }
       onSuccess?.()
       cerrar()
     } catch (err) {
@@ -168,8 +194,18 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
             className="w-full p-3 border border-gray-300 rounded-[14px] text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none" />
         </div>
 
+        <div>
+          <label htmlFor="mov-comprobante-archivo" className="block text-sm font-semibold text-gray-700 mb-2">
+            Comprobante (foto o PDF, opcional)
+          </label>
+          <input id="mov-comprobante-archivo" type="file" accept="image/*,application/pdf" capture="environment"
+            onChange={elegirArchivo}
+            className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-[12px] file:border-0 file:bg-primary-50 file:text-primary-700 file:font-semibold file:cursor-pointer" />
+          {archivo && <p className="text-xs text-gray-500 mt-1 m-0">📎 {archivo.name}</p>}
+        </div>
+
         {verTecnico && <details className="border border-gray-200 rounded-[14px]">
-          <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">Datos para el contador</summary>
+          <summary className="p-3 text-sm font-semibold text-gray-700 cursor-pointer">Facturación</summary>
           <div className="p-3 pt-0 space-y-3">
             <div>
               <label htmlFor="mov-comprobante" className="block text-xs font-semibold text-gray-600 mb-1">Comprobante</label>
@@ -177,6 +213,18 @@ export default function MovimientoModal({ tipo, isOpen, onClose, localId, userId
                 className="w-full p-2 border border-gray-300 rounded-[12px] text-sm">
                 {TIPOS_COMPROBANTE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="mov-punto-venta" className="block text-xs font-semibold text-gray-600 mb-1">Punto de venta (opcional)</label>
+                <input id="mov-punto-venta" type="text" value={puntoVenta} onChange={(e) => setPuntoVenta(e.target.value)}
+                  placeholder="Ej: 0001" className="w-full p-2 border border-gray-300 rounded-[12px] text-sm" />
+              </div>
+              <div>
+                <label htmlFor="mov-nro-comprobante" className="block text-xs font-semibold text-gray-600 mb-1">Número (opcional)</label>
+                <input id="mov-nro-comprobante" type="text" value={nroComprobante} onChange={(e) => setNroComprobante(e.target.value)}
+                  placeholder="Ej: 00012345" className="w-full p-2 border border-gray-300 rounded-[12px] text-sm" />
+              </div>
             </div>
             {conIva && (
               <div>
