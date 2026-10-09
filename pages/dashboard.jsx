@@ -121,6 +121,7 @@ export default function Dashboard() {
             {esHoyVista && caja.cajaAbierta && <CajaAcciones onCobro={() => setModal('cobro')} onGasto={() => setModal('gasto')} />}
             {esHoyVista && <PorConfirmarMp localId={localId} local={local} />}
             <ListaTransacciones items={movimientos} onReversar={setAReversar} soloLectura={!esHoyVista}
+              localId={localId} onCambio={recargar}
               titulo={!opera ? 'Ventas de hoy' : esHoyVista ? 'Movimientos de hoy' : 'Movimientos del día'} />
             {vista === 'dueno' && <AcreditacionesDelDia acreditaciones={acreditacionesHoy} />}
             {vista === 'dueno' && <DesgloseMedios medios={desgloseMedios} />}

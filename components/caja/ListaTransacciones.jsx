@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { formatCurrency, formatHora } from '../../lib/format'
 import { usePaginacion } from '../../hooks/usePaginacion'
 import SeccionColapsable from '../ui/SeccionColapsable'
@@ -6,6 +7,9 @@ import StatusBadge from '../ui/StatusBadge'
 import EmptyState from '../ui/EmptyState'
 import { useUserRole } from '../../lib/UserRoleContext'
 import { ROLES_OPERAN_CAJA } from '../../lib/constants/roles'
+import { subirComprobante, obtenerUrlComprobante } from '../../lib/services/comprobantes'
+import { validarComprobante } from '../../lib/domain/comprobantes'
+import { mensajeError } from '../../lib/errorMessage'
 
 const COLOR = { cobro: 'text-green-700', gasto: 'text-red-700' }
 
@@ -15,10 +19,14 @@ const COLOR = { cobro: 'text-green-700', gasto: 'text-red-700' }
  * ('cobro'|'gasto') para color/signo; ya no es una lista separada por tipo.
  * Mobile: filas expandibles. Desktop: tabla. Misma definición para los dos.
  */
-export default function ListaTransacciones({ items, onReversar, titulo = 'Movimientos de hoy', soloLectura = false }) {
+export default function ListaTransacciones({ items, onReversar, titulo = 'Movimientos de hoy', soloLectura = false, localId, onCambio }) {
   const { hasRole } = useUserRole()
   // En un día pasado la lista es solo lectura: anular ahí tocaría una caja ya cerrada.
   const puedeReversar = hasRole(ROLES_OPERAN_CAJA) && !soloLectura
+  // Adjuntar un comprobante olvidado no toca el arqueo de un día ya cerrado
+  // (CLAUDE.md: nada se borra, esto solo agrega evidencia) — se permite
+  // incluso en días pasados, a diferencia de anular.
+  const puedeAdjuntar = hasRole(ROLES_OPERAN_CAJA) && !!localId
   const [expandida, setExpandida] = useState(null)
   const paginacion = usePaginacion(items, 15)
   const activos = items.filter(t => !t.anulada && !t.reversa).length
@@ -66,9 +74,12 @@ export default function ListaTransacciones({ items, onReversar, titulo = 'Movimi
                   {t.anulada && t.motivo_reversa && (
                     <div className="flex justify-between gap-4"><span className="text-gray-500">Motivo</span><span className="font-semibold text-right text-gray-700">{t.motivo_reversa}</span></div>
                   )}
-                  {puedeCancelar(t) && (
-                    <div className="pt-2 border-t border-gray-200 flex justify-end">
-                      <button onClick={() => onReversar(t)} className="press min-h-[44px] px-4 bg-warning-50 text-warning-700 border-none rounded-[12px] text-sm font-semibold cursor-pointer hover:bg-amber-100">↩️ Anular</button>
+                  {(puedeAdjuntar || puedeCancelar(t)) && (
+                    <div className="pt-2 border-t border-gray-200 flex justify-end gap-2">
+                      {puedeAdjuntar && <ComprobanteAccion transaccion={t} localId={localId} onCambio={onCambio} />}
+                      {puedeCancelar(t) && (
+                        <button onClick={() => onReversar(t)} className="press min-h-[44px] px-4 bg-warning-50 text-warning-700 border-none rounded-[12px] text-sm font-semibold cursor-pointer hover:bg-amber-100">↩️ Anular</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -104,9 +115,12 @@ export default function ListaTransacciones({ items, onReversar, titulo = 'Movimi
                   </td>
                   <td className={`p-2 text-right font-bold ${marcada ? 'text-gray-400 line-through' : COLOR[t.tipoMovimiento]}`}>{formatCurrency(t.monto)}</td>
                   <td className="p-2 text-center">
-                    {puedeCancelar(t) && (
-                      <button onClick={() => onReversar(t)} className="accion-fila press px-3 py-1.5 bg-warning-50 text-warning-700 border-none rounded-[10px] text-xs font-semibold cursor-pointer hover:bg-amber-100 transition-opacity duration-150">↩️ Anular</button>
-                    )}
+                    <div className="flex items-center justify-center gap-2">
+                      {puedeAdjuntar && <ComprobanteAccion transaccion={t} localId={localId} onCambio={onCambio} compacto />}
+                      {puedeCancelar(t) && (
+                        <button onClick={() => onReversar(t)} className="accion-fila press px-3 py-1.5 bg-warning-50 text-warning-700 border-none rounded-[10px] text-xs font-semibold cursor-pointer hover:bg-amber-100 transition-opacity duration-150">↩️ Anular</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -115,5 +129,59 @@ export default function ListaTransacciones({ items, onReversar, titulo = 'Movimi
         </table>
       </div>
     </SeccionColapsable>
+  )
+}
+
+/**
+ * Botón de comprobante por movimiento: "Ver" si ya tiene uno adjunto (abre
+ * una URL firmada, el bucket es privado), o "Adjuntar" si todavía no — un
+ * input de archivo oculto, igual que en MovimientoModal, para cargarlo
+ * después sin tener que anular y volver a registrar el movimiento.
+ */
+function ComprobanteAccion({ transaccion, localId, onCambio, compacto = false }) {
+  const [subiendo, setSubiendo] = useState(false)
+  const inputId = `comprobante-${transaccion.id}`
+  const claseBoton = compacto
+    ? 'accion-fila press px-3 py-1.5 bg-gray-100 text-gray-700 border-none rounded-[10px] text-xs font-semibold cursor-pointer hover:bg-gray-200 transition-opacity duration-150'
+    : 'press min-h-[44px] px-4 bg-gray-100 text-gray-700 border-none rounded-[12px] text-sm font-semibold cursor-pointer hover:bg-gray-200'
+
+  const ver = async () => {
+    try {
+      const url = await obtenerUrlComprobante(transaccion.comprobante_path)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      toast.error(`No se pudo abrir el comprobante: ${mensajeError(err)}`)
+    }
+  }
+
+  const elegirArchivo = async (e) => {
+    const file = e.target.files?.[0] || null
+    e.target.value = ''
+    if (!file) return
+    const validacion = validarComprobante(file)
+    if (!validacion.ok) return toast.error(validacion.error)
+
+    setSubiendo(true)
+    try {
+      await subirComprobante(transaccion.id, localId, file)
+      toast.success('Comprobante adjuntado')
+      onCambio?.()
+    } catch (err) {
+      toast.error(`No se pudo subir el comprobante: ${mensajeError(err)}`)
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  if (transaccion.comprobante_path) {
+    return <button onClick={ver} className={claseBoton}>📎 Ver</button>
+  }
+
+  return (
+    <label htmlFor={inputId} className={`${claseBoton} inline-flex items-center`}>
+      {subiendo ? 'Subiendo…' : '📎 Adjuntar'}
+      <input id={inputId} type="file" accept="image/*,application/pdf" capture="environment"
+        onChange={elegirArchivo} disabled={subiendo} className="hidden" />
+    </label>
   )
 }
