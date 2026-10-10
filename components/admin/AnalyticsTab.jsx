@@ -1,7 +1,11 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import toast from 'react-hot-toast'
 import { useAnalyticsSuperAdmin } from '../../hooks/useAnalyticsSuperAdmin'
 import { formatCurrency, formatPorcentaje, formatFechaHora } from '../../lib/format'
+import { ownerPorLocal } from '../../lib/domain/analyticsSuperadmin'
+import { periodoRapido } from '../../lib/dates'
 import Icono from '../ui/Icono'
+import AnalyticsDetalle from './AnalyticsDetalle'
 
 const LABEL_PERIODO = {
   hoy: 'Hoy', semana: 'Últimos 7 días', mes: 'Este mes', 'ultimos-30': 'Últimos 30 días', trimestre: 'Último trimestre',
@@ -17,36 +21,148 @@ const LABEL_MEDIO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: '
  * período — no inventa ni proyecta nada que no haya pasado.
  */
 export default function AnalyticsTab({ locales, suscripciones }) {
-  const { periodo, setPeriodo, statsPorLocal, statsPorOwner, statsPorMedioPago, inactivos, porVencer, loading } =
-    useAnalyticsSuperAdmin(locales, suscripciones)
+  const {
+    periodo, setPeriodo, statsPorLocal, statsPorOwner, statsPorMedioPago, inactivos, porVencer,
+    scope, setScope, comisiones, comisionesPorMedio, heatmap, serie, alertaCaida, crecimiento, loading,
+  } = useAnalyticsSuperAdmin(locales, suscripciones)
+
+  const [exportando, setExportando] = useState(false)
 
   const nombrePorLocal = useMemo(() => new Map(locales.map((l) => [l.id, l.nombre])), [locales])
 
   const rankingLocales = useMemo(
-    () => [...statsPorLocal].sort((a, b) => b.volumenCobrado - a.volumenCobrado),
-    [statsPorLocal]
+    () => [...statsPorLocal]
+      .map((s) => ({ ...s, nombre: nombrePorLocal.get(s.localId) || 'Sin nombre' }))
+      .sort((a, b) => b.volumenCobrado - a.volumenCobrado),
+    [statsPorLocal, nombrePorLocal]
   )
+
+  // Agrupa locales por owner para el selector — independiente del scope elegido,
+  // siempre ofrece TODOS los owners/locales para poder cambiar de uno a otro.
+  const gruposPorOwner = useMemo(() => {
+    const ownerMap = ownerPorLocal(locales)
+    const porOwner = new Map()
+    for (const l of locales) {
+      const o = ownerMap.get(l.id) || {}
+      const key = o.ownerId || `sin-owner:${l.id}`
+      if (!porOwner.has(key)) porOwner.set(key, { ownerId: o.ownerId || null, label: o.ownerEmail || o.ownerNombre || 'Sin owner activo', locales: [] })
+      porOwner.get(key).locales.push(l)
+    }
+    return Array.from(porOwner.values())
+  }, [locales])
+
+  const valorSelectScope = scope.tipo === 'todos' ? 'todos' : `${scope.tipo}:${scope.id}`
+  const onChangeScope = (e) => {
+    const v = e.target.value
+    if (v === 'todos') return setScope({ tipo: 'todos', id: null })
+    const [tipo, id] = v.split(':')
+    setScope({ tipo, id })
+  }
+
+  const scopeLabel = useMemo(() => {
+    if (scope.tipo === 'owner') return gruposPorOwner.find((g) => g.ownerId === scope.id)?.label || 'Owner'
+    if (scope.tipo === 'local') {
+      const grupo = gruposPorOwner.find((g) => g.locales.some((l) => l.id === scope.id))
+      const local = grupo?.locales.find((l) => l.id === scope.id)
+      return local ? `${local.nombre} (${grupo.label})` : 'Local'
+    }
+    return null
+  }, [scope, gruposPorOwner])
+
+  const alcanceLabel = scope.tipo === 'todos' ? 'Toda la plataforma' : scopeLabel
+
+  // Todo lo que ya se calculó para la pantalla, acomodado como lo espera
+  // lib/export/analyticsExcel.js — nada se vuelve a traer ni a agregar acá.
+  const ctxExcel = useMemo(() => ({
+    alcanceLabel,
+    alcanceArchivo: alcanceLabel,
+    periodoLabel: LABEL_PERIODO[periodo],
+    periodo: periodoRapido(periodo),
+    rankingLocales,
+    porOwner: statsPorOwner.map((o) => ({
+      ownerLabel: o.ownerEmail || o.ownerNombre || 'Sin owner activo',
+      cantidadLocales: o.locales.length,
+      movimientos: o.movimientos,
+      volumenCobrado: o.volumenCobrado,
+      volumenGastado: o.volumenGastado,
+    })),
+    porMedioPago: comisionesPorMedio.map((m) => ({
+      label: LABEL_MEDIO[m.tipo] || m.tipo,
+      movimientos: m.movimientos,
+      volumen: m.volumen,
+      comision: m.comision,
+      pctComision: m.pctComision,
+    })),
+    comisiones,
+    heatmap,
+    serie,
+    alertaCaida,
+    crecimiento,
+  }), [alcanceLabel, periodo, rankingLocales, statsPorOwner, comisionesPorMedio, comisiones, heatmap, serie, alertaCaida, crecimiento])
+
+  const exportarExcel = async () => {
+    if (exportando) return
+    setExportando(true)
+    try {
+      const { generarExcelAnalytics } = await import('../../lib/export/analyticsExcel')
+      await generarExcelAnalytics(ctxExcel)
+      toast.success('Excel descargado')
+    } catch (err) {
+      toast.error(`No se pudo generar el Excel: ${err.message}`)
+    } finally {
+      setExportando(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
       <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="reportes" size={16} className="inline-block align-text-bottom mr-1.5" />
-          Actividad real de la plataforma por local, por owner y por medio de pago. Las reversas y
+          Actividad real por local, por owner y por medio de pago. Las reversas y
           transacciones anuladas no suman al volumen, igual que en la caja de cada local.
         </p>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {Object.keys(LABEL_PERIODO).map((p) => (
-          <button key={p} onClick={() => setPeriodo(p)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
-              periodo === p ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}>
-            {LABEL_PERIODO[p]}
+      <div className="flex gap-3 flex-wrap items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {Object.keys(LABEL_PERIODO).map((p) => (
+            <button key={p} onClick={() => setPeriodo(p)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
+                periodo === p ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}>
+              {LABEL_PERIODO[p]}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select value={valorSelectScope} onChange={onChangeScope}
+            className="p-2 border border-gray-300 rounded-md text-sm font-semibold max-w-full">
+            <option value="todos">Todos los owners</option>
+            {gruposPorOwner.map((g) => (
+              <optgroup key={g.ownerId || g.label} label={g.label}>
+                {g.ownerId && <option value={`owner:${g.ownerId}`}>Todo — {g.label}</option>}
+                {g.locales.map((l) => <option key={l.id} value={`local:${l.id}`}>{l.nombre}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <button onClick={exportarExcel} disabled={loading || exportando}
+            title="Exportar este análisis a Excel"
+            className="px-3 py-2 bg-emerald-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50 whitespace-nowrap">
+            {exportando ? 'Generando…' : 'Exportar a Excel'}
           </button>
-        ))}
+        </div>
       </div>
+
+      {scope.tipo !== 'todos' && (
+        <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 inline-flex items-center gap-1.5">
+          <Icono nombre="buscar" size={14} />Mostrando solo: {scopeLabel}
+          <button onClick={() => setScope({ tipo: 'todos', id: null })} className="ml-2 text-primary-600 font-semibold cursor-pointer bg-transparent border-none underline">
+            ver todos
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
@@ -167,6 +283,15 @@ export default function AnalyticsTab({ locales, suscripciones }) {
               </div>
             )}
           </div>
+
+          <AnalyticsDetalle
+            comisiones={comisiones}
+            comisionesPorMedio={comisionesPorMedio}
+            heatmap={heatmap}
+            serie={serie}
+            alertaCaida={alertaCaida}
+            crecimiento={crecimiento}
+          />
         </>
       )}
     </div>
