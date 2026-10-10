@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import toast from 'react-hot-toast'
 import { useAnalyticsSuperAdmin } from '../../hooks/useAnalyticsSuperAdmin'
 import { formatCurrency, formatPorcentaje, formatFechaHora } from '../../lib/format'
 import { ownerPorLocal } from '../../lib/domain/analyticsSuperadmin'
+import { periodoRapido } from '../../lib/dates'
 import Icono from '../ui/Icono'
 import AnalyticsDetalle from './AnalyticsDetalle'
 
@@ -24,11 +26,15 @@ export default function AnalyticsTab({ locales, suscripciones }) {
     scope, setScope, comisiones, comisionesPorMedio, heatmap, serie, alertaCaida, crecimiento, loading,
   } = useAnalyticsSuperAdmin(locales, suscripciones)
 
+  const [exportando, setExportando] = useState(false)
+
   const nombrePorLocal = useMemo(() => new Map(locales.map((l) => [l.id, l.nombre])), [locales])
 
   const rankingLocales = useMemo(
-    () => [...statsPorLocal].sort((a, b) => b.volumenCobrado - a.volumenCobrado),
-    [statsPorLocal]
+    () => [...statsPorLocal]
+      .map((s) => ({ ...s, nombre: nombrePorLocal.get(s.localId) || 'Sin nombre' }))
+      .sort((a, b) => b.volumenCobrado - a.volumenCobrado),
+    [statsPorLocal, nombrePorLocal]
   )
 
   // Agrupa locales por owner para el selector — independiente del scope elegido,
@@ -63,6 +69,51 @@ export default function AnalyticsTab({ locales, suscripciones }) {
     return null
   }, [scope, gruposPorOwner])
 
+  const alcanceLabel = scope.tipo === 'todos' ? 'Toda la plataforma' : scopeLabel
+
+  // Todo lo que ya se calculó para la pantalla, acomodado como lo espera
+  // lib/export/analyticsExcel.js — nada se vuelve a traer ni a agregar acá.
+  const ctxExcel = useMemo(() => ({
+    alcanceLabel,
+    alcanceArchivo: alcanceLabel,
+    periodoLabel: LABEL_PERIODO[periodo],
+    periodo: periodoRapido(periodo),
+    rankingLocales,
+    porOwner: statsPorOwner.map((o) => ({
+      ownerLabel: o.ownerEmail || o.ownerNombre || 'Sin owner activo',
+      cantidadLocales: o.locales.length,
+      movimientos: o.movimientos,
+      volumenCobrado: o.volumenCobrado,
+      volumenGastado: o.volumenGastado,
+    })),
+    porMedioPago: comisionesPorMedio.map((m) => ({
+      label: LABEL_MEDIO[m.tipo] || m.tipo,
+      movimientos: m.movimientos,
+      volumen: m.volumen,
+      comision: m.comision,
+      pctComision: m.pctComision,
+    })),
+    comisiones,
+    heatmap,
+    serie,
+    alertaCaida,
+    crecimiento,
+  }), [alcanceLabel, periodo, rankingLocales, statsPorOwner, comisionesPorMedio, comisiones, heatmap, serie, alertaCaida, crecimiento])
+
+  const exportarExcel = async () => {
+    if (exportando) return
+    setExportando(true)
+    try {
+      const { generarExcelAnalytics } = await import('../../lib/export/analyticsExcel')
+      await generarExcelAnalytics(ctxExcel)
+      toast.success('Excel descargado')
+    } catch (err) {
+      toast.error(`No se pudo generar el Excel: ${err.message}`)
+    } finally {
+      setExportando(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
@@ -85,16 +136,23 @@ export default function AnalyticsTab({ locales, suscripciones }) {
           ))}
         </div>
 
-        <select value={valorSelectScope} onChange={onChangeScope}
-          className="p-2 border border-gray-300 rounded-md text-sm font-semibold max-w-full">
-          <option value="todos">Todos los owners</option>
-          {gruposPorOwner.map((g) => (
-            <optgroup key={g.ownerId || g.label} label={g.label}>
-              {g.ownerId && <option value={`owner:${g.ownerId}`}>Todo — {g.label}</option>}
-              {g.locales.map((l) => <option key={l.id} value={`local:${l.id}`}>{l.nombre}</option>)}
-            </optgroup>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select value={valorSelectScope} onChange={onChangeScope}
+            className="p-2 border border-gray-300 rounded-md text-sm font-semibold max-w-full">
+            <option value="todos">Todos los owners</option>
+            {gruposPorOwner.map((g) => (
+              <optgroup key={g.ownerId || g.label} label={g.label}>
+                {g.ownerId && <option value={`owner:${g.ownerId}`}>Todo — {g.label}</option>}
+                {g.locales.map((l) => <option key={l.id} value={`local:${l.id}`}>{l.nombre}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <button onClick={exportarExcel} disabled={loading || exportando}
+            title="Exportar este análisis a Excel"
+            className="px-3 py-2 bg-emerald-500 text-white border-none rounded-md text-xs font-semibold cursor-pointer hover:bg-emerald-600 disabled:opacity-50 whitespace-nowrap">
+            {exportando ? 'Generando…' : 'Exportar a Excel'}
+          </button>
+        </div>
       </div>
 
       {scope.tipo !== 'todos' && (
