@@ -21,6 +21,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
 import TerminosEditorTab from '../components/admin/TerminosEditorTab'
+import AnalyticsTab from '../components/admin/AnalyticsTab'
 import BottomNav from '../components/layout/BottomNav'
 
 /**
@@ -293,6 +294,7 @@ export default function SuperAdmin() {
         <div ref={tabsScrollRef} onScroll={actualizarSombrasTabs} className="flex gap-2 border-b border-gray-200 overflow-x-auto">
           {[
             { id: 'dashboard', label: 'Dashboard Global', icono: 'reportes' },
+            { id: 'analytics', label: 'Análisis', icono: 'reportes' },
             { id: 'contactos', label: 'Consultas', icono: 'mail' },
             { id: 'usuarios', label: 'Usuarios', icono: 'equipo' },
             { id: 'locales', label: 'Locales', icono: 'inicio' },
@@ -359,6 +361,11 @@ export default function SuperAdmin() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB: ANÁLISIS */}
+        {activeTab === 'analytics' && (
+          <AnalyticsTab locales={todosLosLocales} suscripciones={suscripciones} />
         )}
 
         {/* TAB: CONSULTAS */}
