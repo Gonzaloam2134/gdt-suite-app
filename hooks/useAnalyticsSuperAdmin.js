@@ -26,9 +26,10 @@ import {
  * plataforma con muchos locales y mucho historial sería pesado pedirlas
  * siempre, aunque nadie abra este tab).
  *
- * `scope` acota el análisis profundo (comisiones, heatmap, alerta de caída)
- * a un local o un owner puntual — para vender consultoría hace falta poder
- * mostrarle a CADA dueño su propio detalle, no solo el ranking general.
+ * `scope` acota TODO el análisis (ranking, comisiones, heatmap, alertas) a
+ * un owner o un local puntual — pensado para sostener una conversación de
+ * consultoría con un dueño sin que se le mezclen los números de otros.
+ * `scope.tipo === 'todos'` es la única vista que mira la plataforma entera.
  */
 export function useAnalyticsSuperAdmin(locales, suscripciones) {
   const [periodo, setPeriodo] = useState('ultimos-30')
@@ -52,21 +53,33 @@ export function useAnalyticsSuperAdmin(locales, suscripciones) {
 
   useEffect(() => { cargar() }, [cargar])
 
-  // Vista general: siempre sobre TODA la plataforma, no se acota por scope.
-  const statsPorLocal = useMemo(() => agruparTransaccionesPorLocal(transacciones), [transacciones])
-  const statsPorOwner = useMemo(() => agruparPorOwner(statsPorLocal, locales), [statsPorLocal, locales])
-  const statsPorMedioPago = useMemo(() => agruparPorTipoMedioPago(transacciones), [transacciones])
-  const inactivos = useMemo(() => localesInactivos(statsPorLocal, 14), [statsPorLocal])
-  const porVencer = useMemo(() => suscripcionesPorVencerPronto(suscripciones, 7), [suscripciones])
-
-  // Vista de detalle: acotada por `scope` (todos / un owner / un local puntual).
   const ownerMap = useMemo(() => ownerPorLocal(locales), [locales])
+
   const transaccionesScope = useMemo(() => {
     if (scope.tipo === 'local') return transacciones.filter((t) => t.local_id === scope.id)
     if (scope.tipo === 'owner') return transacciones.filter((t) => ownerMap.get(t.local_id)?.ownerId === scope.id)
     return transacciones
   }, [transacciones, scope, ownerMap])
 
+  // Ranking / overview — ya acotados por `scope` (en 'todos' es la plataforma entera).
+  const statsPorLocal = useMemo(() => agruparTransaccionesPorLocal(transaccionesScope), [transaccionesScope])
+  const statsPorOwner = useMemo(() => agruparPorOwner(statsPorLocal, locales), [statsPorLocal, locales])
+  const statsPorMedioPago = useMemo(() => agruparPorTipoMedioPago(transaccionesScope), [transaccionesScope])
+  const inactivos = useMemo(() => localesInactivos(statsPorLocal, 14), [statsPorLocal])
+
+  const ownerIdDelScope = useMemo(() => {
+    if (scope.tipo === 'owner') return scope.id
+    if (scope.tipo === 'local') return ownerMap.get(scope.id)?.ownerId || null
+    return null
+  }, [scope, ownerMap])
+
+  const suscripcionesScope = useMemo(
+    () => (ownerIdDelScope ? suscripciones.filter((s) => s.owner_id === ownerIdDelScope) : suscripciones),
+    [suscripciones, ownerIdDelScope]
+  )
+  const porVencer = useMemo(() => suscripcionesPorVencerPronto(suscripcionesScope, 7), [suscripcionesScope])
+
+  // Detalle profundo — mismo `transaccionesScope` de arriba.
   const comisiones = useMemo(() => resumenComisiones(transaccionesScope), [transaccionesScope])
   const comisionesPorMedio = useMemo(() => comisionesPorTipoMedioPago(transaccionesScope), [transaccionesScope])
   const heatmap = useMemo(() => heatmapHoraDia(transaccionesScope), [transaccionesScope])

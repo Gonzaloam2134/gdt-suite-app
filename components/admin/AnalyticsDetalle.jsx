@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import { formatCurrency, formatPorcentaje } from '../../lib/format'
-import { ownerPorLocal } from '../../lib/domain/analyticsSuperadmin'
 import Icono from '../ui/Icono'
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -49,48 +48,16 @@ function HeatmapHoraDia({ celdas }) {
 }
 
 /**
- * Detalle "por owner y por negocio" — selector de alcance + comisiones
- * reales, patrón horario, y alertas de caída/crecimiento del gasto, todo
- * acotado a lo que se elija. Pensado para la conversación de venta de
- * consultoría: algo que el dueño no sabe de su propio negocio, no un
- * resumen de lo que ya ve en Caja.
+ * Detalle profundo: comisiones reales, patrón horario, y alertas de
+ * caída/crecimiento del gasto — ya acotado por el `scope` que se elija en
+ * el selector de arriba (AnalyticsTab). Pensado para la conversación de
+ * venta de consultoría: algo que el dueño no sabe de su propio negocio, no
+ * un resumen de lo que ya ve en Caja.
  */
-export default function AnalyticsDetalle({ locales, scope, setScope, comisiones, comisionesPorMedio, heatmap, serie, alertaCaida, crecimiento }) {
-  const gruposPorOwner = useMemo(() => {
-    const ownerMap = ownerPorLocal(locales)
-    const porOwner = new Map()
-    for (const l of locales) {
-      const o = ownerMap.get(l.id) || {}
-      const key = o.ownerId || `sin-owner:${l.id}`
-      if (!porOwner.has(key)) porOwner.set(key, { ownerId: o.ownerId || null, label: o.ownerEmail || o.ownerNombre || 'Sin owner activo', locales: [] })
-      porOwner.get(key).locales.push(l)
-    }
-    return Array.from(porOwner.values())
-  }, [locales])
-
-  const valorSelect = scope.tipo === 'todos' ? 'todos' : `${scope.tipo}:${scope.id}`
-  const onChangeScope = (e) => {
-    const v = e.target.value
-    if (v === 'todos') return setScope({ tipo: 'todos', id: null })
-    const [tipo, id] = v.split(':')
-    setScope({ tipo, id })
-  }
-
+export default function AnalyticsDetalle({ comisiones, comisionesPorMedio, heatmap, serie, alertaCaida, crecimiento }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-base font-bold text-gray-900 m-0">Detalle por owner / por negocio</h3>
-        <select value={valorSelect} onChange={onChangeScope}
-          className="p-2 border border-gray-300 rounded-md text-sm max-w-full">
-          <option value="todos">Todos los locales</option>
-          {gruposPorOwner.map((g) => (
-            <optgroup key={g.ownerId || g.label} label={g.label}>
-              {g.ownerId && <option value={`owner:${g.ownerId}`}>Todo — {g.label}</option>}
-              {g.locales.map((l) => <option key={l.id} value={`local:${l.id}`}>{l.nombre}</option>)}
-            </optgroup>
-          ))}
-        </select>
-      </div>
+      <h3 className="text-base font-bold text-gray-900 m-0">Detalle</h3>
 
       {alertaCaida?.caida && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">

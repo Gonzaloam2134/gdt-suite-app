@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useAnalyticsSuperAdmin } from '../../hooks/useAnalyticsSuperAdmin'
 import { formatCurrency, formatPorcentaje, formatFechaHora } from '../../lib/format'
+import { ownerPorLocal } from '../../lib/domain/analyticsSuperadmin'
 import Icono from '../ui/Icono'
 import AnalyticsDetalle from './AnalyticsDetalle'
 
@@ -30,26 +31,80 @@ export default function AnalyticsTab({ locales, suscripciones }) {
     [statsPorLocal]
   )
 
+  // Agrupa locales por owner para el selector — independiente del scope elegido,
+  // siempre ofrece TODOS los owners/locales para poder cambiar de uno a otro.
+  const gruposPorOwner = useMemo(() => {
+    const ownerMap = ownerPorLocal(locales)
+    const porOwner = new Map()
+    for (const l of locales) {
+      const o = ownerMap.get(l.id) || {}
+      const key = o.ownerId || `sin-owner:${l.id}`
+      if (!porOwner.has(key)) porOwner.set(key, { ownerId: o.ownerId || null, label: o.ownerEmail || o.ownerNombre || 'Sin owner activo', locales: [] })
+      porOwner.get(key).locales.push(l)
+    }
+    return Array.from(porOwner.values())
+  }, [locales])
+
+  const valorSelectScope = scope.tipo === 'todos' ? 'todos' : `${scope.tipo}:${scope.id}`
+  const onChangeScope = (e) => {
+    const v = e.target.value
+    if (v === 'todos') return setScope({ tipo: 'todos', id: null })
+    const [tipo, id] = v.split(':')
+    setScope({ tipo, id })
+  }
+
+  const scopeLabel = useMemo(() => {
+    if (scope.tipo === 'owner') return gruposPorOwner.find((g) => g.ownerId === scope.id)?.label || 'Owner'
+    if (scope.tipo === 'local') {
+      const grupo = gruposPorOwner.find((g) => g.locales.some((l) => l.id === scope.id))
+      const local = grupo?.locales.find((l) => l.id === scope.id)
+      return local ? `${local.nombre} (${grupo.label})` : 'Local'
+    }
+    return null
+  }, [scope, gruposPorOwner])
+
   return (
     <div className="space-y-4">
       <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="reportes" size={16} className="inline-block align-text-bottom mr-1.5" />
-          Actividad real de la plataforma por local, por owner y por medio de pago. Las reversas y
+          Actividad real por local, por owner y por medio de pago. Las reversas y
           transacciones anuladas no suman al volumen, igual que en la caja de cada local.
         </p>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {Object.keys(LABEL_PERIODO).map((p) => (
-          <button key={p} onClick={() => setPeriodo(p)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
-              periodo === p ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}>
-            {LABEL_PERIODO[p]}
-          </button>
-        ))}
+      <div className="flex gap-3 flex-wrap items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {Object.keys(LABEL_PERIODO).map((p) => (
+            <button key={p} onClick={() => setPeriodo(p)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-none ${
+                periodo === p ? 'press bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}>
+              {LABEL_PERIODO[p]}
+            </button>
+          ))}
+        </div>
+
+        <select value={valorSelectScope} onChange={onChangeScope}
+          className="p-2 border border-gray-300 rounded-md text-sm font-semibold max-w-full">
+          <option value="todos">Todos los owners</option>
+          {gruposPorOwner.map((g) => (
+            <optgroup key={g.ownerId || g.label} label={g.label}>
+              {g.ownerId && <option value={`owner:${g.ownerId}`}>Todo — {g.label}</option>}
+              {g.locales.map((l) => <option key={l.id} value={`local:${l.id}`}>{l.nombre}</option>)}
+            </optgroup>
+          ))}
+        </select>
       </div>
+
+      {scope.tipo !== 'todos' && (
+        <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 inline-flex items-center gap-1.5">
+          <Icono nombre="buscar" size={14} />Mostrando solo: {scopeLabel}
+          <button onClick={() => setScope({ tipo: 'todos', id: null })} className="ml-2 text-primary-600 font-semibold cursor-pointer bg-transparent border-none underline">
+            ver todos
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
@@ -172,9 +227,6 @@ export default function AnalyticsTab({ locales, suscripciones }) {
           </div>
 
           <AnalyticsDetalle
-            locales={locales}
-            scope={scope}
-            setScope={setScope}
             comisiones={comisiones}
             comisionesPorMedio={comisionesPorMedio}
             heatmap={heatmap}
