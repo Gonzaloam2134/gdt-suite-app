@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useAnalyticsSuperAdmin } from '../../hooks/useAnalyticsSuperAdmin'
 import { formatCurrency, formatPorcentaje, formatFechaHora } from '../../lib/format'
 import Icono from '../ui/Icono'
+import AnalyticsDetalle from './AnalyticsDetalle'
 
 const LABEL_PERIODO = {
   hoy: 'Hoy', semana: 'Últimos 7 días', mes: 'Este mes', 'ultimos-30': 'Últimos 30 días', trimestre: 'Último trimestre',
@@ -17,8 +18,10 @@ const LABEL_MEDIO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: '
  * período — no inventa ni proyecta nada que no haya pasado.
  */
 export default function AnalyticsTab({ locales, suscripciones }) {
-  const { periodo, setPeriodo, statsPorLocal, statsPorOwner, statsPorMedioPago, inactivos, porVencer, loading } =
-    useAnalyticsSuperAdmin(locales, suscripciones)
+  const {
+    periodo, setPeriodo, statsPorLocal, statsPorOwner, statsPorMedioPago, inactivos, porVencer,
+    scope, setScope, comisiones, comisionesPorMedio, heatmap, serie, alertaCaida, crecimiento, loading,
+  } = useAnalyticsSuperAdmin(locales, suscripciones)
 
   const nombrePorLocal = useMemo(() => new Map(locales.map((l) => [l.id, l.nombre])), [locales])
 
@@ -167,6 +170,18 @@ export default function AnalyticsTab({ locales, suscripciones }) {
               </div>
             )}
           </div>
+
+          <AnalyticsDetalle
+            locales={locales}
+            scope={scope}
+            setScope={setScope}
+            comisiones={comisiones}
+            comisionesPorMedio={comisionesPorMedio}
+            heatmap={heatmap}
+            serie={serie}
+            alertaCaida={alertaCaida}
+            crecimiento={crecimiento}
+          />
         </>
       )}
     </div>
