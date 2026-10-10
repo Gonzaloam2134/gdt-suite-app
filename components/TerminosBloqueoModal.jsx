@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 
 /**
  * A diferencia de components/ui/Modal.jsx, este NO se puede cerrar sin
@@ -15,6 +16,11 @@ export default function TerminosBloqueoModal({ isOpen, onAceptar }) {
     setAceptando(true)
     try {
       await onAceptar()
+    } catch (err) {
+      // Antes esto se tragaba en silencio: si el guardado fallaba (ej. un
+      // problema de configuración del servidor), el modal volvía a aparecer
+      // en la próxima pantalla sin ningún aviso — parecía un loop infinito.
+      toast.error(err?.message || 'No se pudo registrar la aceptación. Probá de nuevo.')
     } finally {
       setAceptando(false)
     }
