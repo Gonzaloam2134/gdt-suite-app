@@ -35,19 +35,19 @@ export default function CashflowTab({ pagosSuscripcion, suscripciones, usuarios 
           <Icono nombre="dinero" size={16} className="inline-block align-text-bottom mr-1.5 " />Lo que ya cobraste, y una proyección de lo que deberías seguir cobrando si nadie
           cancela ni falla ningún pago — es optimista a propósito, no una garantía.
         </p>
-      </div>>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <div className="text-xs text-gray-500 font-semibold uppercase">Cobrado hasta hoy</div>>
-          <div className="text-2xl font-extrabold text-green-700 mt-1">{formatCurrency(total)}</div>>
-        </div>>
+          <div className="text-xs text-gray-500 font-semibold uppercase">Cobrado hasta hoy</div>
+          <div className="text-2xl font-extrabold text-green-700 mt-1">{formatCurrency(total)}</div>
+        </div>
         <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <div className="text-xs text-gray-500 font-semibold uppercase">Ingreso mensual recurrente (MRR)</div>>
-          <div className="text-2xl font-extrabold text-primary-700 mt-1">{formatCurrency(mrr)}</div>>
-          <div className="text-xs text-gray-400 mt-1">Suscripciones activas hoy — las anuales cuentan a 1/12</div>>
-        </div>>
-      </div>>
+          <div className="text-xs text-gray-500 font-semibold uppercase">Ingreso mensual recurrente (MRR)</div>
+          <div className="text-2xl font-extrabold text-primary-700 mt-1">{formatCurrency(mrr)}</div>
+          <div className="text-xs text-gray-400 mt-1">Suscripciones activas hoy — las anuales cuentan a 1/12</div>
+        </div>
+      </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-5">
         <h3 className="text-base font-bold text-gray-900 mb-1">Real vs. proyectado, mes a mes</h3>
@@ -67,8 +67,8 @@ export default function CashflowTab({ pagosSuscripcion, suscripciones, usuarios 
               <Bar dataKey="proyectado" name="Proyectado" fill="#9ADBC0" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>>
-      </div>>
+        </div>
+      </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-5">
         <h3 className="text-base font-bold text-gray-900 mb-3">Detalle de pagos ({pagosSuscripcion.length})</h3>
@@ -76,19 +76,19 @@ export default function CashflowTab({ pagosSuscripcion, suscripciones, usuarios 
           {pagosSuscripcion.map(pago => (
             <div key={pago.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg text-sm">
               <div>
-                <div className="font-semibold text-gray-800">{nombrePorOwner(pago.owner_id)}</div>>
+                <div className="font-semibold text-gray-800">{nombrePorOwner(pago.owner_id)}</div>
                 <div className="text-xs text-gray-500">
                   {pago.segmento} · {pago.ciclo} · {new Date(pago.procesado_en).toLocaleDateString('es-AR')}
-                </div>>
-              </div>>
-              <div className="font-bold text-green-700">{formatCurrency(pago.monto)}</div>>
-            </div>>
+                </div>
+              </div>
+              <div className="font-bold text-green-700">{formatCurrency(pago.monto)}</div>
+            </div>
           ))}
           {pagosSuscripcion.length === 0 && (
             <p className="text-gray-500 text-sm m-0">Todavía no hay pagos registrados.</p>
           )}
-        </div>>
-      </div>>
-    </div>>
+        </div>
+      </div>
+    </div>
   )
 }
