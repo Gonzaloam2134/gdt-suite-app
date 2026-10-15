@@ -4,7 +4,7 @@ import Icono from '../ui/Icono'
 export default function DashboardGlobalTab({ globalStats }) {
   return (
     <div className="space-y-4">
-      <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+      <div className="bg-primary-50 border border-primary-500 opacity-30 rounded-lg p-4">
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="corona" size={16} className="inline-block align-text-bottom mr-1.5 " />Bienvenido al panel de super administrador. Acá tenés una vista global de toda la plataforma GDT Suite.
         </p>
