@@ -9,7 +9,7 @@ export default function LocalesTab({
 }) {
   return (
     <div className="space-y-4">
-      <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+      <div className="bg-primary-50 border border-primary-500 opacity-30 rounded-lg p-4">
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
         </p>
