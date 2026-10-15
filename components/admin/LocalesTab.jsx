@@ -13,7 +13,7 @@ export default function LocalesTab({
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná todos los locales de la plataforma. Podés suspender locales problemáticos.
         </p>
-      </div>
+      </div>>
 
       <input
         type="text"
@@ -38,31 +38,31 @@ export default function LocalesTab({
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="font-bold text-gray-900 text-sm">{local.nombre}</div>
+                      <div className="font-bold text-gray-900 text-sm">{local.nombre}</div>>
                       {estaSuspendido && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">SUSPENDIDO</span>}
-                    </div>
+                    </div>>
                     <div className="text-xs text-gray-500 space-y-0.5">
-                      <div>Rubro: {local.rubro || 'Sin rubro'}</div>
-                      <div>Condición fiscal: {local.condicion_fiscal || 'Sin especificar'}</div>
-                      <div><Icono nombre="reloj" size={16} className="inline-block align-text-bottom mr-1.5 " />Creado: {new Date(local.creado_en).toLocaleDateString('es-AR')}</div>
-                    </div>
-                  </div>
-                </div>
+                      <div>Rubro: {local.rubro || 'Sin rubro'}</div>>
+                      <div>Condición fiscal: {local.condicion_fiscal || 'Sin especificar'}</div>>
+                      <div><Icono nombre="reloj" size={16} className="inline-block align-text-bottom mr-1.5 " />Creado: {new Date(local.creado_en).toLocaleDateString('es-AR')}</div>>
+                    </div>>
+                  </div>>
+                </div>>
 
                 {local.miembros_locales && local.miembros_locales.length > 0 && (
                   <div className="mb-3 text-xs text-gray-600">
-                    <div className="font-semibold mb-1"><Icono nombre="equipo" size={16} className="inline-block align-text-bottom mr-1.5 " />Miembros ({miembrosActivos} activos):</div>
+                    <div className="font-semibold mb-1"><Icono nombre="equipo" size={16} className="inline-block align-text-bottom mr-1.5 " />Miembros ({miembrosActivos} activos):</div>>
                     {local.miembros_locales.slice(0, 5).map((m, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <span>{m.perfiles?.email || 'Usuario'}</span>
                         <span className="px-1.5 py-0.5 bg-gray-100 rounded text-xs">{m.rol.toUpperCase()}</span>
                         {m.activo === false && <span className="text-red-600 text-xs">(inactivo)</span>}
-                      </div>
+                      </div>>
                     ))}
                     {local.miembros_locales.length > 5 && (
-                      <div className="text-gray-400">... y {local.miembros_locales.length - 5} más</div>
+                      <div className="text-gray-400">... y {local.miembros_locales.length - 5} más</div>>
                     )}
-                  </div>
+                  </div>>
                 )}
 
                 <button
@@ -75,18 +75,18 @@ export default function LocalesTab({
                 >
                   {estaSuspendido ? 'Activar local' : 'Suspender local'}
                 </button>
-              </div>
+              </div>>
             )
           })}
-        </div>
+        </div>>
 
         {todosLosLocales.filter(l => l.nombre.toLowerCase().includes(filtroLocal.toLowerCase())).length === 0 && (
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-            <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="buscar" size={44} /></div>
+            <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="buscar" size={44} /></div>>
             <p className="text-gray-500 text-sm">No se encontraron locales.</p>
-          </div>
+          </div>>
         )}
-      </div>
-    </div>
+      </div>>
+    </div>>
   )
 }

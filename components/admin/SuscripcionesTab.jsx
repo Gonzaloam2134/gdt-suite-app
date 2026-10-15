@@ -12,7 +12,7 @@ export default function SuscripcionesTab({
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="tarjeta" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná el estado de pago de cada local. Podés restringir funcionalidades o suspender el acceso si no pagan.
         </p>
-      </div>
+      </div>>
 
       <div className="flex gap-2 flex-wrap">
         {['todos', 'active', 'restricted', 'suspended'].map(estado => (
@@ -29,7 +29,7 @@ export default function SuscripcionesTab({
             {estado !== 'todos' && ` (${suscripciones.filter(s => s.estado === estado).length})`}
           </button>
         ))}
-      </div>
+      </div>>
 
       <div className="space-y-3">
         {suscripciones
@@ -60,15 +60,15 @@ export default function SuscripcionesTab({
                       {isVencido && sub.estado === 'active' && (
                         <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">VENCIDO</span>
                       )}
-                    </div>
+                    </div>>
                     <div className="text-xs text-gray-600 space-y-1">
-                      <div><Icono nombre="cuenta" size={16} className="inline-block align-text-bottom mr-1.5 " />Owner: {sub.ownerEmail}</div>
+                      <div><Icono nombre="cuenta" size={16} className="inline-block align-text-bottom mr-1.5 " />Owner: {sub.ownerEmail}</div>>
                       <div>
                         Plan: <span className="font-semibold uppercase">{sub.plan}</span>
-                      </div>
-                      <div>Vencimiento: {sub.fecha_vencimiento ? new Date(sub.fecha_vencimiento).toLocaleDateString('es-AR') : 'Sin fecha'}</div>
-                    </div>
-                  </div>
+                      </div>>
+                      <div>Vencimiento: {sub.fecha_vencimiento ? new Date(sub.fecha_vencimiento).toLocaleDateString('es-AR') : 'Sin fecha'}</div>>
+                    </div>>
+                  </div>>
 
                   <div className="flex flex-col gap-2 min-w-[200px]">
                     {sub.estado !== 'active' && (
@@ -95,13 +95,13 @@ export default function SuscripcionesTab({
                         Suspender acceso total
                       </button>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </div>>
+                </div>>
+              </div>>
             )
           })}
-        </div>
-      </div>
-    </div>
+        </div>>
+      </div>>
+    </div>>
   )
 }

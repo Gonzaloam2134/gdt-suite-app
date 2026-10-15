@@ -17,7 +17,7 @@ export default function ConsultasTab({
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="mail" size={16} className="inline-block align-text-bottom mr-1.5 " />Tenés <strong>{contactos.filter(c => c.estado === 'pendiente').length}</strong> consultas pendientes de {contactos.length} totales.
         </p>
-      </div>
+      </div>>
 
       <div className="flex gap-2 flex-wrap">
         {['todos', 'pendiente', 'resuelto', 'cerrado'].map(estado => (
@@ -34,7 +34,7 @@ export default function ConsultasTab({
             {estado !== 'todos' && ` (${contactos.filter(c => c.estado === estado).length})`}
           </button>
         ))}
-      </div>
+      </div>>
 
       {contactos
         .filter(c => filtroEstado === 'todos' || c.estado === filtroEstado)
@@ -64,31 +64,31 @@ export default function ConsultasTab({
                     }`}>
                       {contacto.estado.toUpperCase()}
                     </span>
-                  </div>
+                  </div>>
                   <h4 className="font-bold text-gray-900 text-sm mb-1">{contacto.asunto}</h4>
                   <div className="text-xs text-gray-500 space-y-0.5">
-                    <div><Icono nombre="cuenta" size={16} className="inline-block align-text-bottom mr-1.5 " />{contacto.perfil?.email || 'Usuario desconocido'}</div>
-                    {contacto.local?.nombre && <div><Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />{contacto.local.nombre}</div>}
-                    <div>Desde: {contacto.pagina_origen || 'Web'}</div>
-                    <div><Icono nombre="reloj" size={16} className="inline-block align-text-bottom mr-1.5 " />{new Date(contacto.creado_en).toLocaleString('es-AR')}</div>
-                  </div>
-                </div>
-              </div>
+                    <div><Icono nombre="cuenta" size={16} className="inline-block align-text-bottom mr-1.5 " />{contacto.perfil?.email || 'Usuario desconocido'}</div>>
+                    {contacto.local?.nombre && <div><Icono nombre="inicio" size={16} className="inline-block align-text-bottom mr-1.5 " />{contacto.local.nombre}</div>>}
+                    <div>Desde: {contacto.pagina_origen || 'Web'}</div>>
+                    <div><Icono nombre="reloj" size={16} className="inline-block align-text-bottom mr-1.5 " />{new Date(contacto.creado_en).toLocaleString('es-AR')}</div>>
+                  </div>>
+                </div>>
+              </div>>
 
               <div className="bg-gray-50 rounded-lg p-3 mb-3 text-sm text-gray-700 whitespace-pre-wrap">
                 {contacto.mensaje}
-              </div>
+              </div>>
 
               {contacto.respuesta && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                  <div className="text-xs text-green-700 font-bold mb-1"><Icono nombre="check" size={16} className="inline-block align-text-bottom mr-1.5 " />RESPUESTA:</div>
-                  <div className="text-sm text-green-900 whitespace-pre-wrap">{contacto.respuesta}</div>
+                  <div className="text-xs text-green-700 font-bold mb-1"><Icono nombre="check" size={16} className="inline-block align-text-bottom mr-1.5 " />RESPUESTA:</div>>
+                  <div className="text-sm text-green-900 whitespace-pre-wrap">{contacto.respuesta}</div>>
                   {contacto.respondido_en && (
                     <div className="text-xs text-green-600 mt-1">
                       Respondido: {new Date(contacto.respondido_en).toLocaleString('es-AR')}
-                    </div>
+                    </div>>
                   )}
-                </div>
+                </div>>
               )}
 
               {esPendiente && !estaRespondiendo && (
@@ -122,20 +122,20 @@ export default function ConsultasTab({
                     >
                       Cancelar
                     </button>
-                  </div>
-                </div>
+                  </div>>
+                </div>>
               )}
-            </div>
+            </div>>
           )
         })
       }
 
       {contactos.length === 0 && (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="vacio" size={44} /></div>
+          <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="vacio" size={44} /></div>>
           <p className="text-gray-500 text-sm">No hay consultas de soporte aún.</p>
-        </div>
+        </div>>
       )}
-    </div>
+    </div>>
   )
 }
