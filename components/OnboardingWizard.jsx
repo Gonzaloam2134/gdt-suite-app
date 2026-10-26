@@ -6,16 +6,27 @@ import { formatCurrency } from '../lib/format'
 
 const ORDEN_SEGMENTOS = [SEGMENTO.BASICO, SEGMENTO.NEGOCIO, SEGMENTO.MULTI_LOCAL]
 
-// Qué plan tiene sentido según la escala elegida en el Paso 2 — solo para
-// resaltarlo en el resumen (Paso 4). La prueba de 7 días desbloquea todo
-// sin importar el plan, así que esto es una sugerencia visual, no algo que
-// se guarde en la suscripción: "2-5" y "5+" caen en el mismo Multi-local
-// porque es el único segmento sin límite de locales (no hay un escalón
-// "Enterprise" en lib/constants/planes.js).
-const SEGMENTO_RECOMENDADO_POR_ESCALA = {
-  '1': SEGMENTO.BASICO,
-  '2-5': SEGMENTO.MULTI_LOCAL,
-  '5+': SEGMENTO.MULTI_LOCAL,
+// Paso 2: se elige directamente uno de los 3 segmentos reales, en el propio
+// lenguaje del dueño ("un cajero" / "varios cajeros y empleados" / "varios
+// locales"). Antes esto se adivinaba solo a partir de la cantidad de
+// locales, y alguien con 1 local pero con cajeros quedaba recomendado en
+// Básico (que es de un solo operador) — por eso ahora se pregunta directo.
+// La prueba de 7 días desbloquea todo sin importar el plan elegido acá: esto
+// es solo para que quede claro desde el vamos qué plan le queda, no algo que
+// se guarde en la suscripción.
+const OPCIONES_SEGMENTO = {
+  [SEGMENTO.BASICO]: {
+    titulo: 'Un local, un único cajero',
+    detalle: 'Vos (o un solo cajero) operando la caja. Sin más gente cargando cobros.',
+  },
+  [SEGMENTO.NEGOCIO]: {
+    titulo: 'Un local, con varios cajeros y/o empleados',
+    detalle: 'Ya no estás solo atendiendo — invitás al equipo que haga falta.',
+  },
+  [SEGMENTO.MULTI_LOCAL]: {
+    titulo: 'Varios locales, con cajeros y empleados',
+    detalle: 'Para cadenas o más de un local, cada uno con su propio equipo.',
+  },
 }
 
 // Iconos automáticos por tipo de medio de pago
@@ -50,7 +61,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
     businessName: '',
     rubro: 'Gastronomía',
     condicionFiscal: 'No inscripto',
-    escala: '1', // 1, 2-5, 5+
+    segmentoPrevisto: SEGMENTO.BASICO,
     mediosPago: MEDIOS_PRESET,
     invites: []
   })
@@ -84,8 +95,8 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
       return
     }
 
-    if (step === 2 && !formData.escala) {
-      toast.error('Seleccioná una opción de escala')
+    if (step === 2 && !formData.segmentoPrevisto) {
+      toast.error('Elegí la opción que más se parece a tu negocio')
       return
     }
 
@@ -123,7 +134,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">
               {step === 1 && '🏪 Datos del Negocio'}
-              {step === 2 && '📊 Tu Escala'}
+              {step === 2 && '📊 Tu Plan'}
               {step === 3 && '💳 Medios de Pago'}
               {step === 4 && '✅ Resumen Final'}
             </h2>
@@ -206,54 +217,42 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
             </div>
           )}
 
-          {/* PASO 2: Tu Escala (SOLO si NO es skipScaleStep) */}
+          {/* PASO 2: Tu Plan (SOLO si NO es skipScaleStep) — se elige directo uno de
+              los 3 segmentos reales, para que quede claro desde el registro cuál
+              le corresponde a cada uno. */}
           {step === 2 && !skipScaleStep && (
             <div className="space-y-4">
               <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4 mb-4">
                 <p className="text-sm text-primary-700 m-0">
-                  💡 Esto nos ayuda a configurar tu cuenta de la mejor manera.
+                  💡 Elegí la que más se parece a tu negocio hoy — podés cambiarla
+                  cuando quieras, y durante la prueba de 7 días tenés todo desbloqueado
+                  sin importar cuál elijas.
                 </p>
               </div>
               <h3 className="text-base font-bold text-gray-900 mb-4">
-                ¿Cuántos locales o sucursales planeas manejar en GDT Suite?
+                ¿Cómo vas a operar?
               </h3>
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => updateField('escala', '1')}
-                  className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
-                    formData.escala === '1' 
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-bold text-gray-900">1 Local</div>
-                  <div className="text-sm text-gray-600 mt-1">Ideal para emprendedores y negocios unipersonales.</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateField('escala', '2-5')}
-                  className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
-                    formData.escala === '2-5' 
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-bold text-gray-900">2 a 5 Locales</div>
-                  <div className="text-sm text-gray-600 mt-1">Perfecto para cadenas pequeñas o franquicias.</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateField('escala', '5+')}
-                  className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
-                    formData.escala === '5+' 
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-bold text-gray-900">Más de 5 Locales</div>
-                  <div className="text-sm text-gray-600 mt-1">Para cadenas en expansión — mismo plan Multi-local, sin límite de locales.</div>
-                </button>
+                {ORDEN_SEGMENTOS.map(seg => (
+                  <button
+                    key={seg}
+                    type="button"
+                    onClick={() => updateField('segmentoPrevisto', seg)}
+                    className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                      formData.segmentoPrevisto === seg
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900">{OPCIONES_SEGMENTO[seg].titulo}</span>
+                      <span className="text-[11px] font-bold text-primary-700 bg-primary-100 rounded-full px-2 py-0.5">
+                        {LABEL_SEGMENTO[seg]}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">{OPCIONES_SEGMENTO[seg].detalle}</div>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -325,11 +324,9 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                 </div>
                 {!skipScaleStep && (
                   <div className="flex justify-between border-b border-gray-100 pb-2">
-                    <span className="text-gray-500">Escala:</span>
+                    <span className="text-gray-500">Tu plan:</span>
                     <span className="font-semibold text-gray-900">
-                      {formData.escala === '1' && '1 Local'}
-                      {formData.escala === '2-5' && '2 a 5 Locales'}
-                      {formData.escala === '5+' && 'Más de 5 Locales'}
+                      {LABEL_SEGMENTO[formData.segmentoPrevisto]}
                     </span>
                   </div>
                 )}
@@ -367,7 +364,7 @@ export default function OnboardingWizard({ onComplete, onCancel, userEmail, prel
                   <div className="space-y-2">
                     {ORDEN_SEGMENTOS.map(seg => {
                       const precio = precios.find(p => p.segmento === seg && p.ciclo === 'mensual')
-                      const recomendado = !skipScaleStep && SEGMENTO_RECOMENDADO_POR_ESCALA[formData.escala] === seg
+                      const recomendado = !skipScaleStep && formData.segmentoPrevisto === seg
                       return (
                         <div key={seg} className={`flex items-start justify-between gap-3 text-xs bg-white rounded-lg p-2 border ${recomendado ? 'border-primary-500 ring-1 ring-primary-500/40' : 'border-primary-500/20'}`}>
                           <div className="min-w-0">

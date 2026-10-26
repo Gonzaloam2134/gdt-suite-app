@@ -18,16 +18,19 @@ export default function MasMenu({ lateral = false, activeTab, unSoloLocal = fals
   const ref = useRef(null)
   useClickOutside(ref, () => setAbierto(false), abierto)
 
-  const secundarioActivo = ['admin', 'mi-cuenta', 'planes', 'anuncios'].includes(activeTab)
+  const secundarioActivo = ['admin', 'mi-cuenta', 'planes', 'anuncios', 'cuenta-corriente'].includes(activeTab)
 
   // Lo ocasional, y solo lo que le sirve a cada rol: cajero y empleado no tienen
   // configuración, plan ni cuenta que administrar (solo Novedades y su sesión).
+  // Cuenta corriente es distinta: la anota cualquiera que opera la caja, así
+  // que va para los tres roles (mismo criterio que ROLES_REGISTRAN_COBRO).
   const esDueno = hasRole([ROLES.OWNER])
   const items = [
     esDueno && { label: 'Configuración', icono: 'admin', path: '/admin' },
     esDueno && unSoloLocal && { label: 'Mis locales', icono: 'inicio', path: '/locales?ver=1' },
     esDueno && { label: 'Mi cuenta', icono: 'cuenta', path: '/mi-cuenta' },
     esDueno && { label: 'Planes', icono: 'tarjeta', path: '/planes' },
+    { label: 'Cuenta corriente', icono: 'recibo', path: '/cuenta-corriente' },
     { label: 'Ayuda', icono: 'info', path: '/ayuda' },
   ].filter(Boolean)
 
