@@ -16,7 +16,9 @@ const TABS = [
   { id: 'inicio', label: 'Inicio', icono: 'inicio', path: '/locales' },
   { id: 'caja', label: 'Caja', icono: 'caja', path: '/dashboard', requiereLocal: true },
   // Sin `roles`: la anota cualquiera que opera la caja (dueño, cajero, empleado).
-  { id: 'cuenta-corriente', label: 'Cta. corriente', icono: 'recibo', path: '/cuenta-corriente', requiereLocal: true },
+  // `soloConLocal`: solo tiene sentido una vez adentro de una caja puntual —
+  // en /locales (eligiendo cuál) no hay "el cliente" todavía.
+  { id: 'cuenta-corriente', label: 'Cta. corriente', icono: 'recibo', path: '/cuenta-corriente', requiereLocal: true, soloConLocal: true },
   { id: 'reportes', label: 'Reportes', icono: 'reportes', path: '/reportes', roles: [ROLES.OWNER] },
 ]
 
@@ -34,6 +36,7 @@ export default function BottomNav({ activeTab, lateral = false, cantidadLocales 
     ...TABS
       .filter(t => !t.roles || hasRole(t.roles))
       .filter(t => !(t.id === 'inicio' && unSoloLocal))
+      .filter(t => !t.soloConLocal || activeLocalId)
       .map(t => (t.id === 'caja' && role === ROLES.EMPLEADO ? { ...t, label: 'Cobrar' } : t)),
   ]
   const ir = (tab) => router.push(tab.requiereLocal && !activeLocalId ? '/locales' : tab.path)

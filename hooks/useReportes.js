@@ -4,7 +4,9 @@ import { getMembresias } from '../lib/services/miembros'
 import { getLocales } from '../lib/services/locales'
 import { listarTransaccionesPeriodo } from '../lib/services/transacciones'
 import { listarCierres } from '../lib/services/cierresCaja'
+import { listarPagosCcPeriodo } from '../lib/services/cuentaCorriente'
 import { calcularResumenPeriodo } from '../lib/domain/transacciones'
+import { resumenPagosCc } from '../lib/domain/cuentaCorriente'
 import { agruparPorAlicuota, agruparPorMedio, agruparPorDia, evaluarCalidad, conciliarCierres } from '../lib/domain/reportes'
 import { rangoEntre, periodoRapido } from '../lib/dates'
 import { discriminaIva } from '../lib/constants/transacciones'
@@ -16,6 +18,7 @@ export function useReportes(userId) {
   const [periodo, setPeriodo] = useState(() => ({ ...periodoRapido('ultimos-30'), preset: 'ultimos-30' }))
   const [transacciones, setTransacciones] = useState([])
   const [cierres, setCierres] = useState([])
+  const [pagosCc, setPagosCc] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -44,18 +47,21 @@ export function useReportes(userId) {
     setLoading(true)
     try {
       const { inicio, fin } = rangoEntre(periodo.desde, periodo.hasta)
-      const [tx, cj] = await Promise.all([
+      const [tx, cj, pcc] = await Promise.all([
         listarTransaccionesPeriodo(localIds, periodo.desde, periodo.hasta),
         listarCierres(localIds, { inicio, fin, limite: 200 }),
+        listarPagosCcPeriodo(localIds, periodo.desde, periodo.hasta),
       ])
       if (idPeticion !== peticionActual.current) return
       setTransacciones(tx)
       setCierres(cj)
+      setPagosCc(pcc)
     } catch (err) {
       if (idPeticion !== peticionActual.current) return
       toast.error(`No se pudo generar el reporte: ${err.message}`)
       setTransacciones([])
       setCierres([])
+      setPagosCc([])
     } finally {
       if (idPeticion === peticionActual.current) setLoading(false)
     }
@@ -83,8 +89,9 @@ export function useReportes(userId) {
       porDia: agruparPorDia(transacciones),
       calidad: evaluarCalidad(transacciones),
       conciliacion: conciliarCierres(cierres),
+      pagosCc: resumenPagosCc(pagosCc),
     }
-  }, [transacciones, cierres, localActual?.condicion_fiscal])
+  }, [transacciones, cierres, pagosCc, localActual?.condicion_fiscal])
 
   return {
     locales, localId, setLocalId, localActual, periodo, cierres, loading,
