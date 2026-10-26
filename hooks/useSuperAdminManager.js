@@ -9,7 +9,7 @@ import { actualizarPrecioPlan } from '../lib/services/planes'
 import { crearAnuncio, actualizarAnuncio, cambiarActivoAnuncio, eliminarAnuncio } from '../lib/services/anuncios'
 import { useSuperAdminData } from './useSuperAdminData'
 
-export function useSuperAdminManager() {
+export function useSuperAdminManager(userId) {
   const router = useRouter()
   const {
     globalStats, contactos, usuarios, todosLosLocales, suscripciones,
@@ -204,9 +204,12 @@ export function useSuperAdminManager() {
 
   const handleCrearAnuncio = async () => {
     if (!nuevoAnuncio.titulo.trim() || !nuevoAnuncio.mensaje.trim()) return toast.error('Completá título y mensaje')
+    if (!userId) return toast.error('No se encontró tu usuario — recargá la página e intentá de nuevo')
     setPublicando(true)
     try {
-      await crearAnuncio({ ...nuevoAnuncio, creadoPor: 'superadmin' }) // Fallback since we don't have user.id here yet
+      // creado_por es uuid (FK a perfiles) — tiene que ser el id real del
+      // super admin que publica, nunca un string fijo (eso rompía el insert).
+      await crearAnuncio({ ...nuevoAnuncio, creadoPor: userId })
       toast.success('✅ Anuncio publicado')
       setNuevoAnuncio({ titulo: '', mensaje: '', tipo: 'info' })
       await recargar()

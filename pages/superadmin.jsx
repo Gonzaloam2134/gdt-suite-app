@@ -29,7 +29,7 @@ export default function SuperAdmin() {
   const terminos = useTerminosGuard(user?.id)
   const signOut = useSignOut()
 
-  const manager = useSuperAdminManager()
+  const manager = useSuperAdminManager(user?.id)
   const {
     activeTab, setActiveTab, tabsScrollRef, tabsPuedeIzq, tabsPuedeDer, desplazarTabs,
     loading, recargar
