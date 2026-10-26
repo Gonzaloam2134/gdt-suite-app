@@ -21,3 +21,5 @@ supabase/.temp/
 
 # Estado local del plugin Clawness (ledger, memoria, config) — no es código del proyecto
 .clawness/
+.vercel
+.env*
