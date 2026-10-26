@@ -14,7 +14,7 @@ export default function AnunciosTab({
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="novedades" size={16} className="inline-block align-text-bottom mr-1.5 " />Publicá anuncios que todos los usuarios verán al iniciar sesión.
         </p>
-      </div>
+      </div>>
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-base font-bold text-gray-900 mb-4">Crear nuevo anuncio</h3>
@@ -29,7 +29,7 @@ export default function AnunciosTab({
               placeholder="Ej: Nueva funcionalidad disponible"
               className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
             />
-          </div>
+          </div>>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Mensaje:</label>
@@ -40,7 +40,7 @@ export default function AnunciosTab({
               rows={4}
               className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none resize-vertical"
             />
-          </div>
+          </div>>
 
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">Tipo: <span className="text-primary-600"><Icono nombre={iconoDeAnuncio(nuevoAnuncio.tipo)} size={18} /></span></label>
@@ -54,7 +54,7 @@ export default function AnunciosTab({
               <option value="success">Éxito</option>
               <option value="feature">Nueva feature</option>
             </select>
-          </div>
+          </div>>
 
           <button
             onClick={handleCrearAnuncio}
@@ -63,8 +63,8 @@ export default function AnunciosTab({
           >
             {publicando ? 'Publicando…' : 'Publicar anuncio'}
           </button>
-        </div>
-      </div>
+        </div>>
+      </div>>
 
       <div className="space-y-3">
         <h3 className="text-base font-bold text-gray-900">Anuncios publicados ({anuncios.length})</h3>
@@ -95,22 +95,22 @@ export default function AnunciosTab({
                     className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold cursor-pointer hover:bg-gray-200">
                     Cancelar
                   </button>
-                </div>
-              </div>
+                </div>>
+              </div>>
             ) : (
               <div className="flex items-start gap-3">
-                <div className="text-primary-600 shrink-0"><Icono nombre={iconoDeAnuncio(anuncio.tipo)} size={26} /></div>
+                <div className="text-primary-600 shrink-0"><Icono nombre={iconoDeAnuncio(anuncio.tipo)} size={26} /></div>>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-gray-900 text-sm mb-1 m-0">{anuncio.titulo}</h4>
                     {!anuncio.activo && (
                       <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase">Oculto</span>
                     )}
-                  </div>
+                  </div>>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{anuncio.mensaje}</p>
                   <div className="text-xs text-gray-500 mt-2">
                     Publicado: {new Date(anuncio.creado_en).toLocaleString('es-AR')}
-                  </div>
+                  </div>>
                   <div className="flex gap-2 mt-3">
                     <button onClick={() => setEditandoAnuncio({ id: anuncio.id, titulo: anuncio.titulo, mensaje: anuncio.mensaje, tipo: anuncio.tipo })}
                       className="px-3 py-1 bg-primary-50 text-primary-700 rounded text-xs font-semibold cursor-pointer hover:bg-primary-500/20">
@@ -124,19 +124,19 @@ export default function AnunciosTab({
                       className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold cursor-pointer hover:bg-red-200">
                       Eliminar
                     </button>
-                  </div>
-                </div>
-              </div>
+                  </div>>
+                </div>>
+              </div>>
             )}
-          </div>
+          </div>>
         ))}
         {anuncios.length === 0 && (
           <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
-            <div className="mb-2 text-primary-600/70 flex justify-center"><Icono nombre="vacio" size={40} /></div>
+            <div className="mb-2 text-primary-600/70 flex justify-center"><Icono nombre="vacio" size={40} /></div>>
             <p className="text-gray-500 text-sm">No hay anuncios publicados</p>
-          </div>
+          </div>>
         )}
-      </div>
-    </div>
+      </div>>
+    </div>>
   )
 }

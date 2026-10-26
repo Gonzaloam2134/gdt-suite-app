@@ -13,7 +13,7 @@ export default function UsuariosTab({
           <Icono nombre="equipo" size={16} className="inline-block align-text-bottom mr-1.5 " />Gestioná los usuarios de la plataforma. Podés cambiar el rol global.
           El email de inicio de sesión se administra desde Supabase Auth, no desde acá.
         </p>
-      </div>
+      </div>>
 
       <div className="space-y-2">
         {usuarios.map(usuario => {
@@ -26,7 +26,7 @@ export default function UsuariosTab({
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="font-bold text-gray-900 text-sm">{usuario.nombre || 'Sin nombre'}</div>
+                    <div className="font-bold text-gray-900 text-sm">{usuario.nombre || 'Sin nombre'}</div>>
                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                       usuario.rol_global === 'super_user' ? 'bg-purple-100 text-purple-700' :
                       usuario.rol_global === 'owner' ? 'bg-primary-50 text-primary-700' :
@@ -36,10 +36,10 @@ export default function UsuariosTab({
                       {usuario.rol_global?.toUpperCase() || 'USUARIO'}
                     </span>
                     {!esActivo && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">INACTIVO</span>}
-                  </div>
-                  <div className="text-xs text-gray-500 mb-2">{usuario.email}</div>
-                </div>
-              </div>
+                  </div>>
+                  <div className="text-xs text-gray-500 mb-2">{usuario.email}</div>>
+                </div>>
+              </div>>
 
               {editandoUsuario === usuario.id ? (
                 <div className="bg-slate-50 p-3 rounded-lg space-y-3">
@@ -54,7 +54,7 @@ export default function UsuariosTab({
                       <option value="cajero">Cajero</option>
                       <option value="empleado">Empleado</option>
                     </select>
-                  </div>
+                  </div>>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleActualizarUsuario(usuario.id)}
@@ -68,8 +68,8 @@ export default function UsuariosTab({
                     >
                       Cancelar
                     </button>
-                  </div>
-                </div>
+                  </div>>
+                </div>>
               ) : editandoEmail === usuario.id ? (
                 <div className="bg-slate-50 p-3 rounded-lg space-y-3">
                   <div>
@@ -80,7 +80,7 @@ export default function UsuariosTab({
                       onChange={(e) => setNuevoEmail(e.target.value)}
                       placeholder={usuario.email}
                       className="w-full p-2 border border-gray-300 rounded-md text-sm" />
-                  </div>
+                  </div>>
                   <div className="flex gap-2">
                     <button
                       disabled={!/\S+@\S+\.\S+/.test(nuevoEmail) || nuevoEmail === usuario.email}
@@ -95,8 +95,8 @@ export default function UsuariosTab({
                     >
                       Cancelar
                     </button>
-                  </div>
-                </div>
+                  </div>>
+                </div>>
               ) : (
                 <div className="flex gap-2 flex-wrap">
                   <button
@@ -111,12 +111,12 @@ export default function UsuariosTab({
                   >
                     Editar email
                   </button>
-                </div>
+                </div>>
               )}
-            </div>
+            </div>>
           )
         })}
-      </div>
-    </div>
+      </div>>
+    </div>>
   )
 }

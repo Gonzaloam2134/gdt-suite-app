@@ -15,7 +15,7 @@ export default function ConfiguracionTab({
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="admin" size={16} className="inline-block align-text-bottom mr-1.5 " />Configuración global de la plataforma. Estos valores afectan a todos los usuarios y locales.
         </p>
-      </div>
+      </div>>
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-base font-bold text-gray-900 mb-4">Parámetros globales</h3>
@@ -29,7 +29,7 @@ export default function ConfiguracionTab({
               onChange={(e) => setConfig({...config, max_locales_por_usuario: parseInt(e.target.value) || 0})}
               className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
             />
-          </div>
+          </div>>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Comisión por defecto (%):</label>
@@ -40,7 +40,7 @@ export default function ConfiguracionTab({
               onChange={(e) => setConfig({...config, comision_default: parseFloat(e.target.value) || 0})}
               className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
             />
-          </div>
+          </div>>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Plazo de acreditación default (días):</label>
@@ -50,7 +50,7 @@ export default function ConfiguracionTab({
               onChange={(e) => setConfig({...config, plazo_acreditacion_default: parseInt(e.target.value) || 0})}
               className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
             />
-          </div>
+          </div>>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Modo mantenimiento:</label>
@@ -62,8 +62,8 @@ export default function ConfiguracionTab({
               <option value="no">Desactivado</option>
               <option value="si">Activado (bloquea accesos)</option>
             </select>
-          </div>
-        </div>
+          </div>>
+        </div>>
 
         <button
           onClick={handleGuardarConfig}
@@ -71,7 +71,7 @@ export default function ConfiguracionTab({
         >
           Guardar configuración
         </button>
-      </div>
+      </div>>
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-base font-bold text-gray-900 mb-1">Precios de los planes</h3>
@@ -87,9 +87,9 @@ export default function ConfiguracionTab({
             return (
               <div key={plan.id} className="flex items-center gap-3 flex-wrap p-3 bg-slate-50 rounded-lg">
                 <div className="min-w-[160px]">
-                  <div className="text-sm font-semibold text-gray-800">{plan.segmento}</div>
-                  <div className="text-xs text-gray-500">{plan.ciclo} · hoy: {formatCurrency(plan.precio)}</div>
-                </div>
+                  <div className="text-sm font-semibold text-gray-800">{plan.segmento}</div>>
+                  <div className="text-xs text-gray-500">{plan.ciclo} · hoy: {formatCurrency(plan.precio)}</div>>
+                </div>>
                 <input type="number" min="0" step="100"
                   value={valorEditando}
                   onChange={(e) => setPreciosEditando({ ...preciosEditando, [plan.id]: e.target.value })}
@@ -101,14 +101,14 @@ export default function ConfiguracionTab({
                 >
                   {guardandoPrecio === plan.id ? 'Guardando…' : 'Guardar'}
                 </button>
-              </div>
+              </div>>
             )
           })}
           {planes.length === 0 && (
             <p className="text-sm text-gray-400 m-0">No se pudieron cargar los planes.</p>
           )}
-        </div>
-      </div>
+        </div>>
+      </div>>
 
       <details className="bg-white rounded-lg border border-gray-200 p-6">
         <summary className="text-base font-bold text-gray-900 cursor-pointer m-0">
@@ -123,23 +123,23 @@ export default function ConfiguracionTab({
             <div key={log.id} className="p-3 bg-slate-50 rounded-lg text-xs">
               <div className="font-semibold text-gray-800">
                 {log.accion === 'email_actualizado' ? 'Email de acceso actualizado' : log.accion}
-              </div>
+              </div>>
               <div className="text-gray-600 mt-1">
                 {log.actor?.nombre || log.actor?.email || 'Desconocido'} → {log.objetivo?.nombre || log.objetivo?.email || 'Desconocido'}
-              </div>
+              </div>>
               {log.detalles?.emailAnterior && (
                 <div className="text-gray-400 mt-1">
                   {log.detalles.emailAnterior} → {log.detalles.emailNuevo}
-                </div>
+                </div>>
               )}
-              <div className="text-gray-400 mt-1">{new Date(log.creado_en).toLocaleString('es-AR')}</div>
-            </div>
+              <div className="text-gray-400 mt-1">{new Date(log.creado_en).toLocaleString('es-AR')}</div>>
+            </div>>
           ))}
           {auditoriaGlobal.length === 0 && (
             <p className="text-sm text-gray-400 m-0">Sin registros todavía.</p>
           )}
-        </div>
+        </div>>
       </details>
-    </div>
+    </div>>
   )
 }
