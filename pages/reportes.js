@@ -18,6 +18,7 @@ import ResumenEjecutivo from '../components/reportes/ResumenEjecutivo'
 import TarjetaNegocio from '../components/reportes/TarjetaNegocio'
 import ResumenPorAlicuota from '../components/reportes/ResumenPorAlicuota'
 import ResumenMedios from '../components/reportes/ResumenMedios'
+import ResumenCuentaCorriente from '../components/reportes/ResumenCuentaCorriente'
 import ConciliacionCaja from '../components/reportes/ConciliacionCaja'
 import TablaLibro from '../components/reportes/TablaLibro'
 import TerminosBloqueoModal from '../components/TerminosBloqueoModal'
@@ -134,6 +135,12 @@ export default function Reportes() {
         <SeccionColapsable titulo="Medios de pago" abiertaPorDefecto={false}>
           <ResumenMedios porMedio={r.porMedio} totalFacturado={r.resumen.totalFacturado} />
         </SeccionColapsable>
+
+        {r.pagosCc.cantidad > 0 && (
+          <SeccionColapsable titulo="Cobrado por cuenta corriente" badge={r.pagosCc.cantidad} abiertaPorDefecto={false}>
+            <ResumenCuentaCorriente pagosCc={r.pagosCc} totalFacturado={r.resumen.totalFacturado} />
+          </SeccionColapsable>
+        )}
 
         <SeccionColapsable titulo="Conciliación de caja" abiertaPorDefecto={false}>
           <ConciliacionCaja conciliacion={r.conciliacion} cierres={r.cierres} />

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   calcularSaldo, saldoAFavor, deudaPendiente, clientesConSaldo, totalAdeudado, excedeSaldo,
-  esConsumo, esPago, esValido,
+  esConsumo, esPago, esValido, resumenPagosCc,
 } from '../lib/domain/cuentaCorriente'
 
 const consumo = (monto, extra = {}) => ({ tipo: 'consumo', monto, es_reversa: false, revertida: false, ...extra })
@@ -104,5 +104,38 @@ describe('esConsumo / esPago / esValido', () => {
     expect(esValido(consumo(100))).toBe(true)
     expect(esValido(consumo(100, { es_reversa: true }))).toBe(false)
     expect(esValido(consumo(100, { revertida: true }))).toBe(false)
+  })
+})
+
+describe('resumenPagosCc', () => {
+  const pagoDe = (clienteId, nombre, monto, extra = {}) =>
+    pago(monto, { cliente_id: clienteId, clientes_cc: { nombre }, ...extra })
+
+  it('sin pagos en el período', () => {
+    expect(resumenPagosCc([])).toEqual({ total: 0, cantidad: 0, porCliente: [] })
+  })
+
+  it('ignora consumos, solo cuenta pagos', () => {
+    const movs = [consumo(1000, { cliente_id: 'c1', clientes_cc: { nombre: 'Juana' } }), pagoDe('c1', 'Juana', 500)]
+    const r = resumenPagosCc(movs)
+    expect(r.total).toBe(500)
+    expect(r.cantidad).toBe(1)
+  })
+
+  it('agrupa por cliente y suma el total general', () => {
+    const movs = [pagoDe('c1', 'Juana', 1000), pagoDe('c1', 'Juana', 500), pagoDe('c2', 'Tomás', 2000)]
+    const r = resumenPagosCc(movs)
+    expect(r.total).toBe(3500)
+    expect(r.cantidad).toBe(3)
+    expect(r.porCliente).toEqual([
+      { clienteId: 'c2', nombre: 'Tomás', total: 2000, cantidad: 1 },
+      { clienteId: 'c1', nombre: 'Juana', total: 1500, cantidad: 2 },
+    ])
+  })
+
+  it('un pago anulado no cuenta (ni su reversa)', () => {
+    const original = pagoDe('c1', 'Juana', 1000, { revertida: true })
+    const reversa = pagoDe('c1', 'Juana', -1000, { es_reversa: true })
+    expect(resumenPagosCc([original, reversa])).toEqual({ total: 0, cantidad: 0, porCliente: [] })
   })
 })
