@@ -22,6 +22,7 @@ export default function MasMenu({ lateral = false, activeTab, unSoloLocal = fals
 
   // Lo ocasional, y solo lo que le sirve a cada rol: cajero y empleado no tienen
   // configuración, plan ni cuenta que administrar (solo Novedades y su sesión).
+  // Cuenta corriente vive en la nav principal (BottomNav), no acá.
   const esDueno = hasRole([ROLES.OWNER])
   const items = [
     esDueno && { label: 'Configuración', icono: 'admin', path: '/admin' },
