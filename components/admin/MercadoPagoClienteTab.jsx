@@ -69,6 +69,11 @@ export default function MercadoPagoClienteTab({ local, localId, ownerId, locales
           lleguen a una cola de "por confirmar" acá en GDT Suite. Nada se carga solo a la caja:
           vos o tu equipo confirman cada cobro con un toque.
         </p>
+        <p className="text-xs text-gray-400 m-0">
+          Al conectar, tu cuenta y tus cobros los administra Mercado Pago — GDT Suite no guarda ni
+          administra datos de tarjetas ni de medios de pago/cobro, solo recibe el aviso de cada cobro
+          para que lo confirmes acá.
+        </p>
 
         {!conectado && !tieneDireccion && (
           <div className="space-y-2 pt-2 border-t border-gray-100">

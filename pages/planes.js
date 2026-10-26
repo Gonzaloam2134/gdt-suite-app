@@ -213,6 +213,10 @@ export default function Planes() {
             Política de Reembolsos
           </a>.
         </p>
+        <p className="text-center text-xs text-gray-400 mt-1">
+          El pago se procesa en Mercado Pago, no en GDT Suite: tus datos de tarjeta y de pago los administra
+          Mercado Pago, nunca nosotros.
+        </p>
       </div>
 
       <EmailPagoModal
