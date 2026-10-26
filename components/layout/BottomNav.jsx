@@ -15,6 +15,8 @@ import Icono from '../ui/Icono'
 const TABS = [
   { id: 'inicio', label: 'Inicio', icono: 'inicio', path: '/locales' },
   { id: 'caja', label: 'Caja', icono: 'caja', path: '/dashboard', requiereLocal: true },
+  // Sin `roles`: la anota cualquiera que opera la caja (dueño, cajero, empleado).
+  { id: 'cuenta-corriente', label: 'Cta. corriente', icono: 'recibo', path: '/cuenta-corriente', requiereLocal: true },
   { id: 'reportes', label: 'Reportes', icono: 'reportes', path: '/reportes', roles: [ROLES.OWNER] },
 ]
 
