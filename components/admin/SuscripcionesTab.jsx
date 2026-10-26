@@ -104,9 +104,9 @@ export default function SuscripcionesTab({
                   )}
                 </div>
               </div>
-            )
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
