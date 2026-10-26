@@ -27,8 +27,8 @@ export default function ManualContenido() {
     <div>
       <p className="text-sm text-gray-700 leading-relaxed mb-8">
         Esta guía es para el dueño o la persona que atiende el local. Cubre lo que se usa todos los
-        días: abrir la caja, cobrar, registrar gastos, cerrarla, y mirar los reportes. Cada paso tiene
-        una captura real de la aplicación.
+        días: abrir la caja, cobrar, registrar gastos, llevar cuentas corrientes, cerrarla, y mirar los
+        reportes. Cada paso tiene una captura real de la aplicación.
       </p>
 
       <Seccion titulo="1. Entrar y elegir tu local">
@@ -68,7 +68,32 @@ export default function ManualContenido() {
         <Captura src="10-gasto-registrado.jpg" alt="Gasto registrado" />
       </Seccion>
 
-      <Seccion titulo="5. Cerrar la caja al final del día">
+      <Seccion titulo="5. Cuenta corriente (para kioskos de colegio y clientes habituales)">
+        <p>
+          Desde el menú inferior, tocá <strong>Cta. corriente</strong>. Es para cuando alguien consume
+          durante el mes y paga todo junto al final — el caso típico es el kiosko de un colegio: el
+          alumno se lleva algo, se anota, y el padre paga a fin de mes.
+        </p>
+        <p>
+          Tocá <strong>+ Nuevo cliente</strong> para dar de alta a quien va a tener cuenta (un alumno, una
+          familia). Podés agregarle un dato para identificarlo — el grado, un teléfono, lo que te sirva.
+        </p>
+        <p>
+          Entrá al cliente y tocá <strong>Anotar consumo</strong> cada vez que se lleve algo. Esto queda
+          como deuda del cliente — no suma a lo cobrado del día, no afecta el arqueo de tu caja.
+        </p>
+        <p>
+          Cuando el padre paga, tocá <strong>Registrar pago</strong>. Ahí sí es plata real: elegís el medio
+          de pago y eso entra a la caja como un cobro normal, igual que cualquier venta, y baja la deuda
+          del cliente. No hace falta que pague todo junto — podés registrar pagos parciales.
+        </p>
+        <p>
+          Si anotaste un consumo o un pago equivocado, no se borra: se anula con una reversa, igual que un
+          cobro o un gasto común.
+        </p>
+      </Seccion>
+
+      <Seccion titulo="6. Cerrar la caja al final del día">
         <p>
           Al terminar el día, tocá <strong>Cerrar caja</strong>. La app te muestra cuánto efectivo
           debería haber según lo cobrado y gastado — contá el efectivo real y cargalo para ver si coincide.
@@ -80,7 +105,7 @@ export default function ManualContenido() {
         </p>
       </Seccion>
 
-      <Seccion titulo="6. Ver los reportes">
+      <Seccion titulo="7. Ver los reportes">
         <p>
           Desde el menú inferior, tocá <strong>Reportes</strong>. Elegí el período (hoy, últimos 30 días, un
           mes puntual) y ves cómo viene el negocio.
@@ -94,7 +119,7 @@ export default function ManualContenido() {
         <p>Si falta algún comprobante, el reporte lo avisa — nunca inventa un dato que no cargaste.</p>
       </Seccion>
 
-      <Seccion titulo="7. Administrar tu local">
+      <Seccion titulo="8. Administrar tu local">
         <p>
           Desde el menú inferior, tocá <strong>Más</strong> para llegar a Configuración, cambio de
           contraseña y el resto de las opciones.
@@ -113,7 +138,7 @@ export default function ManualContenido() {
         <Captura src="16-admin-medios-cobro.jpg" alt="Medios de cobro" />
       </Seccion>
 
-      <Seccion titulo="8. Preguntas frecuentes">
+      <Seccion titulo="9. Preguntas frecuentes">
         <p><strong>Cargué mal un cobro, ¿cómo lo saco?</strong><br />
           Nada se borra. Anulalo y se crea una reversa: el original queda tachado en la caja, pero visible,
           y ninguno de los dos suma al total.</p>
@@ -123,6 +148,8 @@ export default function ManualContenido() {
           No. Cada cobro guarda su comisión, IVA y fecha de acreditación del momento en que se hizo.</p>
         <p><strong>¿Quién puede ver Administración?</strong><br />
           Solo el dueño. Un cajero opera la caja pero no ve esa sección.</p>
+        <p><strong>¿Un consumo de cuenta corriente suma al arqueo del día?</strong><br />
+          No. Es deuda del cliente, no plata cobrada — recién entra a la caja cuando el padre paga.</p>
         <p><strong>¿Qué hago si algo no funciona como acá?</strong><br />
           Escribinos a supportfranquicias@gmail.com.</p>
       </Seccion>
