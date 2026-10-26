@@ -1,12 +1,32 @@
-import React from 'react'
+import React, { useState } from 'react'
 import Icono from '../ui/Icono'
+
+/** Input de días + botón, para no repetir el useState en cada fila del listado. */
+function ExtenderPruebaControl({ onExtender }) {
+  const [dias, setDias] = useState(7)
+  return (
+    <div className="flex gap-1.5 items-center">
+      <input type="number" min="1" value={dias}
+        onChange={(e) => setDias(Math.max(1, Number(e.target.value) || 1))}
+        className="w-16 px-2 py-2 border border-gray-300 rounded-md text-xs text-center" />
+      <button
+        onClick={() => onExtender(dias)}
+        className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-blue-600"
+      >
+        Extender prueba (días)
+      </button>
+    </div>
+  )
+}
 
 export default function SuscripcionesTab({
   suscripciones,
   filtroSuscripcion,
   setFiltroSuscripcion,
   confirmarSuscripcion,
-  setConfirmarSuscripcion
+  setConfirmarSuscripcion,
+  setConfirmarExtender,
+  setConfirmarGratis,
 }) {
   const filteredSuscripciones = suscripciones.filter(s =>
     filtroSuscripcion === 'todos' || s.estado === filtroSuscripcion
@@ -78,6 +98,19 @@ export default function SuscripcionesTab({
                 </div>
 
                 <div className="flex flex-col gap-2 min-w-[200px]">
+                  {sub.plan === 'trial' && (
+                    <ExtenderPruebaControl onExtender={(dias) =>
+                      setConfirmarExtender({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, dias })
+                    } />
+                  )}
+                  {sub.plan !== 'free' && (
+                    <button
+                      onClick={() => setConfirmarGratis({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre })}
+                      className="px-3 py-2 bg-purple-500 text-white rounded-md text-xs font-semibold cursor-pointer hover:bg-purple-600"
+                    >
+                      ⭐ Cliente selecto: 100% gratis
+                    </button>
+                  )}
                   {sub.estado !== 'active' && (
                     <button
                       onClick={() => setConfirmarSuscripcion({ ownerId: sub.owner_id, nombreLocal: sub.locales?.[0]?.nombre, nuevoEstado: 'active' })}

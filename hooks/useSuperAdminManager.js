@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabaseClient'
-import { cambiarEstadoSuscripcion, cambiarEstadoCuenta } from '../lib/services/suscripciones'
+import { cambiarEstadoSuscripcion, cambiarEstadoCuenta, extenderPrueba, hacerCuentaGratis } from '../lib/services/suscripciones'
 import { responderContacto } from '../lib/services/contactos'
 import { actualizarUsuario, guardarConfigGlobal } from '../lib/services/superadmin'
 import { actualizarPrecioPlan } from '../lib/services/planes'
@@ -137,6 +137,34 @@ export function useSuperAdminManager() {
     }
   }
 
+  // { ownerId, nombreLocal, dias } | null
+  const [confirmarExtender, setConfirmarExtender] = useState(null)
+  const confirmarExtenderPrueba = async () => {
+    if (!confirmarExtender) return
+    try {
+      await extenderPrueba(confirmarExtender.ownerId, confirmarExtender.dias)
+      toast.success(`✅ Prueba extendida ${confirmarExtender.dias} días`)
+      setConfirmarExtender(null)
+      await recargar()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  // { ownerId, nombreLocal } | null
+  const [confirmarGratis, setConfirmarGratis] = useState(null)
+  const confirmarHacerGratis = async () => {
+    if (!confirmarGratis) return
+    try {
+      await hacerCuentaGratis(confirmarGratis.ownerId)
+      toast.success('✅ Cuenta pasada a 100% gratis')
+      setConfirmarGratis(null)
+      await recargar()
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
   // Config
   const handleGuardarConfig = async () => {
     try {
@@ -241,6 +269,8 @@ export function useSuperAdminManager() {
 
     // Suscripciones
     filtroSuscripcion, setFiltroSuscripcion, confirmarSuscripcion, setConfirmarSuscripcion, confirmarCambioSuscripcion,
+    confirmarExtender, setConfirmarExtender, confirmarExtenderPrueba,
+    confirmarGratis, setConfirmarGratis, confirmarHacerGratis,
 
     // Config
     handleGuardarConfig, preciosEditando, setPreciosEditando, guardandoPrecio, handleGuardarPrecio,

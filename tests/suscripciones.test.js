@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { diasHastaVencer, estadoEfectivo, debeAvisarProntoAVencer, PLAN } from '../lib/domain/suscripciones'
+import { diasHastaVencer, estadoEfectivo, debeAvisarProntoAVencer, extenderFechaVencimiento, PLAN } from '../lib/domain/suscripciones'
 
 describe('diasHastaVencer', () => {
   it('positivo cuando falta para vencer', () => {
@@ -88,5 +88,24 @@ describe('debeAvisarProntoAVencer', () => {
   })
   it('no avisa para planes sin fecha de prueba (pago, free)', () => {
     expect(debeAvisarProntoAVencer({ estado: 'active', vencioPrueba: false, diasRestantes: null })).toBe(false)
+  })
+})
+
+describe('extenderFechaVencimiento', () => {
+  it('prueba vigente: suma los días desde la fecha actual, no desde hoy', () => {
+    expect(extenderFechaVencimiento('2026-09-05', 7, '2026-08-28')).toBe('2026-09-12')
+  })
+  it('prueba ya vencida: cuenta desde HOY, no desde la fecha vieja (si no, perdería días)', () => {
+    expect(extenderFechaVencimiento('2026-08-01', 7, '2026-08-28')).toBe('2026-09-04')
+  })
+  it('sin fecha previa: cuenta desde hoy', () => {
+    expect(extenderFechaVencimiento(null, 10, '2026-08-28')).toBe('2026-09-07')
+  })
+  it('vence justo hoy: se toma como vigente, suma desde esa fecha (no desde "hoy" de nuevo)', () => {
+    expect(extenderFechaVencimiento('2026-08-28', 5, '2026-08-28')).toBe('2026-09-02')
+  })
+  it('ignora un número de días inválido o negativo (no resta)', () => {
+    expect(extenderFechaVencimiento('2026-08-28', -5, '2026-08-28')).toBe('2026-08-28')
+    expect(extenderFechaVencimiento('2026-08-28', 'abc', '2026-08-28')).toBe('2026-08-28')
   })
 })
