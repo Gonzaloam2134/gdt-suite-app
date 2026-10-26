@@ -82,7 +82,7 @@ export default function LocalesTab({
 
         {todosLosLocales.filter(l => l.nombre.toLowerCase().includes(filtroLocal.toLowerCase())).length === 0 && (
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-            <div className="mb-3 text-primary-600/70 flex justify-center"><Icono nombre="buscar" size={44} /></div>
+            <div className="mb-3 text-primary-600 opacity-70 flex justify-center"><Icono nombre="buscar" size={44} /></div>
             <p className="text-gray-500 text-sm">No se encontraron locales.</p>
           </div>
         )}

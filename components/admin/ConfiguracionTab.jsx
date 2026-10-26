@@ -11,7 +11,7 @@ export default function ConfiguracionTab({
 }) {
   return (
     <div className="space-y-4">
-      <div className="bg-primary-50 border border-primary-500/30 rounded-lg p-4">
+      <div className="bg-primary-50 border border-primary-500 opacity-30 rounded-lg p-4">
         <p className="text-sm text-primary-700 m-0">
           <Icono nombre="admin" size={16} className="inline-block align-text-bottom mr-1.5 " />Configuración global de la plataforma. Estos valores afectan a todos los usuarios y locales.
         </p>
