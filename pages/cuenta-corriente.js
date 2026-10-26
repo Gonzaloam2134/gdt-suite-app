@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useUserRole } from '../lib/UserRoleContext'
 import { useActiveLocal } from '../hooks/useActiveLocal'
+import { useMisLocales } from '../hooks/useMisLocales'
 import { useSuscripcionGuard } from '../hooks/useSuscripcionGuard'
 import { useTerminosGuard } from '../hooks/useTerminosGuard'
 import { useCuentaCorriente } from '../hooks/useCuentaCorriente'
@@ -32,6 +33,7 @@ export default function CuentaCorriente() {
   const { user, checking } = useAuthGuard()
   const terminos = useTerminosGuard(user?.id)
   const { local, localId, loading: cargandoLocal } = useActiveLocal(user)
+  const { locales: misLocales } = useMisLocales(user?.id)
   const { userId } = useUserRole()
   const suscripcion = useSuscripcionGuard(localId, 'total')
 
@@ -102,7 +104,7 @@ export default function CuentaCorriente() {
       <MovimientosCcModal isOpen={!!clienteAbierto} onClose={() => setClienteAbierto(null)} cliente={clienteAbierto}
         localId={localId} mediosPago={mediosPago} userId={userId} onCambio={recargar} />
 
-      <BottomNav activeTab="cuenta-corriente" />
+      <BottomNav activeTab="cuenta-corriente" lateral cantidadLocales={misLocales.length} />
     </main>
   )
 }
